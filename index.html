@@ -29,7 +29,19 @@ header h1{font-size:18px;font-weight:600}
 .bar-wrap{flex:1;background:#eee;border-radius:4px;height:8px;overflow:hidden}
 .bar-fill{height:100%;border-radius:4px}
 .cat-row .camt{width:70px;text-align:right;font-size:13px;font-weight:500}
-.txn-list{display:flex;flex-direction:column;gap:8px}
+
+/* Date group */
+.date-group{margin-bottom:10px}
+.date-header{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#fff;border-radius:12px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.06);user-select:none}
+.date-header-left{display:flex;align-items:center;gap:8px}
+.date-label{font-size:13px;font-weight:600;color:#1E3A5F}
+.date-total{font-size:12px;color:#888}
+.date-count{font-size:11px;background:#f0f4fa;color:#1E3A5F;border-radius:10px;padding:2px 7px;font-weight:600}
+.chevron{font-size:13px;color:#aaa;transition:transform .2s}
+.chevron.open{transform:rotate(180deg)}
+.date-entries{display:flex;flex-direction:column;gap:8px;margin-top:8px;overflow:hidden;transition:all .2s}
+.date-entries.collapsed{display:none}
+
 .txn{background:#fff;border-radius:14px;padding:.8rem 1rem;display:flex;align-items:center;gap:12px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
 .txn-ico{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
 .txn-info{flex:1;min-width:0}
@@ -100,7 +112,7 @@ header h1{font-size:18px;font-weight:600}
     <div class="cat-bars" id="cbars"></div>
   </div>
   <p class="section-title">Recent</p>
-  <div class="txn-list" id="tlist"></div>
+  <div id="tlist"></div>
   <div class="fab"><button id="addbtn">+</button></div>
 </div>
 
@@ -164,13 +176,8 @@ const CATS=[
   {n:"Health",e:"💊",c:"#0E6655"},
   {n:"Other",e:"📦",c:"#808B96"},
 ];
-const PAYS=[
-  {n:"UPI",e:"📲"},
-  {n:"Cash",e:"💵"},
-  {n:"Credit",e:"💳"},
-  {n:"Gift",e:"🎁"},
-];
 const MN=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const DAYS=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
 let recs=[];
 try{recs=JSON.parse(localStorage.getItem("xpns")||"[]");}catch(e){}
@@ -179,26 +186,42 @@ let selPay="UPI";
 let editId=null;
 let cur=new Date();cur.setDate(1);
 
+// track which date groups are collapsed; default all expanded
+const collapsed=new Set();
+
 const fmt=n=>"₹"+Math.round(n).toLocaleString("en-IN");
 const persist=()=>{try{localStorage.setItem("xpns",JSON.stringify(recs));}catch(e){}};
 const isoDay=d=>d.toISOString().split("T")[0];
 
 function filtered(){
-  return recs.filter(r=>{const d=new Date(r.date);return d.getMonth()===cur.getMonth()&&d.getFullYear()===cur.getFullYear();});
+  return recs.filter(r=>{
+    const d=new Date(r.date);
+    return d.getMonth()===cur.getMonth()&&d.getFullYear()===cur.getFullYear();
+  });
+}
+
+function friendlyDate(dateStr){
+  const d=new Date(dateStr);
+  const today=isoDay(new Date());
+  const yesterday=isoDay(new Date(Date.now()-86400000));
+  if(dateStr===today) return "Today";
+  if(dateStr===yesterday) return "Yesterday";
+  return DAYS[d.getDay()]+", "+d.getDate()+" "+MN[d.getMonth()];
 }
 
 function payBadge(pay){
   if(!pay)return'';
-  const cls=pay==="Credit"?"Credit":pay==="Gift"?"Gift":pay;
-  return `<span class="pay-badge pay-${cls}">${pay}</span>`;
+  return`<span class="pay-badge pay-${pay==="Credit"?"Credit":pay==="Gift"?"Gift":pay}">${pay}</span>`;
 }
 
 function render(){
   document.getElementById("mlbl").textContent=MN[cur.getMonth()]+" "+cur.getFullYear();
-  const rows=filtered().sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const rows=filtered().sort((a,b)=>new Date(b.date)-new Date(a.date)||(b.id-a.id));
   const total=rows.reduce((s,r)=>s+r.amt,0);
   document.getElementById("tot").textContent=fmt(total);
   document.getElementById("cnt").textContent=rows.length;
+
+  // category bars
   const byc={};rows.forEach(r=>{byc[r.cat]=(byc[r.cat]||0)+r.amt;});
   const catSec=document.getElementById("cat-section");
   catSec.style.display=Object.keys(byc).length?"block":"none";
@@ -211,27 +234,78 @@ function render(){
     d.innerHTML=`<div class="cname">${c.e} ${c.n}</div><div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${c.c}"></div></div><div class="camt">${fmt(byc[c.n])}</div>`;
     cbars.appendChild(d);
   });
+
   const tlist=document.getElementById("tlist");
-  if(!rows.length){tlist.innerHTML='<div class="empty"><span>🧾</span>No expenses this month.<br>Tap + to add one.</div>';return;}
-  tlist.innerHTML="";
+  if(!rows.length){
+    tlist.innerHTML='<div class="empty"><span>🧾</span>No expenses this month.<br>Tap + to add one.</div>';
+    return;
+  }
+
+  // group by date (already sorted latest first)
+  const groups=[];
+  const seen={};
   rows.forEach(r=>{
-    const cat=CATS.find(c=>c.n===r.cat)||CATS[CATS.length-1];
-    const d=new Date(r.date);
-    const el=document.createElement("div");el.className="txn";
-    el.innerHTML=`
-      <div class="txn-ico" style="background:${cat.c}20">${cat.e}</div>
-      <div class="txn-info">
-        <div class="txn-desc">${r.desc||cat.n}</div>
-        <div class="txn-meta">${cat.n} · ${d.getDate()} ${MN[d.getMonth()]}${payBadge(r.pay)}</div>
-      </div>
-      <div class="txn-amt">${fmt(r.amt)}</div>
-      <div class="txn-actions">
-        <button class="icon-btn edit" data-id="${r.id}" title="Edit">✏️</button>
-        <button class="icon-btn del" data-id="${r.id}" title="Delete">×</button>
+    if(!seen[r.date]){seen[r.date]=[];groups.push({date:r.date,items:seen[r.date]});}
+    seen[r.date].push(r);
+  });
+
+  tlist.innerHTML="";
+  groups.forEach(g=>{
+    const isCollapsed=collapsed.has(g.date);
+    const groupTotal=g.items.reduce((s,r)=>s+r.amt,0);
+    const grp=document.createElement("div");
+    grp.className="date-group";
+    grp.dataset.date=g.date;
+
+    const entriesHtml=g.items.map(r=>{
+      const cat=CATS.find(c=>c.n===r.cat)||CATS[CATS.length-1];
+      return`<div class="txn">
+        <div class="txn-ico" style="background:${cat.c}20">${cat.e}</div>
+        <div class="txn-info">
+          <div class="txn-desc">${r.desc||cat.n}</div>
+          <div class="txn-meta">${cat.n}${payBadge(r.pay||'UPI')}</div>
+        </div>
+        <div class="txn-amt">${fmt(r.amt)}</div>
+        <div class="txn-actions">
+          <button class="icon-btn edit" data-id="${r.id}">✏️</button>
+          <button class="icon-btn del" data-id="${r.id}">×</button>
+        </div>
       </div>`;
-    tlist.appendChild(el);
+    }).join("");
+
+    grp.innerHTML=`
+      <div class="date-header">
+        <div class="date-header-left">
+          <span class="chevron${isCollapsed?'':' open'}">▼</span>
+          <span class="date-label">${friendlyDate(g.date)}</span>
+          <span class="date-count">${g.items.length}</span>
+        </div>
+        <span class="date-total">${fmt(groupTotal)}</span>
+      </div>
+      <div class="date-entries${isCollapsed?' collapsed':''}">${entriesHtml}</div>`;
+    tlist.appendChild(grp);
   });
 }
+
+// toggle collapse on date header click
+document.getElementById("tlist").addEventListener("click",e=>{
+  // delete
+  const del=e.target.closest(".del");
+  if(del){if(!confirm("Delete this entry?"))return;recs=recs.filter(r=>r.id!=del.dataset.id);persist();render();return;}
+  // edit
+  const edit=e.target.closest(".edit");
+  if(edit){showEdit(Number(edit.dataset.id));return;}
+  // collapse toggle
+  const hdr=e.target.closest(".date-header");
+  if(hdr){
+    const grp=hdr.closest(".date-group");
+    const date=grp.dataset.date;
+    const entries=grp.querySelector(".date-entries");
+    const chevron=grp.querySelector(".chevron");
+    if(collapsed.has(date)){collapsed.delete(date);entries.classList.remove("collapsed");chevron.classList.add("open");}
+    else{collapsed.add(date);entries.classList.add("collapsed");chevron.classList.remove("open");}
+  }
+});
 
 function setPayChip(pay){
   selPay=pay;
@@ -239,9 +313,7 @@ function setPayChip(pay){
 }
 
 function showAdd(){
-  editId=null;
-  selCat=CATS[0].n;
-  selPay="UPI";
+  editId=null;selCat=CATS[0].n;selPay="UPI";
   document.getElementById("form-title").textContent="Add expense";
   document.getElementById("ichips").innerHTML=CATS.map(c=>`<div class="chip${c.n===selCat?" on":""}" data-cat="${c.n}">${c.e} ${c.n}</div>`).join("");
   setPayChip("UPI");
@@ -255,9 +327,7 @@ function showAdd(){
 
 function showEdit(id){
   const r=recs.find(x=>x.id===id);if(!r)return;
-  editId=id;
-  selCat=r.cat;
-  selPay=r.pay||"UPI";
+  editId=id;selCat=r.cat;selPay=r.pay||"UPI";
   document.getElementById("form-title").textContent="Edit expense";
   document.getElementById("ichips").innerHTML=CATS.map(c=>`<div class="chip${c.n===selCat?" on":""}" data-cat="${c.n}">${c.e} ${c.n}</div>`).join("");
   setPayChip(selPay);
@@ -284,20 +354,9 @@ document.getElementById("ichips").addEventListener("click",e=>{
   selCat=chip.dataset.cat;
   document.querySelectorAll(".chip").forEach(c=>c.classList.toggle("on",c===chip));
 });
-
 document.getElementById("ipaychips").addEventListener("click",e=>{
   const chip=e.target.closest(".pay-chip");if(!chip)return;
   setPayChip(chip.dataset.pay);
-});
-
-document.getElementById("tlist").addEventListener("click",e=>{
-  const del=e.target.closest(".del");
-  if(del){
-    if(!confirm("Delete this entry?"))return;
-    recs=recs.filter(r=>r.id!=del.dataset.id);persist();render();return;
-  }
-  const edit=e.target.closest(".edit");
-  if(edit)showEdit(Number(edit.dataset.id));
 });
 
 document.getElementById("savebtn").onclick=function(){
@@ -320,7 +379,6 @@ document.getElementById("exportBtn").onclick=function(){
   a.download="expenses_backup_"+isoDay(new Date())+".json";a.click();
   document.getElementById("overlay").classList.remove("open");
 };
-
 document.getElementById("importBtn").onclick=()=>document.getElementById("importFile").click();
 document.getElementById("importFile").onchange=function(){
   const file=this.files[0];if(!file)return;
