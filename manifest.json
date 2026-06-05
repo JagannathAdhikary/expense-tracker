@@ -1,7 +1,8 @@
 {
   "name": "Expense Tracker",
   "short_name": "Expenses",
-  "start_url": "/",
+  "start_url": "/expense-tracker/",
+  "scope": "/expense-tracker/",
   "display": "standalone",
   "background_color": "#f5f6fa",
   "theme_color": "#1E3A5F",
