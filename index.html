@@ -36,13 +36,20 @@ header h1{font-size:18px;font-weight:600}
 .txn-desc{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .txn-meta{font-size:12px;color:#888;margin-top:2px}
 .txn-amt{font-size:15px;font-weight:600;white-space:nowrap}
-.del{background:none;border:none;font-size:20px;color:#ccc;cursor:pointer;padding:4px;line-height:1}
+.txn-actions{display:flex;flex-direction:column;gap:2px}
+.icon-btn{background:none;border:none;font-size:16px;color:#ccc;cursor:pointer;padding:3px;line-height:1}
+.icon-btn:hover{color:#888}
+.icon-btn.del:hover{color:#e74c3c}
+.pay-badge{display:inline-block;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:500;margin-left:4px;vertical-align:middle}
+.pay-UPI{background:#e8f4fd;color:#1a6fa8}
+.pay-Cash{background:#e9f7ef;color:#1a6b3a}
+.pay-Credit{background:#fdf0e8;color:#a04000}
+.pay-Gift{background:#f5eafd;color:#6c3483}
 .empty{text-align:center;padding:3rem 0;color:#bbb;font-size:15px}
 .empty span{font-size:44px;display:block;margin-bottom:.6rem}
 .fab{position:fixed;bottom:1.5rem;right:1.5rem;z-index:10}
 .fab button{width:58px;height:58px;border-radius:50%;background:#1E3A5F;color:#fff;border:none;font-size:30px;cursor:pointer;box-shadow:0 4px 16px rgba(30,58,95,.35);display:flex;align-items:center;justify-content:center}
 .menu-btn{background:none;border:none;font-size:22px;cursor:pointer;color:#888;padding:4px}
-/* Add screen */
 .back-btn{display:flex;align-items:center;gap:6px;background:none;border:none;font-size:15px;color:#666;cursor:pointer;padding:4px 0}
 .form{display:flex;flex-direction:column;gap:16px;margin-top:.5rem}
 .field label{font-size:13px;color:#666;margin-bottom:6px;display:block;font-weight:500}
@@ -54,8 +61,14 @@ header h1{font-size:18px;font-weight:600}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chip{padding:8px 14px;border-radius:20px;font-size:13px;border:1.5px solid #e0e0e0;cursor:pointer;background:#fff;color:#555;user-select:none}
 .chip.on{background:#1E3A5F;color:#fff;border-color:#1E3A5F}
+.pay-chips{display:flex;gap:8px;flex-wrap:wrap}
+.pay-chip{padding:8px 14px;border-radius:20px;font-size:13px;border:1.5px solid #e0e0e0;cursor:pointer;background:#fff;color:#555;user-select:none;display:flex;align-items:center;gap:5px}
+.pay-chip.on{border-width:2px}
+.pay-chip[data-pay="UPI"].on{background:#e8f4fd;color:#1a6fa8;border-color:#1a6fa8}
+.pay-chip[data-pay="Cash"].on{background:#e9f7ef;color:#1a6b3a;border-color:#1a6b3a}
+.pay-chip[data-pay="Credit"].on{background:#fdf0e8;color:#a04000;border-color:#a04000}
+.pay-chip[data-pay="Gift"].on{background:#f5eafd;color:#6c3483;border-color:#6c3483}
 .save-btn{width:100%;padding:15px;background:#1E3A5F;color:#fff;border:none;border-radius:14px;font-size:16px;font-weight:600;cursor:pointer}
-/* Options modal */
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:20;align-items:flex-end}
 .overlay.open{display:flex}
 .sheet{background:#fff;border-radius:20px 20px 0 0;padding:1.5rem;width:100%;max-width:480px;margin:0 auto}
@@ -91,11 +104,11 @@ header h1{font-size:18px;font-weight:600}
   <div class="fab"><button id="addbtn">+</button></div>
 </div>
 
-<!-- ADD -->
+<!-- ADD / EDIT -->
 <div id="add" class="screen">
   <header>
     <button class="back-btn" id="backbtn">&#8592; Back</button>
-    <h1>Add expense</h1>
+    <h1 id="form-title">Add expense</h1>
   </header>
   <div class="form">
     <div class="field">
@@ -108,6 +121,15 @@ header h1{font-size:18px;font-weight:600}
     <div class="field">
       <label>Category</label>
       <div class="chips" id="ichips"></div>
+    </div>
+    <div class="field">
+      <label>Payment type</label>
+      <div class="pay-chips" id="ipaychips">
+        <div class="pay-chip" data-pay="UPI">📲 UPI</div>
+        <div class="pay-chip" data-pay="Cash">💵 Cash</div>
+        <div class="pay-chip" data-pay="Credit">💳 Credit Card</div>
+        <div class="pay-chip" data-pay="Gift">🎁 Gift Card</div>
+      </div>
     </div>
     <div class="field">
       <label>Note <span style="font-size:11px;opacity:.5">(optional)</span></label>
@@ -142,11 +164,19 @@ const CATS=[
   {n:"Health",e:"💊",c:"#0E6655"},
   {n:"Other",e:"📦",c:"#808B96"},
 ];
+const PAYS=[
+  {n:"UPI",e:"📲"},
+  {n:"Cash",e:"💵"},
+  {n:"Credit",e:"💳"},
+  {n:"Gift",e:"🎁"},
+];
 const MN=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 let recs=[];
 try{recs=JSON.parse(localStorage.getItem("xpns")||"[]");}catch(e){}
 let selCat=CATS[0].n;
+let selPay="UPI";
+let editId=null;
 let cur=new Date();cur.setDate(1);
 
 const fmt=n=>"₹"+Math.round(n).toLocaleString("en-IN");
@@ -155,6 +185,12 @@ const isoDay=d=>d.toISOString().split("T")[0];
 
 function filtered(){
   return recs.filter(r=>{const d=new Date(r.date);return d.getMonth()===cur.getMonth()&&d.getFullYear()===cur.getFullYear();});
+}
+
+function payBadge(pay){
+  if(!pay)return'';
+  const cls=pay==="Credit"?"Credit":pay==="Gift"?"Gift":pay;
+  return `<span class="pay-badge pay-${cls}">${pay}</span>`;
 }
 
 function render(){
@@ -182,14 +218,33 @@ function render(){
     const cat=CATS.find(c=>c.n===r.cat)||CATS[CATS.length-1];
     const d=new Date(r.date);
     const el=document.createElement("div");el.className="txn";
-    el.innerHTML=`<div class="txn-ico" style="background:${cat.c}20">${cat.e}</div><div class="txn-info"><div class="txn-desc">${r.desc||cat.n}</div><div class="txn-meta">${cat.n} · ${d.getDate()} ${MN[d.getMonth()]}</div></div><div class="txn-amt">${fmt(r.amt)}</div><button class="del" data-id="${r.id}">×</button>`;
+    el.innerHTML=`
+      <div class="txn-ico" style="background:${cat.c}20">${cat.e}</div>
+      <div class="txn-info">
+        <div class="txn-desc">${r.desc||cat.n}</div>
+        <div class="txn-meta">${cat.n} · ${d.getDate()} ${MN[d.getMonth()]}${payBadge(r.pay)}</div>
+      </div>
+      <div class="txn-amt">${fmt(r.amt)}</div>
+      <div class="txn-actions">
+        <button class="icon-btn edit" data-id="${r.id}" title="Edit">✏️</button>
+        <button class="icon-btn del" data-id="${r.id}" title="Delete">×</button>
+      </div>`;
     tlist.appendChild(el);
   });
 }
 
+function setPayChip(pay){
+  selPay=pay;
+  document.querySelectorAll(".pay-chip").forEach(c=>c.classList.toggle("on",c.dataset.pay===pay));
+}
+
 function showAdd(){
+  editId=null;
   selCat=CATS[0].n;
+  selPay="UPI";
+  document.getElementById("form-title").textContent="Add expense";
   document.getElementById("ichips").innerHTML=CATS.map(c=>`<div class="chip${c.n===selCat?" on":""}" data-cat="${c.n}">${c.e} ${c.n}</div>`).join("");
+  setPayChip("UPI");
   document.getElementById("iamt").value="";
   document.getElementById("idesc").value="";
   document.getElementById("idate").value=isoDay(new Date());
@@ -197,6 +252,23 @@ function showAdd(){
   document.getElementById("add").classList.add("active");
   setTimeout(()=>document.getElementById("iamt").focus(),100);
 }
+
+function showEdit(id){
+  const r=recs.find(x=>x.id===id);if(!r)return;
+  editId=id;
+  selCat=r.cat;
+  selPay=r.pay||"UPI";
+  document.getElementById("form-title").textContent="Edit expense";
+  document.getElementById("ichips").innerHTML=CATS.map(c=>`<div class="chip${c.n===selCat?" on":""}" data-cat="${c.n}">${c.e} ${c.n}</div>`).join("");
+  setPayChip(selPay);
+  document.getElementById("iamt").value=r.amt;
+  document.getElementById("idesc").value=r.desc||"";
+  document.getElementById("idate").value=r.date;
+  document.getElementById("home").classList.remove("active");
+  document.getElementById("add").classList.add("active");
+  setTimeout(()=>document.getElementById("iamt").focus(),100);
+}
+
 function showHome(){document.getElementById("add").classList.remove("active");document.getElementById("home").classList.add("active");render();}
 
 document.getElementById("addbtn").onclick=showAdd;
@@ -212,19 +284,36 @@ document.getElementById("ichips").addEventListener("click",e=>{
   selCat=chip.dataset.cat;
   document.querySelectorAll(".chip").forEach(c=>c.classList.toggle("on",c===chip));
 });
-document.getElementById("tlist").addEventListener("click",e=>{
-  const btn=e.target.closest(".del");if(!btn)return;
-  if(!confirm("Delete this entry?"))return;
-  recs=recs.filter(r=>r.id!=btn.dataset.id);persist();render();
+
+document.getElementById("ipaychips").addEventListener("click",e=>{
+  const chip=e.target.closest(".pay-chip");if(!chip)return;
+  setPayChip(chip.dataset.pay);
 });
+
+document.getElementById("tlist").addEventListener("click",e=>{
+  const del=e.target.closest(".del");
+  if(del){
+    if(!confirm("Delete this entry?"))return;
+    recs=recs.filter(r=>r.id!=del.dataset.id);persist();render();return;
+  }
+  const edit=e.target.closest(".edit");
+  if(edit)showEdit(Number(edit.dataset.id));
+});
+
 document.getElementById("savebtn").onclick=function(){
   const amt=parseFloat(document.getElementById("iamt").value);
   if(!amt||amt<=0){document.getElementById("iamt").focus();return;}
-  recs.push({id:Date.now(),amt,cat:selCat,desc:document.getElementById("idesc").value.trim(),date:document.getElementById("idate").value||isoDay(new Date())});
+  const desc=document.getElementById("idesc").value.trim();
+  const date=document.getElementById("idate").value||isoDay(new Date());
+  if(editId){
+    const idx=recs.findIndex(r=>r.id===editId);
+    if(idx>-1)recs[idx]={...recs[idx],amt,cat:selCat,pay:selPay,desc,date};
+  } else {
+    recs.push({id:Date.now(),amt,cat:selCat,pay:selPay,desc,date});
+  }
   persist();showHome();
 };
 
-// Export
 document.getElementById("exportBtn").onclick=function(){
   const blob=new Blob([JSON.stringify(recs,null,2)],{type:"application/json"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);
@@ -232,7 +321,6 @@ document.getElementById("exportBtn").onclick=function(){
   document.getElementById("overlay").classList.remove("open");
 };
 
-// Import
 document.getElementById("importBtn").onclick=()=>document.getElementById("importFile").click();
 document.getElementById("importFile").onchange=function(){
   const file=this.files[0];if(!file)return;
@@ -250,8 +338,7 @@ document.getElementById("importFile").onchange=function(){
       }
     }catch(err){alert("Invalid backup file.");}
   };
-  reader.readAsText(file);
-  this.value="";
+  reader.readAsText(file);this.value="";
 };
 
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});}
