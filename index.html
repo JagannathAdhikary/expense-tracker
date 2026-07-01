@@ -82,6 +82,10 @@ header h1{font-size:18px;font-weight:600}
 .pay-chip[data-pay="Cash"].on{background:#e9f7ef;color:#1a6b3a;border-color:#1a6b3a}
 .pay-chip[data-pay="Credit"].on{background:#fdf0e8;color:#a04000;border-color:#a04000}
 .pay-chip[data-pay="Gift"].on{background:#f5eafd;color:#6c3483;border-color:#6c3483}
+.pay-chip.add-chip{color:#1E3A5F;border-style:dashed;font-weight:500}
+.pay-chip.pay-custom.on{background:#eef1f6;color:#1E3A5F;border-color:#1E3A5F}
+.pay-badge.pay-custom{background:#eef1f6;color:#1E3A5F}
+.default-star{color:#d4a017;font-size:12px;margin-left:4px}
 .save-btn{width:100%;padding:15px;background:#1E3A5F;color:#fff;border:none;border-radius:14px;font-size:16px;font-weight:600;cursor:pointer}
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:20;align-items:flex-end}
 .overlay.open{display:flex}
@@ -174,12 +178,7 @@ header h1{font-size:18px;font-weight:600}
     </div>
     <div class="field">
       <label>Payment type</label>
-      <div class="pay-chips" id="ipaychips">
-        <div class="pay-chip" data-pay="UPI">📲 UPI</div>
-        <div class="pay-chip" data-pay="Cash">💵 Cash</div>
-        <div class="pay-chip" data-pay="Credit">💳 Credit Card</div>
-        <div class="pay-chip" data-pay="Gift">🎁 Gift Card</div>
-      </div>
+      <div class="pay-chips" id="ipaychips"></div>
     </div>
     <div class="field">
       <label>Note <span style="font-size:11px;opacity:.5">(optional)</span></label>
@@ -198,6 +197,8 @@ header h1{font-size:18px;font-weight:600}
   <div class="sheet">
     <h3>Options</h3>
     <button class="sheet-btn" id="manageCatsBtn"><span>🏷️</span> Manage categories</button>
+    <button class="sheet-btn" id="managePaysBtn"><span>💳</span> Manage payment methods</button>
+    <button class="sheet-btn" id="defaultsBtn"><span>⭐</span> Set defaults</button>
     <button class="sheet-btn" id="exportBtn"><span>📤</span> Export data (backup)</button>
     <button class="sheet-btn" id="importBtn"><span>📥</span> Import data (restore)</button>
     <input type="file" id="importFile" accept=".json" style="display:none"/>
@@ -238,6 +239,54 @@ header h1{font-size:18px;font-weight:600}
   </div>
 </div>
 
+<!-- MANAGE PAYMENT METHODS SHEET -->
+<div class="overlay" id="payOverlay">
+  <div class="sheet">
+    <h3>Manage payment methods</h3>
+    <div class="cat-manage-list" id="payManageList"></div>
+    <button class="sheet-btn" id="addPayBtn" style="color:#1E3A5F;font-weight:500"><span>➕</span> Add new payment method</button>
+    <button class="sheet-btn" id="closePaySheet"><span>✕</span> Close</button>
+  </div>
+</div>
+
+<!-- ADD PAYMENT MODAL -->
+<div class="modal" id="payModal">
+  <div class="modal-box">
+    <h3>New payment method</h3>
+    <div class="field">
+      <label>Name</label>
+      <input type="text" id="pName" placeholder="e.g. Debit Card" maxlength="20"/>
+    </div>
+    <div class="field">
+      <label>Emoji <span style="font-size:11px;opacity:.5">(optional)</span></label>
+      <input type="text" id="pEmoji" placeholder="🏦" maxlength="4" style="font-size:20px"/>
+    </div>
+    <div class="modal-actions">
+      <button id="pCancel">Cancel</button>
+      <button class="primary" id="pSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- DEFAULTS MODAL -->
+<div class="modal" id="defModal">
+  <div class="modal-box">
+    <h3>Set defaults</h3>
+    <div class="field">
+      <label>Default category</label>
+      <div class="chips" id="defCatChips"></div>
+    </div>
+    <div class="field">
+      <label>Default payment method</label>
+      <div class="pay-chips" id="defPayChips"></div>
+    </div>
+    <div class="modal-actions">
+      <button id="defCancel">Cancel</button>
+      <button class="primary" id="defSave">Save</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const DEFAULT_CATS=[
   {n:"Living",e:"🏠",c:"#1E3A5F"},
@@ -247,6 +296,12 @@ const DEFAULT_CATS=[
   {n:"Transport",e:"🚗",c:"#D35400"},
   {n:"Health",e:"💊",c:"#0E6655"},
   {n:"Other",e:"📦",c:"#808B96"},
+];
+const DEFAULT_PAYS=[
+  {n:"UPI",e:"📲"},
+  {n:"Cash",e:"💵"},
+  {n:"Credit",e:"💳"},
+  {n:"Gift",e:"🎁"},
 ];
 const PALETTE=["#1E3A5F","#1A6B3A","#7D3C98","#C0392B","#D35400","#0E6655","#808B96","#2874A6","#B7950B","#CA6F1E","#943126","#117A65","#5B2C6F","#34495E"];
 const MN=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -259,12 +314,24 @@ try{
   const stored=JSON.parse(localStorage.getItem("xpns_cats")||"null");
   CATS=(Array.isArray(stored)&&stored.length)?stored:DEFAULT_CATS.slice();
 }catch(e){CATS=DEFAULT_CATS.slice();}
+let PAYS=[];
+try{
+  const stored=JSON.parse(localStorage.getItem("xpns_pays")||"null");
+  PAYS=(Array.isArray(stored)&&stored.length)?stored:DEFAULT_PAYS.slice();
+}catch(e){PAYS=DEFAULT_PAYS.slice();}
+let PREFS={defaultCat:null,defaultPay:null};
+try{
+  const stored=JSON.parse(localStorage.getItem("xpns_prefs")||"null");
+  if(stored&&typeof stored==="object")PREFS={...PREFS,...stored};
+}catch(e){}
 
-const FALLBACK_CAT={n:"Other",e:"📦",c:"#808B96"};
 const catByName=name=>CATS.find(c=>c.n===name)||{n:name||"Other",e:"📦",c:"#808B96"};
+const payByName=name=>PAYS.find(p=>p.n===name)||(name?{n:name,e:"💰"}:null);
+const initialCat=()=>(PREFS.defaultCat&&CATS.find(c=>c.n===PREFS.defaultCat))?PREFS.defaultCat:(CATS[0]?CATS[0].n:"Other");
+const initialPay=()=>(PREFS.defaultPay&&PAYS.find(p=>p.n===PREFS.defaultPay))?PREFS.defaultPay:(PAYS[0]?PAYS[0].n:"UPI");
 
-let selCat=CATS[0]?CATS[0].n:"Other";
-let selPay="UPI";
+let selCat=initialCat();
+let selPay=initialPay();
 let editId=null;
 let cur=new Date();cur.setDate(1);
 let filterCat=null; // when set, home shows filtered category view
@@ -276,6 +343,8 @@ const collapsed=new Set();
 const fmt=n=>"₹"+Math.round(n).toLocaleString("en-IN");
 const persist=()=>{try{localStorage.setItem("xpns",JSON.stringify(recs));}catch(e){}};
 const persistCats=()=>{try{localStorage.setItem("xpns_cats",JSON.stringify(CATS));}catch(e){}};
+const persistPays=()=>{try{localStorage.setItem("xpns_pays",JSON.stringify(PAYS));}catch(e){}};
+const persistPrefs=()=>{try{localStorage.setItem("xpns_prefs",JSON.stringify(PREFS));}catch(e){}};
 const isoDay=d=>d.toISOString().split("T")[0];
 
 function filtered(){
@@ -296,7 +365,10 @@ function friendlyDate(dateStr){
 
 function payBadge(pay){
   if(!pay)return'';
-  return`<span class="pay-badge pay-${pay==="Credit"?"Credit":pay==="Gift"?"Gift":pay}">${pay}</span>`;
+  // Built-in payment names use their dedicated color class; custom ones get a neutral badge.
+  const builtin=["UPI","Cash","Credit","Gift"].includes(pay);
+  const cls=builtin?`pay-${pay}`:"pay-custom";
+  return`<span class="pay-badge ${cls}">${pay}</span>`;
 }
 
 // Render a list of rows grouped by date into a container element
@@ -433,9 +505,18 @@ function listClickHandler(container){
 listClickHandler(document.getElementById("tlist"));
 listClickHandler(document.getElementById("cvlist"));
 
+function renderPayChips(){
+  // Built-in pay names keep their existing color classes via data-pay; custom ones get pay-custom class.
+  const html=PAYS.map(p=>{
+    const builtin=["UPI","Cash","Credit","Gift"].includes(p.n);
+    const cls="pay-chip"+(builtin?"":" pay-custom")+(p.n===selPay?" on":"");
+    return`<div class="${cls}" data-pay="${p.n}">${p.e||"💰"} ${p.n}</div>`;
+  }).join("")+`<div class="pay-chip add-chip" id="addPayChip">＋ New</div>`;
+  document.getElementById("ipaychips").innerHTML=html;
+}
 function setPayChip(pay){
   selPay=pay;
-  document.querySelectorAll(".pay-chip").forEach(c=>c.classList.toggle("on",c.dataset.pay===pay));
+  document.querySelectorAll("#ipaychips .pay-chip").forEach(c=>c.classList.toggle("on",c.dataset.pay===pay&&!c.classList.contains("add-chip")));
 }
 
 function renderCatChips(){
@@ -445,10 +526,10 @@ function renderCatChips(){
 }
 
 function showAdd(){
-  editId=null;selCat=CATS[0]?CATS[0].n:"Other";selPay="UPI";
+  editId=null;selCat=initialCat();selPay=initialPay();
   document.getElementById("form-title").textContent="Add expense";
   renderCatChips();
-  setPayChip("UPI");
+  renderPayChips();
   document.getElementById("iamt").value="";
   document.getElementById("idesc").value="";
   document.getElementById("idate").value=isoDay(new Date());
@@ -460,14 +541,18 @@ function showAdd(){
 
 function showEdit(id){
   const r=recs.find(x=>x.id===id);if(!r)return;
-  editId=id;selCat=r.cat;selPay=r.pay||"UPI";
+  editId=id;selCat=r.cat;selPay=r.pay||initialPay();
   // if the record's category was deleted, keep it selectable for this edit
   if(!CATS.find(c=>c.n===selCat)){
     CATS.push({n:selCat,e:"📦",c:"#808B96"});
   }
+  // same treatment for a payment method that was removed
+  if(selPay&&!PAYS.find(p=>p.n===selPay)){
+    PAYS.push({n:selPay,e:"💰"});
+  }
   document.getElementById("form-title").textContent="Edit expense";
   renderCatChips();
-  setPayChip(selPay);
+  renderPayChips();
   document.getElementById("iamt").value=r.amt;
   document.getElementById("idesc").value=r.desc||"";
   document.getElementById("idate").value=r.date;
@@ -508,7 +593,8 @@ document.getElementById("ichips").addEventListener("click",e=>{
   document.querySelectorAll("#ichips .chip").forEach(c=>c.classList.toggle("on",c===chip));
 });
 document.getElementById("ipaychips").addEventListener("click",e=>{
-  const chip=e.target.closest(".pay-chip");if(!chip)return;
+  if(e.target.closest("#addPayChip")){openPayModal();return;}
+  const chip=e.target.closest(".pay-chip");if(!chip||chip.classList.contains("add-chip"))return;
   setPayChip(chip.dataset.pay);
 });
 
@@ -538,9 +624,10 @@ function renderCatManage(){
   const counts={};recs.forEach(r=>{counts[r.cat]=(counts[r.cat]||0)+1;});
   list.innerHTML=CATS.map(c=>{
     const n=counts[c.n]||0;
+    const isDefault=PREFS.defaultCat===c.n;
     return`<div class="cat-manage-row">
       <div class="cm-ico" style="background:${c.c}20">${c.e}</div>
-      <div class="cm-name">${c.n}</div>
+      <div class="cm-name">${c.n}${isDefault?' <span class="default-star" title="Default">★</span>':''}</div>
       <span class="cm-count">${n} ${n===1?'entry':'entries'}</span>
       <button class="cm-del" data-cat="${c.n}" title="Remove">🗑</button>
     </div>`;
@@ -561,6 +648,7 @@ document.getElementById("catManageList").addEventListener("click",e=>{
   if(count)msg+=`\n\n${count} existing ${count===1?'entry':'entries'} still labelled "${name}" will be kept — they'll show as "${name}" but the option won't appear when adding new expenses.`;
   if(!confirm(msg))return;
   CATS=CATS.filter(c=>c.n!==name);
+  if(PREFS.defaultCat===name){PREFS.defaultCat=null;persistPrefs();}
   persistCats();
   renderCatManage();
   render();if(filterCat===name){filterCat=null;}
@@ -606,10 +694,109 @@ document.getElementById("cSave").onclick=function(){
   render();
 };
 
+/* ---------- Manage payment methods ---------- */
+function renderPayManage(){
+  const list=document.getElementById("payManageList");
+  const counts={};recs.forEach(r=>{const k=r.pay||"";if(k)counts[k]=(counts[k]||0)+1;});
+  list.innerHTML=PAYS.map(p=>{
+    const n=counts[p.n]||0;
+    const isDefault=PREFS.defaultPay===p.n;
+    return`<div class="cat-manage-row">
+      <div class="cm-ico" style="background:#eef1f6">${p.e||"💰"}</div>
+      <div class="cm-name">${p.n}${isDefault?' <span class="default-star" title="Default">★</span>':''}</div>
+      <span class="cm-count">${n} ${n===1?'entry':'entries'}</span>
+      <button class="cm-del" data-pay="${p.n}" title="Remove">🗑</button>
+    </div>`;
+  }).join("")||'<div style="color:#888;font-size:13px;padding:8px 0">No payment methods yet.</div>';
+}
+document.getElementById("managePaysBtn").onclick=()=>{
+  document.getElementById("overlay").classList.remove("open");
+  renderPayManage();
+  document.getElementById("payOverlay").classList.add("open");
+};
+document.getElementById("closePaySheet").onclick=()=>document.getElementById("payOverlay").classList.remove("open");
+document.getElementById("payOverlay").onclick=e=>{if(e.target===document.getElementById("payOverlay"))document.getElementById("payOverlay").classList.remove("open");};
+document.getElementById("payManageList").addEventListener("click",e=>{
+  const btn=e.target.closest(".cm-del");if(!btn)return;
+  const name=btn.dataset.pay;
+  const count=recs.filter(r=>r.pay===name).length;
+  let msg=`Remove payment method "${name}" from the picker?`;
+  if(count)msg+=`\n\n${count} existing ${count===1?'entry':'entries'} still tagged "${name}" will be kept — the option just won't appear when adding new expenses.`;
+  if(!confirm(msg))return;
+  PAYS=PAYS.filter(p=>p.n!==name);
+  // If the removed one was the default, clear the pref so we don't auto-select a missing option.
+  if(PREFS.defaultPay===name){PREFS.defaultPay=null;persistPrefs();}
+  persistPays();
+  renderPayManage();
+});
+
+/* ---------- Add new payment method modal ---------- */
+function openPayModal(){
+  document.getElementById("pName").value="";
+  document.getElementById("pEmoji").value="";
+  document.getElementById("payModal").classList.add("open");
+  setTimeout(()=>document.getElementById("pName").focus(),100);
+}
+document.getElementById("addPayBtn").onclick=openPayModal;
+document.getElementById("pCancel").onclick=()=>document.getElementById("payModal").classList.remove("open");
+document.getElementById("payModal").onclick=e=>{if(e.target===document.getElementById("payModal"))document.getElementById("payModal").classList.remove("open");};
+document.getElementById("pSave").onclick=function(){
+  const name=document.getElementById("pName").value.trim();
+  const emoji=document.getElementById("pEmoji").value.trim()||"💰";
+  if(!name){document.getElementById("pName").focus();return;}
+  if(PAYS.find(p=>p.n.toLowerCase()===name.toLowerCase())){
+    alert("A payment method with that name already exists.");return;
+  }
+  PAYS.push({n:name,e:emoji});
+  persistPays();
+  document.getElementById("payModal").classList.remove("open");
+  // if add-expense form is open, refresh chips and select the new one
+  if(document.getElementById("add").classList.contains("active")){
+    selPay=name;renderPayChips();
+  }
+  if(document.getElementById("payOverlay").classList.contains("open"))renderPayManage();
+};
+
+/* ---------- Defaults modal ---------- */
+let defCatSel=null,defPaySel=null;
+function renderDefaultChips(){
+  document.getElementById("defCatChips").innerHTML=CATS.map(c=>
+    `<div class="chip${c.n===defCatSel?" on":""}" data-cat="${c.n}">${c.e} ${c.n}</div>`
+  ).join("");
+  document.getElementById("defPayChips").innerHTML=PAYS.map(p=>{
+    const builtin=["UPI","Cash","Credit","Gift"].includes(p.n);
+    const cls="pay-chip"+(builtin?"":" pay-custom")+(p.n===defPaySel?" on":"");
+    return`<div class="${cls}" data-pay="${p.n}">${p.e||"💰"} ${p.n}</div>`;
+  }).join("");
+}
+document.getElementById("defaultsBtn").onclick=()=>{
+  document.getElementById("overlay").classList.remove("open");
+  defCatSel=PREFS.defaultCat&&CATS.find(c=>c.n===PREFS.defaultCat)?PREFS.defaultCat:(CATS[0]?CATS[0].n:null);
+  defPaySel=PREFS.defaultPay&&PAYS.find(p=>p.n===PREFS.defaultPay)?PREFS.defaultPay:(PAYS[0]?PAYS[0].n:null);
+  renderDefaultChips();
+  document.getElementById("defModal").classList.add("open");
+};
+document.getElementById("defCancel").onclick=()=>document.getElementById("defModal").classList.remove("open");
+document.getElementById("defModal").onclick=e=>{if(e.target===document.getElementById("defModal"))document.getElementById("defModal").classList.remove("open");};
+document.getElementById("defCatChips").addEventListener("click",e=>{
+  const chip=e.target.closest(".chip");if(!chip)return;
+  defCatSel=chip.dataset.cat;renderDefaultChips();
+});
+document.getElementById("defPayChips").addEventListener("click",e=>{
+  const chip=e.target.closest(".pay-chip");if(!chip)return;
+  defPaySel=chip.dataset.pay;renderDefaultChips();
+});
+document.getElementById("defSave").onclick=function(){
+  PREFS.defaultCat=defCatSel;
+  PREFS.defaultPay=defPaySel;
+  persistPrefs();
+  document.getElementById("defModal").classList.remove("open");
+};
+
 /* ---------- Export / Import ---------- */
 document.getElementById("exportBtn").onclick=function(){
   // include categories in backup so custom ones survive restore
-  const payload={version:2,exportedAt:new Date().toISOString(),cats:CATS,records:recs};
+  const payload={version:3,exportedAt:new Date().toISOString(),cats:CATS,pays:PAYS,prefs:PREFS,records:recs};
   const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);
   a.download="expenses_backup_"+isoDay(new Date())+".json";a.click();
@@ -622,17 +809,34 @@ document.getElementById("importFile").onchange=function(){
   reader.onload=e=>{
     try{
       const parsed=JSON.parse(e.target.result);
-      // Support both legacy (array) and v2 ({records, cats}) formats
+      // Support legacy array, v2 ({records, cats}), and v3 ({records, cats, pays, prefs}) formats.
       const importedRecs=Array.isArray(parsed)?parsed:(Array.isArray(parsed.records)?parsed.records:null);
       if(!importedRecs)throw new Error();
       const importedCats=(parsed&&Array.isArray(parsed.cats))?parsed.cats:null;
-      if(confirm(`Import ${importedRecs.length} records${importedCats?` and ${importedCats.length} categories`:''}? This will merge with existing data.`)){
+      const importedPays=(parsed&&Array.isArray(parsed.pays))?parsed.pays:null;
+      const importedPrefs=(parsed&&parsed.prefs&&typeof parsed.prefs==="object")?parsed.prefs:null;
+      const extras=[
+        importedCats?`${importedCats.length} categories`:null,
+        importedPays?`${importedPays.length} payment methods`:null,
+      ].filter(Boolean).join(", ");
+      if(confirm(`Import ${importedRecs.length} records${extras?` and ${extras}`:''}? This will merge with existing data.`)){
         const existingIds=new Set(recs.map(r=>r.id));
         importedRecs.forEach(r=>{if(!existingIds.has(r.id))recs.push(r);});
         if(importedCats){
           const existingNames=new Set(CATS.map(c=>c.n.toLowerCase()));
           importedCats.forEach(c=>{if(c&&c.n&&!existingNames.has(c.n.toLowerCase()))CATS.push(c);});
           persistCats();
+        }
+        if(importedPays){
+          const existingNames=new Set(PAYS.map(p=>p.n.toLowerCase()));
+          importedPays.forEach(p=>{if(p&&p.n&&!existingNames.has(p.n.toLowerCase()))PAYS.push(p);});
+          persistPays();
+        }
+        // Only adopt imported prefs if the current user hasn't set their own
+        if(importedPrefs){
+          if(!PREFS.defaultCat&&importedPrefs.defaultCat)PREFS.defaultCat=importedPrefs.defaultCat;
+          if(!PREFS.defaultPay&&importedPrefs.defaultPay)PREFS.defaultPay=importedPrefs.defaultPay;
+          persistPrefs();
         }
         persist();render();
         document.getElementById("overlay").classList.remove("open");
@@ -644,8 +848,9 @@ document.getElementById("importFile").onchange=function(){
 };
 
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});}
-// Ensure categories are persisted on first run so future sessions load from storage
+// Ensure new keys are seeded on first run so future sessions load from storage
 if(!localStorage.getItem("xpns_cats"))persistCats();
+if(!localStorage.getItem("xpns_pays"))persistPays();
 render();
 </script>
 </body>
