@@ -37,8 +37,10 @@ export async function loadCloudData() {
     return;
   }
 
-  // Groups I'm a member of.
-  const { data: memberships, error: mErr } = await supabase.from('group_members').select('group_id, role, groups(id, name, invite_code)');
+  // Groups I'm a member of. Filter to MY membership rows: RLS lets co-members see
+  // each other, so an unfiltered select returns one row per member of each group
+  // (which would make a group appear multiple times in the list).
+  const { data: memberships, error: mErr } = await supabase.from('group_members').select('group_id, role, groups(id, name, invite_code)').eq('user_id', state.user.id);
   if (mErr) {
     console.error('load groups failed', mErr);
     return;

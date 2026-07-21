@@ -89,6 +89,7 @@ function renderGroupDetail() {
 }
 
 export function showGroups() {
+  $('overlay').classList.remove('open');
   ['home', 'catview', 'add'].forEach((id) => $(id).classList.remove('active'));
   $('groups').classList.add('active');
   if (!cloudEnabled()) {
@@ -131,10 +132,6 @@ export function refreshGroupsView() {
 }
 
 export function initGroupsView() {
-  $('groupsBtn').onclick = () => {
-    $('overlay').classList.remove('open');
-    showGroups();
-  };
   $('groupsBackBtn').onclick = () => {
     ['groups', 'catview', 'add'].forEach((id) => $(id).classList.remove('active'));
     $('home').classList.add('active');

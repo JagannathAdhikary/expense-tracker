@@ -11,6 +11,7 @@ import { $ } from './dom.js';
 import { render, showHome, initHome } from './views/home.js';
 import { renderCategoryView, initCategory } from './views/category.js';
 import { initAddEdit, renderGroupChips } from './views/addEdit.js';
+import { initHeader, renderHomeActions } from './views/header.js';
 import { initCategories } from './features/categories.js';
 import { initPayments } from './features/payments.js';
 import { initDefaults } from './features/defaults.js';
@@ -19,23 +20,11 @@ import { initAuth, onAuthChange } from './features/auth.js';
 import { initGroupsFeature, loadCloudData, onGroupData, subscribeRealtime, unsubscribeRealtime } from './features/groups.js';
 import { initGroupsView, refreshGroupsView } from './views/groups.js';
 
-function initHeader() {
-  $('mprev').onclick = () => {
-    state.cur = new Date(state.cur.getFullYear(), state.cur.getMonth() - 1, 1);
-    render();
-    if (state.filterCat) renderCategoryView();
-  };
-  $('mnext').onclick = () => {
-    state.cur = new Date(state.cur.getFullYear(), state.cur.getMonth() + 1, 1);
-    render();
-    if (state.filterCat) renderCategoryView();
-  };
-  $('menuBtn').onclick = () => $('overlay').classList.add('open');
-  $('closeSheet').onclick = () => $('overlay').classList.remove('open');
-  $('overlay').onclick = (e) => {
-    if (e.target === $('overlay')) $('overlay').classList.remove('open');
-  };
-}
+// Month nav (dispatched from the header) refreshes the active list views.
+document.addEventListener('month-change', () => {
+  render();
+  if (state.filterCat) renderCategoryView();
+});
 
 // Load data, then seed the current selections from user defaults.
 initState();
@@ -55,8 +44,10 @@ initAuth();
 initGroupsFeature();
 initGroupsView();
 
-// React to sign in / out: load or clear cloud data and (un)subscribe to realtime.
+// React to sign in / out: load or clear cloud data, (un)subscribe to realtime,
+// and update the header actions (Login ↔ Groups).
 onAuthChange((user) => {
+  renderHomeActions();
   if (user) {
     loadCloudData();
     subscribeRealtime();

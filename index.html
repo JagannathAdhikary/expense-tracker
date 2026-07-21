@@ -13,12 +13,11 @@
 <div id="home" class="screen active">
   <header>
     <div class="mnav">
-      <button id="mprev">&#8249;</button>
+      <button id="mprev" aria-label="Previous month">&#8249;</button>
       <span id="mlbl"></span>
-      <button id="mnext">&#8250;</button>
+      <button id="mnext" aria-label="Next month">&#8250;</button>
     </div>
-    <h1>Expenses</h1>
-    <button class="menu-btn" id="menuBtn">⋮</button>
+    <div class="header-actions" id="homeActions"></div>
   </header>
   <div class="summary">
     <div class="card"><div class="lbl">Total spent</div><div class="val" id="tot">₹0</div></div>
@@ -138,16 +137,21 @@
 <!-- OPTIONS SHEET -->
 <div class="overlay" id="overlay">
   <div class="sheet">
-    <h3>Options</h3>
-    <div id="authBox" style="margin-bottom:6px"></div>
-    <button class="sheet-btn" id="groupsBtn"><span>👥</span> Groups (split expenses)</button>
-    <button class="sheet-btn" id="manageCatsBtn"><span>🏷️</span> Manage categories</button>
-    <button class="sheet-btn" id="managePaysBtn"><span>💳</span> Manage payment methods</button>
-    <button class="sheet-btn" id="defaultsBtn"><span>⭐</span> Set defaults</button>
-    <button class="sheet-btn" id="exportBtn"><span>📤</span> Export data (backup)</button>
-    <button class="sheet-btn" id="importBtn"><span>📥</span> Import data (restore)</button>
-    <input type="file" id="importFile" accept=".json" style="display:none"/>
-    <button class="sheet-btn" id="closeSheet"><span>✕</span> Close</button>
+    <div class="sheet-head">
+      <h3>Menu</h3>
+      <button class="sheet-close" id="closeSheet" aria-label="Close"></button>
+    </div>
+    <div id="authBox"></div>
+    <div class="sheet-group">
+      <button class="sheet-btn" id="manageCatsBtn"><span class="sb-ico" data-icon="tag"></span> Manage categories</button>
+      <button class="sheet-btn" id="managePaysBtn"><span class="sb-ico" data-icon="card"></span> Manage payment methods</button>
+      <button class="sheet-btn" id="defaultsBtn"><span class="sb-ico" data-icon="star"></span> Set defaults</button>
+    </div>
+    <div class="sheet-group">
+      <button class="sheet-btn" id="exportBtn"><span class="sb-ico" data-icon="upload"></span> Export data (backup)</button>
+      <button class="sheet-btn" id="importBtn"><span class="sb-ico" data-icon="download"></span> Import data (restore)</button>
+      <input type="file" id="importFile" accept=".json" style="display:none"/>
+    </div>
   </div>
 </div>
 

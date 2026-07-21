@@ -2,15 +2,16 @@
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f6fa;color:#1a1a2e;min-height:100vh}
 .screen{display:none;padding:1rem;max-width:480px;margin:0 auto;padding-bottom:6rem}
 .screen.active{display:block}
-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.2rem}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.4rem;gap:10px}
 header h1{font-size:18px;font-weight:600}
-.mnav{display:flex;align-items:center;gap:6px}
-.mnav button{background:#fff;border:1px solid #ddd;border-radius:8px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-.mnav span{font-size:13px;color:#666;min-width:76px;text-align:center}
-.summary{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1.2rem}
-.card{background:#fff;border-radius:14px;padding:.9rem 1rem;box-shadow:0 1px 4px rgba(0,0,0,.06)}
-.card .lbl{font-size:12px;color:#888;margin-bottom:4px}
-.card .val{font-size:22px;font-weight:600;color:#1E3A5F}
+.mnav{display:flex;align-items:center;gap:4px}
+.mnav button{background:#fff;border:1px solid #e2e6ee;border-radius:9px;width:34px;height:36px;font-size:18px;color:#5a6472;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.mnav button:active{background:#eef1f6}
+.mnav span{font-size:13px;font-weight:600;color:#3c4657;min-width:82px;text-align:center}
+.summary{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1.4rem}
+.card{background:#fff;border-radius:14px;padding:.95rem 1.1rem;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.card .lbl{font-size:12px;color:#8a93a2;margin-bottom:5px}
+.card .val{font-size:23px;font-weight:700;color:#1E3A5F}
 .section-title{font-size:12px;font-weight:600;color:#aaa;text-transform:uppercase;letter-spacing:.6px;margin-bottom:.6rem}
 .cat-bars{display:flex;flex-direction:column;gap:10px;margin-bottom:1.3rem}
 .cat-row{display:flex;align-items:center;gap:10px;cursor:pointer;padding:4px;border-radius:8px;transition:background .15s}
@@ -50,7 +51,9 @@ header h1{font-size:18px;font-weight:600}
 .empty{text-align:center;padding:3rem 0;color:#bbb;font-size:15px}
 .empty span{font-size:44px;display:block;margin-bottom:.6rem}
 .fab{position:fixed;bottom:1.5rem;right:1.5rem;z-index:10}
-.fab button{width:58px;height:58px;border-radius:50%;background:#1E3A5F;color:#fff;border:none;font-size:30px;cursor:pointer;box-shadow:0 4px 16px rgba(30,58,95,.35);display:flex;align-items:center;justify-content:center}
+.fab button{width:58px;height:58px;border-radius:50%;background:#1E3A5F;color:#fff;border:none;cursor:pointer;box-shadow:0 4px 16px rgba(30,58,95,.35);display:flex;align-items:center;justify-content:center}
+.fab button svg{display:block}
+.fab button:active{transform:scale(.94)}
 .menu-btn{background:none;border:none;font-size:22px;cursor:pointer;color:#888;padding:4px}
 .back-btn{display:flex;align-items:center;gap:6px;background:none;border:none;font-size:15px;color:#666;cursor:pointer;padding:4px 0}
 .form{display:flex;flex-direction:column;gap:16px;margin-top:.5rem}
@@ -80,9 +83,10 @@ header h1{font-size:18px;font-weight:600}
 .overlay.open{display:flex}
 .sheet{background:#fff;border-radius:20px 20px 0 0;padding:1.5rem;width:100%;max-width:480px;margin:0 auto;max-height:85vh;overflow-y:auto}
 .sheet h3{font-size:16px;font-weight:600;margin-bottom:1rem;color:#1a1a2e}
-.sheet-btn{display:flex;align-items:center;gap:12px;width:100%;padding:13px 0;border:none;background:none;font-size:15px;color:#1a1a2e;cursor:pointer;border-bottom:1px solid #f0f0f0;text-align:left}
+.sheet-btn{display:flex;align-items:center;gap:12px;width:100%;padding:14px 4px;border:none;background:none;font-size:14.5px;font-weight:500;color:#1a1a2e;cursor:pointer;border-bottom:1px solid #f0f0f0;text-align:left}
 .sheet-btn:last-child{border-bottom:none}
-.sheet-btn span{font-size:22px}
+.sheet-btn:active{opacity:.6}
+.sheet-btn > span:first-child{font-size:22px}
 .sheet-btn.danger{color:#e74c3c}
 /* modal (centered) */
 .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:30;align-items:center;justify-content:center;padding:1rem}
@@ -113,3 +117,35 @@ header h1{font-size:18px;font-weight:600}
 .icon-btn.settle:hover{color:#0e6655}
 .group-row{cursor:pointer}
 .group-row .chevron{font-size:22px;color:#ccc;transform:none}
+
+/* ---- Header actions (right side) ---- */
+.header-actions{display:flex;align-items:center;gap:8px}
+.hdr-btn{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 12px;border:1px solid #e2e6ee;background:#fff;color:#1E3A5F;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s}
+.hdr-btn:hover{background:#f2f5fb}
+.hdr-btn:active{background:#e9eef7}
+.hdr-btn svg{display:block}
+.hdr-btn.primary{background:#1E3A5F;border-color:#1E3A5F;color:#fff}
+.hdr-btn.primary:hover{background:#274b78}
+.hdr-btn.icon-only{padding:0;width:36px;justify-content:center;color:#5a6472}
+
+/* ---- Menu sheet refinements ---- */
+.sheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
+.sheet-head h3{margin-bottom:0}
+.sheet-close{width:32px;height:32px;border-radius:8px;border:none;background:#f0f2f6;color:#5a6472;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.sheet-close:hover{background:#e6e9f0}
+.sheet-group{background:#f8f9fb;border-radius:12px;padding:4px 12px;margin-bottom:12px}
+.sheet-group .sheet-btn{border-bottom:1px solid #edeef2}
+.sheet-group .sheet-btn:last-child{border-bottom:none}
+.sb-ico{display:inline-flex;align-items:center;justify-content:center;width:22px;color:#1E3A5F}
+.sb-ico svg{display:block}
+.auth-note{font-size:12px;color:#999;padding:8px 4px 12px}
+
+/* profile card + google button in the menu */
+.profile-card{display:flex;align-items:center;gap:10px;padding:12px;background:#f0f4fa;border-radius:12px;margin-bottom:12px}
+.profile-card img{width:38px;height:38px;border-radius:50%;flex-shrink:0}
+.profile-card .avatar-fallback{width:38px;height:38px;border-radius:50%;background:#1E3A5F;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;flex-shrink:0}
+.profile-meta{flex:1;min-width:0}
+.profile-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.profile-email{font-size:11px;color:#8a93a2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.google-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:12px;margin-bottom:12px;border:1px solid #dadce0;background:#fff;border-radius:12px;font-size:14px;font-weight:600;color:#3c4043;cursor:pointer}
+.google-btn:hover{background:#f8f9fa;box-shadow:0 1px 3px rgba(0,0,0,.08)}
