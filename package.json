@@ -1,0 +1,15 @@
+{
+  "name": "expense-tracker",
+  "version": "1.0.0",
+  "description": "A simple offline-first expense tracker PWA",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0",
+    "vite-plugin-pwa": "^0.20.0"
+  }
+}
