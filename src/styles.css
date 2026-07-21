@@ -1,0 +1,105 @@
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f6fa;color:#1a1a2e;min-height:100vh}
+.screen{display:none;padding:1rem;max-width:480px;margin:0 auto;padding-bottom:6rem}
+.screen.active{display:block}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.2rem}
+header h1{font-size:18px;font-weight:600}
+.mnav{display:flex;align-items:center;gap:6px}
+.mnav button{background:#fff;border:1px solid #ddd;border-radius:8px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.mnav span{font-size:13px;color:#666;min-width:76px;text-align:center}
+.summary{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1.2rem}
+.card{background:#fff;border-radius:14px;padding:.9rem 1rem;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.card .lbl{font-size:12px;color:#888;margin-bottom:4px}
+.card .val{font-size:22px;font-weight:600;color:#1E3A5F}
+.section-title{font-size:12px;font-weight:600;color:#aaa;text-transform:uppercase;letter-spacing:.6px;margin-bottom:.6rem}
+.cat-bars{display:flex;flex-direction:column;gap:10px;margin-bottom:1.3rem}
+.cat-row{display:flex;align-items:center;gap:10px;cursor:pointer;padding:4px;border-radius:8px;transition:background .15s}
+.cat-row:hover,.cat-row:active{background:#eef1f6}
+.cat-row .cname{width:88px;font-size:13px;color:#444;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar-wrap{flex:1;background:#eee;border-radius:4px;height:8px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px}
+.cat-row .camt{width:70px;text-align:right;font-size:13px;font-weight:500}
+
+/* Date group */
+.date-group{margin-bottom:10px}
+.date-header{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#fff;border-radius:12px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.06);user-select:none}
+.date-header-left{display:flex;align-items:center;gap:8px}
+.date-label{font-size:13px;font-weight:600;color:#1E3A5F}
+.date-total{font-size:12px;color:#888}
+.date-count{font-size:11px;background:#f0f4fa;color:#1E3A5F;border-radius:10px;padding:2px 7px;font-weight:600}
+.chevron{font-size:13px;color:#aaa;transition:transform .2s}
+.chevron.open{transform:rotate(180deg)}
+.date-entries{display:flex;flex-direction:column;gap:8px;margin-top:8px;overflow:hidden;transition:all .2s}
+.date-entries.collapsed{display:none}
+
+.txn{background:#fff;border-radius:14px;padding:.8rem 1rem;display:flex;align-items:center;gap:12px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.txn-ico{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.txn-info{flex:1;min-width:0}
+.txn-desc{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.txn-meta{font-size:12px;color:#888;margin-top:2px}
+.txn-amt{font-size:15px;font-weight:600;white-space:nowrap}
+.txn-actions{display:flex;flex-direction:column;gap:2px}
+.icon-btn{background:none;border:none;font-size:16px;color:#ccc;cursor:pointer;padding:3px;line-height:1}
+.icon-btn:hover{color:#888}
+.icon-btn.del:hover{color:#e74c3c}
+.pay-badge{display:inline-block;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:500;margin-left:4px;vertical-align:middle}
+.pay-UPI{background:#e8f4fd;color:#1a6fa8}
+.pay-Cash{background:#e9f7ef;color:#1a6b3a}
+.pay-Credit{background:#fdf0e8;color:#a04000}
+.pay-Gift{background:#f5eafd;color:#6c3483}
+.empty{text-align:center;padding:3rem 0;color:#bbb;font-size:15px}
+.empty span{font-size:44px;display:block;margin-bottom:.6rem}
+.fab{position:fixed;bottom:1.5rem;right:1.5rem;z-index:10}
+.fab button{width:58px;height:58px;border-radius:50%;background:#1E3A5F;color:#fff;border:none;font-size:30px;cursor:pointer;box-shadow:0 4px 16px rgba(30,58,95,.35);display:flex;align-items:center;justify-content:center}
+.menu-btn{background:none;border:none;font-size:22px;cursor:pointer;color:#888;padding:4px}
+.back-btn{display:flex;align-items:center;gap:6px;background:none;border:none;font-size:15px;color:#666;cursor:pointer;padding:4px 0}
+.form{display:flex;flex-direction:column;gap:16px;margin-top:.5rem}
+.field label{font-size:13px;color:#666;margin-bottom:6px;display:block;font-weight:500}
+.field input{width:100%;padding:12px 14px;font-size:16px;border-radius:12px;border:1.5px solid #e0e0e0;background:#fff;outline:none;color:#1a1a2e}
+.field input:focus{border-color:#1E3A5F}
+.amt-wrap{position:relative}
+.amt-prefix{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:18px;color:#888;font-weight:500}
+#iamt{padding-left:34px;font-size:22px;font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{padding:8px 14px;border-radius:20px;font-size:13px;border:1.5px solid #e0e0e0;cursor:pointer;background:#fff;color:#555;user-select:none}
+.chip.on{background:#1E3A5F;color:#fff;border-color:#1E3A5F}
+.chip.add-chip{color:#1E3A5F;border-style:dashed;font-weight:500}
+.pay-chips{display:flex;gap:8px;flex-wrap:wrap}
+.pay-chip{padding:8px 14px;border-radius:20px;font-size:13px;border:1.5px solid #e0e0e0;cursor:pointer;background:#fff;color:#555;user-select:none;display:flex;align-items:center;gap:5px}
+.pay-chip.on{border-width:2px}
+.pay-chip[data-pay="UPI"].on{background:#e8f4fd;color:#1a6fa8;border-color:#1a6fa8}
+.pay-chip[data-pay="Cash"].on{background:#e9f7ef;color:#1a6b3a;border-color:#1a6b3a}
+.pay-chip[data-pay="Credit"].on{background:#fdf0e8;color:#a04000;border-color:#a04000}
+.pay-chip[data-pay="Gift"].on{background:#f5eafd;color:#6c3483;border-color:#6c3483}
+.pay-chip.add-chip{color:#1E3A5F;border-style:dashed;font-weight:500}
+.pay-chip.pay-custom.on{background:#eef1f6;color:#1E3A5F;border-color:#1E3A5F}
+.pay-badge.pay-custom{background:#eef1f6;color:#1E3A5F}
+.default-star{color:#d4a017;font-size:12px;margin-left:4px}
+.save-btn{width:100%;padding:15px;background:#1E3A5F;color:#fff;border:none;border-radius:14px;font-size:16px;font-weight:600;cursor:pointer}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:20;align-items:flex-end}
+.overlay.open{display:flex}
+.sheet{background:#fff;border-radius:20px 20px 0 0;padding:1.5rem;width:100%;max-width:480px;margin:0 auto;max-height:85vh;overflow-y:auto}
+.sheet h3{font-size:16px;font-weight:600;margin-bottom:1rem;color:#1a1a2e}
+.sheet-btn{display:flex;align-items:center;gap:12px;width:100%;padding:13px 0;border:none;background:none;font-size:15px;color:#1a1a2e;cursor:pointer;border-bottom:1px solid #f0f0f0;text-align:left}
+.sheet-btn:last-child{border-bottom:none}
+.sheet-btn span{font-size:22px}
+.sheet-btn.danger{color:#e74c3c}
+/* modal (centered) */
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:30;align-items:center;justify-content:center;padding:1rem}
+.modal.open{display:flex}
+.modal-box{background:#fff;border-radius:16px;padding:1.3rem;width:100%;max-width:360px}
+.modal-box h3{font-size:16px;font-weight:600;margin-bottom:1rem}
+.modal-box .field{margin-bottom:12px}
+.modal-actions{display:flex;gap:10px;margin-top:1rem}
+.modal-actions button{flex:1;padding:11px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:1px solid #ddd;background:#fff;color:#555}
+.modal-actions button.primary{background:#1E3A5F;color:#fff;border-color:#1E3A5F}
+.color-swatches{display:flex;flex-wrap:wrap;gap:8px}
+.swatch{width:32px;height:32px;border-radius:50%;cursor:pointer;border:3px solid transparent}
+.swatch.on{border-color:#1a1a2e}
+/* Category-manage list */
+.cat-manage-list{display:flex;flex-direction:column;gap:8px;margin-bottom:.5rem}
+.cat-manage-row{display:flex;align-items:center;gap:12px;padding:10px 12px;background:#f8f9fb;border-radius:10px}
+.cat-manage-row .cm-ico{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.cat-manage-row .cm-name{flex:1;font-size:14px;font-weight:500}
+.cat-manage-row .cm-count{font-size:11px;color:#888;margin-right:4px}
+.cat-manage-row .cm-del{background:none;border:none;color:#c0392b;font-size:20px;cursor:pointer;padding:4px}
