@@ -6,8 +6,10 @@ import { state } from '../state.js';
 import { cloudEnabled } from '../supabase.js';
 import { fmt } from '../format.js';
 import { $ } from '../dom.js';
-import { loadCloudData, markShareDone } from '../features/groups.js';
+import { loadCloudData, markShareDone, deleteGroupExpense } from '../features/groups.js';
 import { netForUser } from '../split.js';
+import { openEditGroup } from './addEdit.js';
+import { expenseHasPayment } from '../cloudrows.js';
 
 function memberName(group, userId) {
   const m = group.members.find((x) => x.id === userId);
@@ -75,13 +77,15 @@ function renderGroupDetail() {
           const pend = splitsFor(e.id).filter((s) => s.debtor_id !== state.user?.id && s.status === 'pending').length;
           action = `<span class="pay-badge pay-custom">you paid${pend ? ` · ${pend} pending` : ' · all settled'}</span>`;
         }
+        const editBtn = iPaid ? `<button class="icon-btn gedit" data-gid="${e.id}" title="Edit">✏️</button>` : '';
+        const delBtn = iPaid ? `<button class="icon-btn gdel" data-gid="${e.id}" title="Delete">×</button>` : '';
         return `<div class="txn">
           <div class="txn-ico" style="background:#eef1f620">🧾</div>
           <div class="txn-info">
             <div class="txn-desc">${e.description || 'Expense'}</div>
             <div class="txn-meta">${memberName(g, e.payer_id)} paid ${fmt(e.amount)} · ${e.spent_on}</div>
           </div>
-          <div style="text-align:right">${action}</div>
+          <div style="display:flex;align-items:center;gap:6px">${action}${editBtn}${delBtn}</div>
         </div>`;
       })
       .join('');
@@ -144,6 +148,23 @@ export function initGroupsView() {
   });
 
   $('groupExpenseList').addEventListener('click', async (e) => {
+    const editBtn = e.target.closest('.gedit');
+    if (editBtn) {
+      openEditGroup(editBtn.dataset.gid);
+      return;
+    }
+    const delBtn = e.target.closest('.gdel');
+    if (delBtn) {
+      const gid = delBtn.dataset.gid;
+      if (expenseHasPayment(gid)) {
+        alert('This expense already has a settled share, so it can no longer be deleted.');
+        return;
+      }
+      if (!confirm('Delete this group expense for everyone? This cannot be undone.')) return;
+      await deleteGroupExpense(gid);
+      renderGroupDetail();
+      return;
+    }
     const btn = e.target.closest('[data-settle]');
     if (!btn) return;
     if (!confirm('Mark your share as settled? This records that you have paid it back.')) return;

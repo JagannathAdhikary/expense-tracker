@@ -19,6 +19,7 @@ import { initBackup } from './features/backup.js';
 import { initAuth, onAuthChange } from './features/auth.js';
 import { initGroupsFeature, loadCloudData, onGroupData, subscribeRealtime, unsubscribeRealtime } from './features/groups.js';
 import { initGroupsView, refreshGroupsView } from './views/groups.js';
+import { renderSyncUI, onLoginSync, onSynced } from './features/sync.js';
 
 // Month nav (dispatched from the header) refreshes the active list views.
 document.addEventListener('month-change', () => {
@@ -45,16 +46,24 @@ initGroupsFeature();
 initGroupsView();
 
 // React to sign in / out: load or clear cloud data, (un)subscribe to realtime,
-// and update the header actions (Login ↔ Groups).
+// update the header actions, and run personal-expense sync.
 onAuthChange((user) => {
   renderHomeActions();
+  renderSyncUI();
   if (user) {
     loadCloudData();
     subscribeRealtime();
+    onLoginSync();
   } else {
     unsubscribeRealtime();
     loadCloudData(); // clears cloud state when logged out
   }
+});
+
+// After a personal-expense sync, refresh the list views.
+onSynced(() => {
+  render();
+  if (state.filterCat) renderCategoryView();
 });
 
 // Whenever cloud data (re)loads, refresh the home list and the groups view, and

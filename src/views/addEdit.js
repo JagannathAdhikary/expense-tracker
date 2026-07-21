@@ -11,7 +11,9 @@ import { openCatModal } from '../features/categories.js';
 import { openPayModal } from '../features/payments.js';
 import { cloudEnabled } from '../supabase.js';
 import { computeSplits } from '../split.js';
-import { saveGroupExpense } from '../features/groups.js';
+import { saveGroupExpense, editGroupExpense } from '../features/groups.js';
+import { pushRecord } from '../features/sync.js';
+import { expenseHasPayment } from '../cloudrows.js';
 
 export function renderCatChips() {
   const html =
@@ -84,6 +86,7 @@ function renderSplitConfig() {
       .join('');
   }
   renderSplitPreview();
+  if (state.editGroupExpId && state.groupEditLocked) applyGroupLock();
 }
 
 function renderSplitPreview() {
@@ -111,6 +114,11 @@ export function showAdd() {
   state.selGroup = null;
   state.selSplitMode = 'equal';
   state.splitWeights = {};
+  state.editGroupExpId = null;
+  state.groupEditLocked = false;
+  $('iamt').disabled = false;
+  const note0 = $('groupLockNote');
+  if (note0) note0.style.display = 'none';
   $('form-title').textContent = 'Add expense';
   renderCatChips();
   renderPayChips();
@@ -128,6 +136,9 @@ export function showEdit(id) {
   const r = state.recs.find((x) => x.id === id);
   if (!r) return;
   state.editId = id;
+  state.editGroupExpId = null;
+  state.groupEditLocked = false;
+  $('iamt').disabled = false;
   state.selCat = r.cat;
   state.selPay = r.pay || initialPay();
   // If the record's category was deleted, keep it selectable for this edit.
@@ -150,6 +161,74 @@ export function showEdit(id) {
   $('catview').classList.remove('active');
   $('add').classList.add('active');
   setTimeout(() => $('iamt').focus(), 100);
+}
+
+// Open the form to edit an existing group expense (payer only). Prefills the
+// amount/description/category/date, tags the group, and restores the split mode.
+// Existing per-member shares seed the weights so "amount" mode shows current values.
+export function openEditGroup(gid) {
+  const exp = state.groupExpenses.find((e) => e.id === gid);
+  if (!exp) return;
+  if (exp.payer_id !== state.user?.id) {
+    alert('Only the person who paid can edit this expense.');
+    return;
+  }
+  state.editId = null;
+  state.editGroupExpId = gid;
+  state.groupEditLocked = expenseHasPayment(gid);
+  state.selCat = exp.category || initialCat();
+  state.selPay = initialPay();
+  state.selGroup = exp.group_id;
+  state.selSplitMode = exp.split_mode || 'equal';
+  // Seed weights from current splits (used by amount/percent modes).
+  state.splitWeights = {};
+  const splits = state.mySplits.filter((s) => s.expense_id === gid);
+  if (state.selSplitMode === 'amount') {
+    splits.forEach((s) => (state.splitWeights[s.debtor_id] = Number(s.share_amount)));
+  } else if (state.selSplitMode === 'percent') {
+    const total = Number(exp.amount) || 1;
+    splits.forEach((s) => (state.splitWeights[s.debtor_id] = Math.round((Number(s.share_amount) / total) * 100)));
+  }
+  if (!state.CATS.find((c) => c.n === state.selCat)) {
+    state.CATS.push({ n: state.selCat, e: '📦', c: '#808B96' });
+  }
+  $('form-title').textContent = 'Edit group expense';
+  renderCatChips();
+  renderPayChips();
+  renderGroupChips();
+  $('iamt').value = exp.amount;
+  $('idesc').value = exp.description || '';
+  $('idate').value = exp.spent_on;
+  // When a payment has already been made, lock the money-affecting fields.
+  applyGroupLock();
+  $('home').classList.remove('active');
+  $('catview').classList.remove('active');
+  $('groups').classList.remove('active');
+  $('add').classList.add('active');
+  setTimeout(() => $('iamt').focus(), 100);
+}
+
+// Enable/disable amount, group picker, and split-mode based on state.groupEditLocked.
+function applyGroupLock() {
+  const locked = state.groupEditLocked;
+  $('iamt').disabled = locked;
+  document.querySelectorAll('#igroupchips .chip, #isplitmode .pay-chip, #splitWeights .split-weight').forEach((el) => {
+    if (el.tagName === 'INPUT') el.disabled = locked;
+    el.classList.toggle('locked', locked);
+  });
+  let note = $('groupLockNote');
+  if (locked) {
+    if (!note) {
+      note = document.createElement('div');
+      note.id = 'groupLockNote';
+      note.className = 'lock-note';
+      $('groupField').appendChild(note);
+    }
+    note.textContent = 'Someone has already settled — amount, group and split type are locked. You can still edit the note, category and date.';
+    note.style.display = 'block';
+  } else if (note) {
+    note.style.display = 'none';
+  }
 }
 
 export function initAddEdit() {
@@ -188,6 +267,7 @@ export function initAddEdit() {
 
   // Group picker: "Just me" (null) or a specific group.
   $('igroupchips').addEventListener('click', (e) => {
+    if (state.groupEditLocked) return; // locked once a payment is made
     const chip = e.target.closest('.chip');
     if (!chip) return;
     state.selGroup = chip.dataset.group || null;
@@ -197,6 +277,7 @@ export function initAddEdit() {
 
   // Split-mode selector.
   $('isplitmode').addEventListener('click', (e) => {
+    if (state.groupEditLocked) return; // locked once a payment is made
     const chip = e.target.closest('.pay-chip');
     if (!chip) return;
     state.selSplitMode = chip.dataset.mode;
@@ -225,7 +306,7 @@ export function initAddEdit() {
     const desc = $('idesc').value.trim();
     const date = $('idate').value || isoDay(new Date());
 
-    // Group-tagged expense (new only): write to the cloud, then return home.
+    // Group expense (new or edit): write to the cloud, then return home.
     if (state.selGroup && !state.editId) {
       const members = taggedGroupMembers().map((m) => m.id);
       let shares;
@@ -235,24 +316,39 @@ export function initAddEdit() {
         alert('Check the split values: ' + err.message);
         return;
       }
-      const ok = await saveGroupExpense({
-        groupId: state.selGroup,
-        amount: amt,
-        description: desc,
-        category: state.selCat,
-        spentOn: date,
-        splitMode: state.selSplitMode,
-        shares,
-      });
+      const ok = state.editGroupExpId
+        ? await editGroupExpense({
+            expenseId: state.editGroupExpId,
+            amount: amt,
+            description: desc,
+            category: state.selCat,
+            spentOn: date,
+            splitMode: state.selSplitMode,
+            shares,
+          })
+        : await saveGroupExpense({
+            groupId: state.selGroup,
+            amount: amt,
+            description: desc,
+            category: state.selCat,
+            spentOn: date,
+            splitMode: state.selSplitMode,
+            shares,
+          });
       if (ok) showHome();
       return;
     }
 
     if (state.editId) {
       const idx = state.recs.findIndex((r) => r.id === state.editId);
-      if (idx > -1) state.recs[idx] = { ...state.recs[idx], amt, cat: state.selCat, pay: state.selPay, desc, date };
+      if (idx > -1) {
+        state.recs[idx] = { ...state.recs[idx], amt, cat: state.selCat, pay: state.selPay, desc, date, updated: Date.now() };
+        pushRecord(state.recs[idx]);
+      }
     } else {
-      state.recs.push({ id: Date.now(), amt, cat: state.selCat, pay: state.selPay, desc, date });
+      const rec = { id: Date.now(), amt, cat: state.selCat, pay: state.selPay, desc, date, updated: Date.now() };
+      state.recs.push(rec);
+      pushRecord(rec);
     }
     persist();
     if (state.filterCat) {

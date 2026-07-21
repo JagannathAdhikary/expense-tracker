@@ -13,7 +13,7 @@ export const state = {
   recs: [],
   CATS: [],
   PAYS: [],
-  PREFS: { defaultCat: null, defaultPay: null },
+  PREFS: { defaultCat: null, defaultPay: null, cloudSync: false },
   selCat: null,
   selPay: null,
   editId: null,
@@ -31,6 +31,8 @@ export const state = {
   selGroup: null, // group id tagged on the expense being added, or null
   selSplitMode: 'equal', // 'equal' | 'amount' | 'percent'
   splitWeights: {}, // per-member weights for amount/percent modes (keyed by user id)
+  editGroupExpId: null, // when set, the add form is editing this cloud group expense
+  groupEditLocked: false, // when editing a group expense that already has a payment: lock amount/group/split
 };
 
 // Set of date strings whose groups are collapsed; default all expanded.

@@ -152,6 +152,50 @@ export async function saveGroupExpense({ groupId, amount, description, category,
   return true;
 }
 
+// Edit a group expense (payer only). Updates the expense row and rebuilds its
+// split rows from the new shares. Any share that changes resets to 'pending'
+// (except the payer's own, which stays 'done'), so re-splitting re-collects.
+export async function editGroupExpense({ expenseId, amount, description, category, spentOn, splitMode, shares }) {
+  if (!cloudEnabled() || !state.user) return false;
+  const { error: uErr } = await supabase
+    .from('group_expenses')
+    .update({ amount, description, category, spent_on: spentOn, split_mode: splitMode })
+    .eq('id', expenseId)
+    .eq('payer_id', state.user.id);
+  if (uErr) {
+    alert('Could not update group expense: ' + uErr.message);
+    return false;
+  }
+  // Rebuild splits: delete existing, insert fresh (payer's share auto-done).
+  await supabase.from('expense_splits').delete().eq('expense_id', expenseId);
+  const rows = shares.map((s) => ({
+    expense_id: expenseId,
+    debtor_id: s.userId,
+    share_amount: s.share,
+    status: s.userId === state.user.id ? 'done' : 'pending',
+    settled_at: s.userId === state.user.id ? new Date().toISOString() : null,
+  }));
+  const { error: sErr } = await supabase.from('expense_splits').insert(rows);
+  if (sErr) {
+    alert('Expense updated but splits failed: ' + sErr.message);
+    return false;
+  }
+  await loadCloudData();
+  return true;
+}
+
+// Delete a group expense (payer only). Cascade removes its splits.
+export async function deleteGroupExpense(expenseId) {
+  if (!cloudEnabled() || !state.user) return false;
+  const { error } = await supabase.from('group_expenses').delete().eq('id', expenseId).eq('payer_id', state.user.id);
+  if (error) {
+    alert('Could not delete: ' + error.message);
+    return false;
+  }
+  await loadCloudData();
+  return true;
+}
+
 // Mark the current user's own split as settled ('done').
 export async function markShareDone(splitId) {
   if (!cloudEnabled() || !state.user) return;

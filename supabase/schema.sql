@@ -222,3 +222,28 @@ create policy splits_update on public.expense_splits
 -- ---------------------------------------------------------------------------
 alter publication supabase_realtime add table public.group_expenses;
 alter publication supabase_realtime add table public.expense_splits;
+
+-- ============================================================================
+-- Personal expense cloud sync (optional, per-user).
+-- Each row mirrors a local record; `id` is the app's numeric record id, unique
+-- per user. Soft-deletes via `deleted` so removals propagate across devices;
+-- `updated_at` drives last-write-wins merging.
+-- ============================================================================
+create table if not exists public.personal_expenses (
+  user_id    uuid not null references public.profiles(id) on delete cascade,
+  id         bigint not null,               -- app record id (Date.now()-based)
+  amt        numeric(12,2) not null,
+  cat        text,
+  pay        text,
+  descr      text,
+  spent_on   date not null,
+  deleted    boolean not null default false,
+  updated_at bigint not null,               -- client ms timestamp for LWW
+  primary key (user_id, id)
+);
+
+alter table public.personal_expenses enable row level security;
+
+drop policy if exists personal_all on public.personal_expenses;
+create policy personal_all on public.personal_expenses
+  for all using (user_id = auth.uid()) with check (user_id = auth.uid());

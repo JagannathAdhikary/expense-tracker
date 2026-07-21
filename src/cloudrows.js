@@ -25,6 +25,14 @@ const splitsByExpense = () => {
 
 const groupName = (gid) => state.groups.find((g) => g.id === gid)?.name || 'Group';
 
+// True if any non-payer share of this expense has been settled. Used to lock
+// edits (amount/group/split) and block deletion once money has changed hands.
+export function expenseHasPayment(expenseId) {
+  const exp = state.groupExpenses.find((e) => e.id === expenseId);
+  if (!exp) return false;
+  return state.mySplits.some((s) => s.expense_id === expenseId && s.debtor_id !== exp.payer_id && s.status === 'done');
+}
+
 // All shared rows for the user, unfiltered by month.
 export function sharedRows() {
   if (!state.user) return [];
@@ -41,21 +49,31 @@ export function sharedRows() {
       desc: exp.description || 'Group expense',
       date: exp.spent_on,
       id: exp.id,
+      groupExpId: exp.id, // stable id of the group_expenses row (for edit)
+      canEdit: iPaid, // only the payer may edit
     };
     if (iPaid) {
       // Own share (always counts) + any not-yet-settled others' shares (still fronted).
       const myShare = rowsFor.find((s) => s.debtor_id === uid);
-      const othersPending = rowsFor.filter((s) => s.debtor_id !== uid && s.status !== 'done');
+      const others = rowsFor.filter((s) => s.debtor_id !== uid);
+      const othersPending = others.filter((s) => s.status !== 'done');
       const fronted = othersPending.reduce((sum, s) => sum + Number(s.share_amount), 0);
       const amt = (myShare ? Number(myShare.share_amount) : 0) + fronted;
-      rows.push({ ...base, amt, pending: false, meta: `${groupName(exp.group_id)} · you paid` });
+      // Payer is owed money until everyone settles: show "awaiting N" then "settled".
+      const badge =
+        othersPending.length > 0
+          ? { label: `awaiting ${othersPending.length}`, cls: 'shared-pending' }
+          : others.length > 0
+            ? { label: 'all settled', cls: 'shared-done' }
+            : { label: 'you paid', cls: 'shared-neutral' };
+      rows.push({ ...base, amt, pending: false, badge, meta: `${groupName(exp.group_id)} · you paid` });
     } else {
       const mine = rowsFor.find((s) => s.debtor_id === uid);
       if (!mine) continue; // not involved
       if (mine.status === 'pending') {
-        rows.push({ ...base, amt: -Number(mine.share_amount), pending: true, settleId: mine.id, meta: `${groupName(exp.group_id)} · you owe` });
+        rows.push({ ...base, amt: -Number(mine.share_amount), pending: true, settleId: mine.id, badge: { label: 'you owe', cls: 'shared-pending' }, meta: `${groupName(exp.group_id)} · you owe` });
       } else {
-        rows.push({ ...base, amt: Number(mine.share_amount), pending: false, meta: `${groupName(exp.group_id)} · your share` });
+        rows.push({ ...base, amt: Number(mine.share_amount), pending: false, badge: { label: 'settled', cls: 'shared-done' }, meta: `${groupName(exp.group_id)} · your share` });
       }
     }
   }

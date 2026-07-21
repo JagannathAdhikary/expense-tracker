@@ -6,16 +6,19 @@ import { fmt, filtered, catByName } from '../format.js';
 import { $ } from '../dom.js';
 import { renderDateGroups, attachListHandler } from './list.js';
 import { render } from './home.js';
-import { showEdit } from './addEdit.js';
+import { showEdit, openEditGroup } from './addEdit.js';
+import { sharedRowsForMonth, expenseHasPayment } from '../cloudrows.js';
+import { markShareDone, deleteGroupExpense } from '../features/groups.js';
 
 export function renderCategoryView() {
   const cat = catByName(state.filterCat);
   $('catview-title').textContent = cat.e + ' ' + cat.n;
   $('cvperiod').textContent = MN[state.cur.getMonth()] + ' ' + state.cur.getFullYear();
-  const rows = filtered()
-    .filter((r) => r.cat === state.filterCat)
-    .sort((a, b) => new Date(b.date) - new Date(a.date) || b.id - a.id);
-  const total = rows.reduce((s, r) => s + r.amt, 0);
+  const personal = filtered().filter((r) => r.cat === state.filterCat);
+  const shared = sharedRowsForMonth(state.cur).filter((r) => r.cat === state.filterCat);
+  const rows = [...personal, ...shared].sort((a, b) => new Date(b.date) - new Date(a.date) || (b.id > a.id ? 1 : -1));
+  // Total: personal + non-pending shared (owed rows excluded until settled), matching home.
+  const total = personal.reduce((s, r) => s + r.amt, 0) + shared.filter((r) => !r.pending).reduce((s, r) => s + r.amt, 0);
   $('cvtot').textContent = fmt(total);
   $('cvcnt').textContent = rows.length;
   const list = $('cvlist');
@@ -40,7 +43,25 @@ function rerender() {
 }
 
 export function initCategory() {
-  attachListHandler($('cvlist'), { onEdit: showEdit, rerender });
+  attachListHandler($('cvlist'), {
+    onEdit: showEdit,
+    rerender,
+    onSettle: async (splitId) => {
+      if (!confirm('Mark your share as settled?')) return;
+      await markShareDone(splitId);
+      rerender();
+    },
+    onEditGroup: (gid) => openEditGroup(gid),
+    onDeleteGroup: async (gid) => {
+      if (expenseHasPayment(gid)) {
+        alert('This expense already has a settled share, so it can no longer be deleted.');
+        return;
+      }
+      if (!confirm('Delete this group expense for everyone? This cannot be undone.')) return;
+      await deleteGroupExpense(gid);
+      rerender();
+    },
+  });
   $('catbackbtn').onclick = () => {
     // Back from category view returns home.
     $('add').classList.remove('active');

@@ -51,13 +51,21 @@ Open **Options (⋮) → Sign in with Google**, then **Options → Groups** to c
 group. Add an expense and pick a group under **Split with group** to split it.
 
 ## How the split works
-
 - Say A pays ₹300 and tags a group {A, B, C}, equal split → ₹100 each.
 - A's list shows the ₹300 they fronted; B and C each see a pending **−₹100** "you owe" row,
   which is **excluded from their spent total** until settled.
 - When B and C tap **✓ / Mark done**, their ₹100 counts as their real spend and A's
   effective spend rebalances down to ₹100. Changes sync live via Supabase realtime.
 - **"Mark done" is a status flag only** — no real money moves; settle up however you like.
+
+## Personal expense cloud sync (optional)
+
+Personal expenses live in `localStorage` by default. After signing in, the app offers a
+**one-time prompt** to upload them to the cloud, and the menu has a **Cloud sync** toggle you
+can flip anytime. When on, every add/edit/delete is mirrored to a private `personal_expenses`
+table (row-level-secured to you), and on login the cloud copy is pulled and merged — newest
+change wins, deletes propagate. This is what makes your expenses appear on a second device.
+The `personal_expenses` table is created by the same `supabase/schema.sql`.
 
 ## Notes
 

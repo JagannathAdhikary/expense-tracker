@@ -6,9 +6,9 @@ import { fmt, filtered, catByName } from '../format.js';
 import { $ } from '../dom.js';
 import { renderDateGroups, attachListHandler } from './list.js';
 import { showCategoryView, renderCategoryView } from './category.js';
-import { showEdit } from './addEdit.js';
-import { sharedRowsForMonth, sharedMonthTotal } from '../cloudrows.js';
-import { markShareDone } from '../features/groups.js';
+import { showEdit, openEditGroup } from './addEdit.js';
+import { sharedRowsForMonth, sharedMonthTotal, expenseHasPayment } from '../cloudrows.js';
+import { markShareDone, deleteGroupExpense } from '../features/groups.js';
 
 export function render() {
   $('mlbl').textContent = MN[state.cur.getMonth()] + ' ' + state.cur.getFullYear();
@@ -85,6 +85,16 @@ export function initHome() {
     onSettle: async (splitId) => {
       if (!confirm('Mark your share as settled?')) return;
       await markShareDone(splitId);
+      rerender();
+    },
+    onEditGroup: (gid) => openEditGroup(gid),
+    onDeleteGroup: async (gid) => {
+      if (expenseHasPayment(gid)) {
+        alert('This expense already has a settled share, so it can no longer be deleted.');
+        return;
+      }
+      if (!confirm('Delete this group expense for everyone? This cannot be undone.')) return;
+      await deleteGroupExpense(gid);
       rerender();
     },
   });
