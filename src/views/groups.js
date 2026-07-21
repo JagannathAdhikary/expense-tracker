@@ -10,6 +10,7 @@ import { loadCloudData, markShareDone, deleteGroupExpense, settleWithPayer } fro
 import { netForUser } from '../split.js';
 import { openEditGroup } from './addEdit.js';
 import { expenseHasPayment, owedByUserInGroup } from '../cloudrows.js';
+import { toastError } from '../toast.js';
 
 function memberName(group, userId) {
   const m = group.members.find((x) => x.id === userId);
@@ -194,7 +195,7 @@ export function initGroupsView() {
     if (delBtn) {
       const gid = delBtn.dataset.gid;
       if (expenseHasPayment(gid)) {
-        alert('This expense already has a settled share, so it can no longer be deleted.');
+        toastError('This expense already has a settled share, so it can no longer be deleted.');
         return;
       }
       if (!confirm('Delete this group expense for everyone? This cannot be undone.')) return;

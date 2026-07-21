@@ -152,8 +152,9 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .cat-manage-row .cm-count{font-size:11px;color:var(--ink-mute);margin-right:4px}
 .cat-manage-row .cm-del{background:none;border:none;color:#c0392b;font-size:20px;cursor:pointer;padding:4px}
 
-/* Shared (group) rows */
-.shared-txn{border:1px dashed #cdd6e4}
+/* Shared (group) rows — visually distinct from personal txns */
+.shared-txn{position:relative;background:linear-gradient(135deg,#f4f8fd 0%,#eef3fb 100%);border:1px solid #dbe6f4;padding-left:calc(1rem + 4px)}
+.shared-txn::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:4px;border-radius:0 4px 4px 0;background:var(--grad-accent)}
 .txn-amt.neg{color:var(--neg)}
 .pay-badge.shared-pending{background:#fdf0e8;color:var(--warn)}
 .pay-badge.shared-done{background:#e9f7ef;color:var(--pos)}
@@ -170,6 +171,11 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .grp-action-row input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,58,95,.12)}
 .grp-action-row .hdr-btn{white-space:nowrap}
 
+/* Group detail lists: give the tiles breathing room */
+#groupExpenseList{display:flex;flex-direction:column;gap:10px}
+#groupBalances{gap:10px}
+#groupExpenseList .txn{padding:.9rem 1rem}
+
 /* "You owe" summary card in group detail */
 .owe-card{background:linear-gradient(135deg,#fff 0%,#fff8f3 100%);border:1px solid #f4dccb;border-radius:var(--radius);padding:14px 16px;margin:12px 0 4px;box-shadow:var(--sh-md)}
 .owe-head{display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:700;color:var(--warn);margin-bottom:8px}
@@ -184,6 +190,14 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .chip.locked,.pay-chip.locked{opacity:.5;pointer-events:none}
 .field input:disabled,input.split-weight:disabled{background:var(--bg-2);color:var(--ink-mute);cursor:not-allowed}
 .lock-note{font-size:11.5px;color:var(--warn);background:#fdf0e8;border-radius:var(--radius-sm);padding:9px 11px;margin-top:10px}
+
+/* Toasts */
+.toast-wrap{position:fixed;left:0;right:0;bottom:calc(1.5rem + env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:center;gap:8px;z-index:1000;pointer-events:none;padding:0 1rem}
+.toast{max-width:420px;width:fit-content;padding:12px 16px;border-radius:12px;font-size:13.5px;font-weight:500;color:#fff;background:#2a2f3e;box-shadow:var(--sh-lg);opacity:0;transform:translateY(12px);transition:opacity .2s,transform .2s;pointer-events:auto;cursor:pointer;text-align:center}
+.toast.show{opacity:1;transform:none}
+.toast-success{background:linear-gradient(135deg,#1e7a45 0%,#155e34 100%)}
+.toast-error{background:linear-gradient(135deg,#c0392b 0%,#96271b 100%)}
+.toast-info{background:linear-gradient(135deg,#2e3a4e 0%,#222a38 100%)}
 
 /* ---- Header actions (right side) ---- */
 .header-actions{display:flex;align-items:center;gap:8px}

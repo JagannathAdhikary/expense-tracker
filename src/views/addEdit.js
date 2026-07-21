@@ -14,6 +14,7 @@ import { computeSplits } from '../split.js';
 import { saveGroupExpense, editGroupExpense } from '../features/groups.js';
 import { pushRecord } from '../features/sync.js';
 import { expenseHasPayment } from '../cloudrows.js';
+import { toastError } from '../toast.js';
 
 export function renderCatChips() {
   const html =
@@ -170,7 +171,7 @@ export function openEditGroup(gid) {
   const exp = state.groupExpenses.find((e) => e.id === gid);
   if (!exp) return;
   if (exp.payer_id !== state.user?.id) {
-    alert('Only the person who paid can edit this expense.');
+    toastError('Only the person who paid can edit this expense.');
     return;
   }
   state.editId = null;
@@ -313,7 +314,7 @@ export function initAddEdit() {
       try {
         shares = computeSplits({ amount: amt, members, mode: state.selSplitMode, weights: state.splitWeights, payerId: state.user?.id });
       } catch (err) {
-        alert('Check the split values: ' + err.message);
+        toastError('Check the split values: ' + err.message);
         return;
       }
       const ok = state.editGroupExpId

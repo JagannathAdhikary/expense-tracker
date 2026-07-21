@@ -6,6 +6,7 @@ import { persistCats, persistPrefs } from '../storage.js';
 import { $ } from '../dom.js';
 import { render } from '../views/home.js';
 import { renderCatChips } from '../views/addEdit.js';
+import { toastError } from '../toast.js';
 
 function renderCatManage() {
   const list = $('catManageList');
@@ -91,7 +92,7 @@ export function initCategories() {
       return;
     }
     if (state.CATS.find((c) => c.n.toLowerCase() === name.toLowerCase())) {
-      alert('A category with that name already exists.');
+      toastError('A category with that name already exists.');
       return;
     }
     state.CATS.push({ n: name, e: emoji, c: state.newCatColor });

@@ -4,6 +4,7 @@ import { state } from '../state.js';
 import { persistPays, persistPrefs } from '../storage.js';
 import { $ } from '../dom.js';
 import { renderPayChips } from '../views/addEdit.js';
+import { toastError } from '../toast.js';
 
 function renderPayManage() {
   const list = $('payManageList');
@@ -75,7 +76,7 @@ export function initPayments() {
       return;
     }
     if (state.PAYS.find((p) => p.n.toLowerCase() === name.toLowerCase())) {
-      alert('A payment method with that name already exists.');
+      toastError('A payment method with that name already exists.');
       return;
     }
     state.PAYS.push({ n: name, e: emoji });

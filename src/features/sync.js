@@ -13,6 +13,7 @@ import { supabase, cloudEnabled } from '../supabase.js';
 import { state } from '../state.js';
 import { persist, persistPrefs } from '../storage.js';
 import { $ } from '../dom.js';
+import { toastError } from '../toast.js';
 
 export const syncOn = () => cloudEnabled() && !!state.user && !!state.PREFS.cloudSync;
 
@@ -59,9 +60,9 @@ export async function uploadAll() {
     console.error('sync upload failed', error);
     // The personal_expenses table missing means the latest schema.sql hasn't been run.
     if (error.message && /personal_expenses/.test(error.message) && /schema cache|does not exist|find the table/i.test(error.message)) {
-      alert('Cloud sync needs a database update. Run the latest supabase/schema.sql in your Supabase SQL editor (it adds the personal_expenses table), then try again.');
+      toastError('Cloud sync needs a database update. Run the latest supabase/schema.sql in your Supabase SQL editor, then try again.');
     } else {
-      alert('Could not upload expenses: ' + error.message);
+      toastError('Could not upload expenses: ' + error.message);
     }
     return false;
   }

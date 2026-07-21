@@ -5,6 +5,7 @@ import { isoDay } from '../format.js';
 import { persist, persistCats, persistPays, persistPrefs } from '../storage.js';
 import { $ } from '../dom.js';
 import { render } from '../views/home.js';
+import { toastSuccess, toastError } from '../toast.js';
 
 export function initBackup() {
   $('exportBtn').onclick = function () {
@@ -62,10 +63,10 @@ export function initBackup() {
           persist();
           render();
           $('overlay').classList.remove('open');
-          alert('Import successful!');
+          toastSuccess('Import successful!');
         }
       } catch (err) {
-        alert('Invalid backup file.');
+        toastError('Invalid backup file.');
       }
     };
     reader.readAsText(file);

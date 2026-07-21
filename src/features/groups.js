@@ -5,6 +5,7 @@
 import { supabase, cloudEnabled } from '../supabase.js';
 import { state } from '../state.js';
 import { $ } from '../dom.js';
+import { toastError } from '../toast.js';
 
 // Callbacks fired after cloud data (groups/expenses/splits) is (re)loaded.
 const dataListeners = [];
@@ -96,7 +97,7 @@ export async function createGroup(name) {
   const invite_code = makeInviteCode();
   const { data: grp, error } = await supabase.from('groups').insert({ name, invite_code, created_by: state.user.id }).select().single();
   if (error) {
-    alert('Could not create group: ' + error.message);
+    toastError('Could not create group: ' + error.message);
     return null;
   }
   // Add the creator as owner.
@@ -109,13 +110,13 @@ export async function joinGroupByCode(code) {
   if (!cloudEnabled() || !state.user) return null;
   const { data: grp, error } = await supabase.from('groups').select('id, name').eq('invite_code', code.trim().toUpperCase()).maybeSingle();
   if (error || !grp) {
-    alert('No group found with that code.');
+    toastError('No group found with that code.');
     return null;
   }
   const { error: jErr } = await supabase.from('group_members').insert({ group_id: grp.id, user_id: state.user.id, role: 'member' });
   // Unique-violation = already a member; treat as success.
   if (jErr && jErr.code !== '23505') {
-    alert('Could not join: ' + jErr.message);
+    toastError('Could not join: ' + jErr.message);
     return null;
   }
   await loadCloudData();
@@ -133,7 +134,7 @@ export async function saveGroupExpense({ groupId, amount, description, category,
     .select()
     .single();
   if (error) {
-    alert('Could not save group expense: ' + error.message);
+    toastError('Could not save group expense: ' + error.message);
     return false;
   }
   const rows = shares.map((s) => ({
@@ -145,7 +146,7 @@ export async function saveGroupExpense({ groupId, amount, description, category,
   }));
   const { error: sErr } = await supabase.from('expense_splits').insert(rows);
   if (sErr) {
-    alert('Expense saved but splits failed: ' + sErr.message);
+    toastError('Expense saved but splits failed: ' + sErr.message);
     return false;
   }
   await loadCloudData();
@@ -163,7 +164,7 @@ export async function editGroupExpense({ expenseId, amount, description, categor
     .eq('id', expenseId)
     .eq('payer_id', state.user.id);
   if (uErr) {
-    alert('Could not update group expense: ' + uErr.message);
+    toastError('Could not update group expense: ' + uErr.message);
     return false;
   }
   // Rebuild splits: delete existing, insert fresh (payer's share auto-done).
@@ -177,7 +178,7 @@ export async function editGroupExpense({ expenseId, amount, description, categor
   }));
   const { error: sErr } = await supabase.from('expense_splits').insert(rows);
   if (sErr) {
-    alert('Expense updated but splits failed: ' + sErr.message);
+    toastError('Expense updated but splits failed: ' + sErr.message);
     return false;
   }
   await loadCloudData();
@@ -189,7 +190,7 @@ export async function deleteGroupExpense(expenseId) {
   if (!cloudEnabled() || !state.user) return false;
   const { error } = await supabase.from('group_expenses').delete().eq('id', expenseId).eq('payer_id', state.user.id);
   if (error) {
-    alert('Could not delete: ' + error.message);
+    toastError('Could not delete: ' + error.message);
     return false;
   }
   await loadCloudData();
@@ -201,7 +202,7 @@ export async function markShareDone(splitId) {
   if (!cloudEnabled() || !state.user) return;
   const { error } = await supabase.from('expense_splits').update({ status: 'done', settled_at: new Date().toISOString() }).eq('id', splitId).eq('debtor_id', state.user.id);
   if (error) {
-    alert('Could not update: ' + error.message);
+    toastError('Could not update: ' + error.message);
     return;
   }
   await loadCloudData();
@@ -219,7 +220,7 @@ export async function settleWithPayer(groupId, payerId) {
   if (!splitIds.length) return;
   const { error } = await supabase.from('expense_splits').update({ status: 'done', settled_at: new Date().toISOString() }).in('id', splitIds).eq('debtor_id', state.user.id);
   if (error) {
-    alert('Could not settle: ' + error.message);
+    toastError('Could not settle: ' + error.message);
     return;
   }
   await loadCloudData();

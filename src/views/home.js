@@ -9,6 +9,7 @@ import { showCategoryView, renderCategoryView } from './category.js';
 import { showEdit, openEditGroup } from './addEdit.js';
 import { sharedRowsForMonth, sharedMonthTotal, expenseHasPayment } from '../cloudrows.js';
 import { markShareDone, deleteGroupExpense } from '../features/groups.js';
+import { toastError } from '../toast.js';
 
 export function render() {
   $('mlbl').textContent = MN[state.cur.getMonth()] + ' ' + state.cur.getFullYear();
@@ -90,7 +91,7 @@ export function initHome() {
     onEditGroup: (gid) => openEditGroup(gid),
     onDeleteGroup: async (gid) => {
       if (expenseHasPayment(gid)) {
-        alert('This expense already has a settled share, so it can no longer be deleted.');
+        toastError('This expense already has a settled share, so it can no longer be deleted.');
         return;
       }
       if (!confirm('Delete this group expense for everyone? This cannot be undone.')) return;
