@@ -6,10 +6,10 @@ import { state } from '../state.js';
 import { cloudEnabled } from '../supabase.js';
 import { fmt } from '../format.js';
 import { $ } from '../dom.js';
-import { loadCloudData, markShareDone, deleteGroupExpense } from '../features/groups.js';
+import { loadCloudData, markShareDone, deleteGroupExpense, settleWithPayer } from '../features/groups.js';
 import { netForUser } from '../split.js';
 import { openEditGroup } from './addEdit.js';
-import { expenseHasPayment } from '../cloudrows.js';
+import { expenseHasPayment, owedByUserInGroup } from '../cloudrows.js';
 
 function memberName(group, userId) {
   const m = group.members.find((x) => x.id === userId);
@@ -48,6 +48,28 @@ function renderGroupDetail() {
   }
   $('groupDetailTitle').textContent = g.name;
   $('groupInviteCode').textContent = g.invite_code;
+
+  // "You owe" summary: per-creditor totals with a one-tap settle-all button.
+  const owe = owedByUserInGroup(g.id);
+  if (owe.total > 0) {
+    const rows = owe.byPayer
+      .map((o) => {
+        const name = memberName(g, o.payerId);
+        return `<div class="owe-row">
+          <span class="owe-name">${name}</span>
+          <span class="owe-amt">${fmt(o.amount)}</span>
+          <button class="owe-settle" data-payer="${o.payerId}">Settle</button>
+        </div>`;
+      })
+      .join('');
+    $('groupOwe').innerHTML = `
+      <div class="owe-card">
+        <div class="owe-head"><span>You owe</span><span class="owe-total">${fmt(owe.total)}</span></div>
+        ${rows}
+      </div>`;
+  } else {
+    $('groupOwe').innerHTML = '';
+  }
 
   const exps = state.groupExpenses.filter((e) => e.group_id === g.id);
   const expIds = new Set(exps.map((e) => e.id));
@@ -145,6 +167,16 @@ export function initGroupsView() {
   $('groupList').addEventListener('click', (e) => {
     const row = e.target.closest('.group-row');
     if (row) showGroupDetail(row.dataset.group);
+  });
+
+  $('groupOwe').addEventListener('click', async (e) => {
+    const btn = e.target.closest('.owe-settle');
+    if (!btn) return;
+    const g = state.groups.find((x) => x.id === state.openGroupId);
+    const name = g ? memberName(g, btn.dataset.payer) : 'this person';
+    if (!confirm(`Settle everything you owe ${name}? This marks all your pending shares to them as paid.`)) return;
+    await settleWithPayer(state.openGroupId, btn.dataset.payer);
+    renderGroupDetail();
   });
 
   $('groupExpenseList').addEventListener('click', async (e) => {

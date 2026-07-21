@@ -33,6 +33,24 @@ export function expenseHasPayment(expenseId) {
   return state.mySplits.some((s) => s.expense_id === expenseId && s.debtor_id !== exp.payer_id && s.status === 'done');
 }
 
+// What the current user owes within a group, aggregated per creditor (payer).
+// Returns { byPayer: [{payerId, amount}], total } over pending, non-self shares.
+export function owedByUserInGroup(groupId) {
+  if (!state.user) return { byPayer: [], total: 0 };
+  const uid = state.user.id;
+  const payerByExp = new Map(state.groupExpenses.filter((e) => e.group_id === groupId).map((e) => [e.id, e.payer_id]));
+  const totals = {}; // payerId -> paise
+  for (const s of state.mySplits) {
+    if (s.debtor_id !== uid || s.status !== 'pending') continue;
+    const payer = payerByExp.get(s.expense_id);
+    if (!payer || payer === uid) continue; // not in this group, or self
+    totals[payer] = (totals[payer] || 0) + Math.round(Number(s.share_amount) * 100);
+  }
+  const byPayer = Object.entries(totals).map(([payerId, paise]) => ({ payerId, amount: paise / 100 }));
+  const total = byPayer.reduce((s, x) => s + x.amount, 0);
+  return { byPayer, total };
+}
+
 // All shared rows for the user, unfiltered by month.
 export function sharedRows() {
   if (!state.user) return [];

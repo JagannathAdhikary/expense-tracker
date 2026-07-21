@@ -119,6 +119,16 @@ header h1{font-size:18px;font-weight:600}
 .group-row{cursor:pointer}
 .group-row .chevron{font-size:22px;color:#ccc;transform:none}
 
+/* "You owe" summary card in group detail */
+.owe-card{background:#fff;border:1px solid #f0d9cc;border-radius:14px;padding:12px 14px;margin:12px 0 4px;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.owe-head{display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:600;color:#a04000;margin-bottom:8px}
+.owe-total{font-size:16px;font-weight:700}
+.owe-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid #f6f0ec}
+.owe-name{flex:1;font-size:14px;color:#1a1a2e}
+.owe-amt{font-size:14px;font-weight:600;color:#a04000}
+.owe-settle{border:none;background:#1E3A5F;color:#fff;font-size:12px;font-weight:600;padding:6px 12px;border-radius:9px;cursor:pointer}
+.owe-settle:active{opacity:.8}
+
 /* ---- Header actions (right side) ---- */
 .header-actions{display:flex;align-items:center;gap:8px}
 .hdr-btn{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 12px;border:1px solid #e2e6ee;background:#fff;color:#1E3A5F;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s}

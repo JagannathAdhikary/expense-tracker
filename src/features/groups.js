@@ -207,6 +207,24 @@ export async function markShareDone(splitId) {
   await loadCloudData();
 }
 
+// Settle ALL of the current user's pending shares owed to one payer within a group,
+// in a single update (e.g. B clears the ₹20 + ₹30 owed to A at once).
+export async function settleWithPayer(groupId, payerId) {
+  if (!cloudEnabled() || !state.user) return;
+  // Expenses in this group paid by that person.
+  const expIds = state.groupExpenses.filter((e) => e.group_id === groupId && e.payer_id === payerId).map((e) => e.id);
+  if (!expIds.length) return;
+  // My pending split ids across those expenses.
+  const splitIds = state.mySplits.filter((s) => s.debtor_id === state.user.id && s.status === 'pending' && expIds.includes(s.expense_id)).map((s) => s.id);
+  if (!splitIds.length) return;
+  const { error } = await supabase.from('expense_splits').update({ status: 'done', settled_at: new Date().toISOString() }).in('id', splitIds).eq('debtor_id', state.user.id);
+  if (error) {
+    alert('Could not settle: ' + error.message);
+    return;
+  }
+  await loadCloudData();
+}
+
 // ---------------------------------------------------------------------------
 // Realtime: reload cloud data when group expenses / splits change (e.g. another
 // member marks their share done). Debounced so a burst of row changes = one reload.
