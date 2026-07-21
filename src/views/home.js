@@ -7,18 +7,28 @@ import { $ } from '../dom.js';
 import { renderDateGroups, attachListHandler } from './list.js';
 import { showCategoryView, renderCategoryView } from './category.js';
 import { showEdit } from './addEdit.js';
+import { sharedRowsForMonth, sharedMonthTotal } from '../cloudrows.js';
+import { markShareDone } from '../features/groups.js';
 
 export function render() {
   $('mlbl').textContent = MN[state.cur.getMonth()] + ' ' + state.cur.getFullYear();
-  const rows = filtered().sort((a, b) => new Date(b.date) - new Date(a.date) || b.id - a.id);
-  const total = rows.reduce((s, r) => s + r.amt, 0);
+  const personal = filtered();
+  const shared = sharedRowsForMonth(state.cur);
+  // Merge personal + shared for the list, newest first.
+  const rows = [...personal, ...shared].sort((a, b) => new Date(b.date) - new Date(a.date) || (b.id > a.id ? 1 : -1));
+
+  // Spent total: personal + settled/paid shared (pending owed rows excluded).
+  const total = personal.reduce((s, r) => s + r.amt, 0) + sharedMonthTotal(state.cur);
   $('tot').textContent = fmt(total);
   $('cnt').textContent = rows.length;
 
-  // Category bars — include any category name present in records even if not in CATS.
+  // Category bars — from personal + non-pending shared rows (owed rows don't count yet).
   const byc = {};
-  rows.forEach((r) => {
+  personal.forEach((r) => {
     byc[r.cat] = (byc[r.cat] || 0) + r.amt;
+  });
+  shared.forEach((r) => {
+    if (!r.pending) byc[r.cat] = (byc[r.cat] || 0) + r.amt;
   });
   const catSec = $('cat-section');
   const catNames = Object.keys(byc);
@@ -69,5 +79,13 @@ export function initHome() {
     const row = e.target.closest('.cat-row');
     if (row) showCategoryView(row.dataset.cat);
   });
-  attachListHandler($('tlist'), { onEdit: showEdit, rerender });
+  attachListHandler($('tlist'), {
+    onEdit: showEdit,
+    rerender,
+    onSettle: async (splitId) => {
+      if (!confirm('Mark your share as settled?')) return;
+      await markShareDone(splitId);
+      rerender();
+    },
+  });
 }

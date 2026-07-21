@@ -10,11 +10,14 @@ import { $ } from './dom.js';
 
 import { render, showHome, initHome } from './views/home.js';
 import { renderCategoryView, initCategory } from './views/category.js';
-import { initAddEdit } from './views/addEdit.js';
+import { initAddEdit, renderGroupChips } from './views/addEdit.js';
 import { initCategories } from './features/categories.js';
 import { initPayments } from './features/payments.js';
 import { initDefaults } from './features/defaults.js';
 import { initBackup } from './features/backup.js';
+import { initAuth, onAuthChange } from './features/auth.js';
+import { initGroupsFeature, loadCloudData, onGroupData, subscribeRealtime, unsubscribeRealtime } from './features/groups.js';
+import { initGroupsView, refreshGroupsView } from './views/groups.js';
 
 function initHeader() {
   $('mprev').onclick = () => {
@@ -48,6 +51,29 @@ initCategories();
 initPayments();
 initDefaults();
 initBackup();
+initAuth();
+initGroupsFeature();
+initGroupsView();
+
+// React to sign in / out: load or clear cloud data and (un)subscribe to realtime.
+onAuthChange((user) => {
+  if (user) {
+    loadCloudData();
+    subscribeRealtime();
+  } else {
+    unsubscribeRealtime();
+    loadCloudData(); // clears cloud state when logged out
+  }
+});
+
+// Whenever cloud data (re)loads, refresh the home list and the groups view, and
+// keep the add-form group picker current.
+onGroupData(() => {
+  render();
+  if (state.filterCat) renderCategoryView();
+  refreshGroupsView();
+  if ($('add').classList.contains('active')) renderGroupChips();
+});
 
 render();
 

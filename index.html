@@ -48,6 +48,45 @@
   <div id="cvlist"></div>
 </div>
 
+<!-- GROUPS -->
+<div id="groups" class="screen">
+  <header>
+    <button class="back-btn" id="groupsBackBtn">&#8592; Back</button>
+    <h1>Groups</h1>
+    <span style="width:40px"></span>
+  </header>
+  <p id="groupsAuthGate" class="empty" style="display:none"></p>
+  <div id="groupsContent" style="display:none">
+    <!-- list of groups + create/join -->
+    <div id="groupsMain">
+      <div class="field" style="margin-bottom:10px">
+        <div style="display:flex;gap:8px">
+          <input type="text" id="grpNameInput" placeholder="New group name" maxlength="40"/>
+          <button class="chip" id="grpCreateBtn" style="white-space:nowrap">Create</button>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:16px">
+        <div style="display:flex;gap:8px">
+          <input type="text" id="grpCodeInput" placeholder="Join with code" maxlength="6" style="text-transform:uppercase"/>
+          <button class="chip" id="grpJoinBtn" style="white-space:nowrap">Join</button>
+        </div>
+      </div>
+      <p class="section-title">Your groups</p>
+      <div id="groupList"></div>
+    </div>
+    <!-- single group detail -->
+    <div id="groupDetail" style="display:none">
+      <button class="back-btn" id="groupDetailBackBtn">&#8592; All groups</button>
+      <h2 id="groupDetailTitle" style="font-size:20px;margin:8px 0 4px"></h2>
+      <p class="section-title">Invite code: <span id="groupInviteCode" style="text-transform:none;color:#1E3A5F;font-weight:600"></span></p>
+      <p class="section-title" style="margin-top:14px">Balances</p>
+      <div class="cat-manage-list" id="groupBalances"></div>
+      <p class="section-title" style="margin-top:14px">Expenses</p>
+      <div id="groupExpenseList"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ADD / EDIT -->
 <div id="add" class="screen">
   <header>
@@ -71,6 +110,19 @@
       <label>Payment type</label>
       <div class="pay-chips" id="ipaychips"></div>
     </div>
+    <div class="field" id="groupField" style="display:none">
+      <label>Split with group <span style="font-size:11px;opacity:.5">(optional)</span></label>
+      <div class="chips" id="igroupchips"></div>
+      <div id="splitConfig" style="display:none;margin-top:12px">
+        <div class="pay-chips" id="isplitmode" style="margin-bottom:10px">
+          <div class="pay-chip on" data-mode="equal">＝ Equal</div>
+          <div class="pay-chip" data-mode="amount">₹ Amounts</div>
+          <div class="pay-chip" data-mode="percent">% Percent</div>
+        </div>
+        <div id="splitWeights"></div>
+        <div id="splitPreview" style="font-size:12px;color:#888;margin-top:6px"></div>
+      </div>
+    </div>
     <div class="field">
       <label>Note <span style="font-size:11px;opacity:.5">(optional)</span></label>
       <input type="text" id="idesc" placeholder="e.g. Swiggy, rent, SIP..."/>
@@ -87,6 +139,8 @@
 <div class="overlay" id="overlay">
   <div class="sheet">
     <h3>Options</h3>
+    <div id="authBox" style="margin-bottom:6px"></div>
+    <button class="sheet-btn" id="groupsBtn"><span>👥</span> Groups (split expenses)</button>
     <button class="sheet-btn" id="manageCatsBtn"><span>🏷️</span> Manage categories</button>
     <button class="sheet-btn" id="managePaysBtn"><span>💳</span> Manage payment methods</button>
     <button class="sheet-btn" id="defaultsBtn"><span>⭐</span> Set defaults</button>

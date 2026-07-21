@@ -103,3 +103,13 @@ header h1{font-size:18px;font-weight:600}
 .cat-manage-row .cm-name{flex:1;font-size:14px;font-weight:500}
 .cat-manage-row .cm-count{font-size:11px;color:#888;margin-right:4px}
 .cat-manage-row .cm-del{background:none;border:none;color:#c0392b;font-size:20px;cursor:pointer;padding:4px}
+
+/* Shared (group) rows */
+.shared-txn{border:1px dashed #cdd6e4}
+.txn-amt.neg{color:#c0392b}
+.pay-badge.shared-pending{background:#fdf0e8;color:#a04000}
+.pay-badge.shared-done{background:#e9f7ef;color:#1a6b3a}
+.icon-btn.settle{color:#1a6b3a;font-weight:700}
+.icon-btn.settle:hover{color:#0e6655}
+.group-row{cursor:pointer}
+.group-row .chevron{font-size:22px;color:#ccc;transform:none}
