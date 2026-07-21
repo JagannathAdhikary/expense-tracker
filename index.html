@@ -13,12 +13,11 @@
 <div id="home" class="screen active">
   <header>
     <div class="mnav">
-      <button id="mprev">&#8249;</button>
+      <button id="mprev" aria-label="Previous month">&#8249;</button>
       <span id="mlbl"></span>
-      <button id="mnext">&#8250;</button>
+      <button id="mnext" aria-label="Next month">&#8250;</button>
     </div>
-    <h1>Expenses</h1>
-    <button class="menu-btn" id="menuBtn">⋮</button>
+    <div class="header-actions" id="homeActions"></div>
   </header>
   <div class="summary">
     <div class="card"><div class="lbl">Total spent</div><div class="val" id="tot">₹0</div></div>
@@ -36,7 +35,7 @@
 <!-- CATEGORY VIEW -->
 <div id="catview" class="screen">
   <header>
-    <button class="back-btn" id="catbackbtn">&#8592; Back</button>
+    <button class="back-btn" id="catbackbtn" aria-label="Back"></button>
     <h1 id="catview-title">Category</h1>
     <span style="width:40px"></span>
   </header>
@@ -48,10 +47,52 @@
   <div id="cvlist"></div>
 </div>
 
+<!-- GROUPS -->
+<div id="groups" class="screen">
+  <header>
+    <button class="back-btn" id="groupsBackBtn" aria-label="Back"></button>
+    <h1 id="groupDetailTitle">Group</h1>
+    <span style="width:38px"></span>
+  </header>
+  <div id="groupDetail">
+    <p class="section-title">Invite code: <span id="groupInviteCode" style="text-transform:none;color:#1E3A5F;font-weight:600"></span></p>
+    <div id="groupOwe"></div>
+    <p class="section-title" style="margin-top:14px">Balances</p>
+    <div class="cat-manage-list" id="groupBalances"></div>
+    <p class="section-title" style="margin-top:14px">Expenses</p>
+    <div id="groupExpenseList"></div>
+  </div>
+</div>
+
+<!-- GROUPS POPOVER (list + create/join) -->
+<div class="overlay" id="groupsOverlay">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h3>Groups</h3>
+      <button class="sheet-close" id="closeGroupsSheet" aria-label="Close"></button>
+    </div>
+    <p id="groupsAuthGate" class="auth-note" style="display:none"></p>
+    <div id="groupsContent" style="display:none">
+      <p class="section-title">Your groups</p>
+      <div id="groupList" style="margin-bottom:14px"></div>
+      <div class="grp-actions">
+        <div class="grp-action-row">
+          <input type="text" id="grpNameInput" placeholder="New group name" maxlength="40"/>
+          <button class="hdr-btn primary" id="grpCreateBtn">Create</button>
+        </div>
+        <div class="grp-action-row">
+          <input type="text" id="grpCodeInput" placeholder="Join with code" maxlength="6" style="text-transform:uppercase"/>
+          <button class="hdr-btn" id="grpJoinBtn">Join</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ADD / EDIT -->
 <div id="add" class="screen">
   <header>
-    <button class="back-btn" id="backbtn">&#8592; Back</button>
+    <button class="back-btn" id="backbtn" aria-label="Back"></button>
     <h1 id="form-title">Add expense</h1>
     <span style="width:40px"></span>
   </header>
@@ -71,6 +112,19 @@
       <label>Payment type</label>
       <div class="pay-chips" id="ipaychips"></div>
     </div>
+    <div class="field" id="groupField" style="display:none">
+      <label>Split with group <span style="font-size:11px;opacity:.5">(optional)</span></label>
+      <div class="chips" id="igroupchips"></div>
+      <div id="splitConfig" style="display:none;margin-top:12px">
+        <div class="pay-chips" id="isplitmode" style="margin-bottom:10px">
+          <div class="pay-chip on" data-mode="equal">＝ Equal</div>
+          <div class="pay-chip" data-mode="amount">₹ Amounts</div>
+          <div class="pay-chip" data-mode="percent">% Percent</div>
+        </div>
+        <div id="splitWeights"></div>
+        <div id="splitPreview" style="font-size:12px;color:#888;margin-top:6px"></div>
+      </div>
+    </div>
     <div class="field">
       <label>Note <span style="font-size:11px;opacity:.5">(optional)</span></label>
       <input type="text" id="idesc" placeholder="e.g. Swiggy, rent, SIP..."/>
@@ -86,14 +140,22 @@
 <!-- OPTIONS SHEET -->
 <div class="overlay" id="overlay">
   <div class="sheet">
-    <h3>Options</h3>
-    <button class="sheet-btn" id="manageCatsBtn"><span>🏷️</span> Manage categories</button>
-    <button class="sheet-btn" id="managePaysBtn"><span>💳</span> Manage payment methods</button>
-    <button class="sheet-btn" id="defaultsBtn"><span>⭐</span> Set defaults</button>
-    <button class="sheet-btn" id="exportBtn"><span>📤</span> Export data (backup)</button>
-    <button class="sheet-btn" id="importBtn"><span>📥</span> Import data (restore)</button>
-    <input type="file" id="importFile" accept=".json" style="display:none"/>
-    <button class="sheet-btn" id="closeSheet"><span>✕</span> Close</button>
+    <div class="sheet-head">
+      <h3>Menu</h3>
+      <button class="sheet-close" id="closeSheet" aria-label="Close"></button>
+    </div>
+    <div id="authBox"></div>
+    <div id="syncBox"></div>
+    <div class="sheet-group">
+      <button class="sheet-btn" id="manageCatsBtn"><span class="sb-ico" data-icon="tag"></span> Manage categories</button>
+      <button class="sheet-btn" id="managePaysBtn"><span class="sb-ico" data-icon="card"></span> Manage payment methods</button>
+      <button class="sheet-btn" id="defaultsBtn"><span class="sb-ico" data-icon="star"></span> Set defaults</button>
+    </div>
+    <div class="sheet-group">
+      <button class="sheet-btn" id="exportBtn"><span class="sb-ico" data-icon="upload"></span> Export data (backup)</button>
+      <button class="sheet-btn" id="importBtn"><span class="sb-ico" data-icon="download"></span> Import data (restore)</button>
+      <input type="file" id="importFile" accept=".json" style="display:none"/>
+    </div>
   </div>
 </div>
 

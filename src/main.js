@@ -10,29 +10,22 @@ import { $ } from './dom.js';
 
 import { render, showHome, initHome } from './views/home.js';
 import { renderCategoryView, initCategory } from './views/category.js';
-import { initAddEdit } from './views/addEdit.js';
+import { initAddEdit, renderGroupChips } from './views/addEdit.js';
+import { initHeader, renderHomeActions } from './views/header.js';
 import { initCategories } from './features/categories.js';
 import { initPayments } from './features/payments.js';
 import { initDefaults } from './features/defaults.js';
 import { initBackup } from './features/backup.js';
+import { initAuth, onAuthChange } from './features/auth.js';
+import { initGroupsFeature, loadCloudData, onGroupData, subscribeRealtime, unsubscribeRealtime } from './features/groups.js';
+import { initGroupsView, refreshGroupsView } from './views/groups.js';
+import { renderSyncUI, onLoginSync, onSynced } from './features/sync.js';
 
-function initHeader() {
-  $('mprev').onclick = () => {
-    state.cur = new Date(state.cur.getFullYear(), state.cur.getMonth() - 1, 1);
-    render();
-    if (state.filterCat) renderCategoryView();
-  };
-  $('mnext').onclick = () => {
-    state.cur = new Date(state.cur.getFullYear(), state.cur.getMonth() + 1, 1);
-    render();
-    if (state.filterCat) renderCategoryView();
-  };
-  $('menuBtn').onclick = () => $('overlay').classList.add('open');
-  $('closeSheet').onclick = () => $('overlay').classList.remove('open');
-  $('overlay').onclick = (e) => {
-    if (e.target === $('overlay')) $('overlay').classList.remove('open');
-  };
-}
+// Month nav (dispatched from the header) refreshes the active list views.
+document.addEventListener('month-change', () => {
+  render();
+  if (state.filterCat) renderCategoryView();
+});
 
 // Load data, then seed the current selections from user defaults.
 initState();
@@ -48,6 +41,39 @@ initCategories();
 initPayments();
 initDefaults();
 initBackup();
+initAuth();
+initGroupsFeature();
+initGroupsView();
+
+// React to sign in / out: load or clear cloud data, (un)subscribe to realtime,
+// update the header actions, and run personal-expense sync.
+onAuthChange((user) => {
+  renderHomeActions();
+  renderSyncUI();
+  if (user) {
+    loadCloudData();
+    subscribeRealtime();
+    onLoginSync();
+  } else {
+    unsubscribeRealtime();
+    loadCloudData(); // clears cloud state when logged out
+  }
+});
+
+// After a personal-expense sync, refresh the list views.
+onSynced(() => {
+  render();
+  if (state.filterCat) renderCategoryView();
+});
+
+// Whenever cloud data (re)loads, refresh the home list and the groups view, and
+// keep the add-form group picker current.
+onGroupData(() => {
+  render();
+  if (state.filterCat) renderCategoryView();
+  refreshGroupsView();
+  if ($('add').classList.contains('active')) renderGroupChips();
+});
 
 render();
 

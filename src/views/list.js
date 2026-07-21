@@ -4,6 +4,7 @@
 import { state, collapsed } from '../state.js';
 import { fmt, friendlyDate, payBadge, catByName } from '../format.js';
 import { persist } from '../storage.js';
+import { pushRecord, syncOn } from '../features/sync.js';
 
 // Render a list of rows grouped by date into a container element.
 export function renderDateGroups(rows, container) {
@@ -27,6 +28,25 @@ export function renderDateGroups(rows, container) {
     const entriesHtml = g.items
       .map((r) => {
         const cat = catByName(r.cat);
+        // Shared (group) rows are cloud-managed: no local edit/delete, badge instead.
+        if (r.shared) {
+          const b = r.badge || { label: r.pending ? 'pending' : 'settled', cls: r.pending ? 'shared-pending' : 'shared-done' };
+          const badge = `<span class="pay-badge ${b.cls}">${b.label}</span>`;
+          const amtCls = r.amt < 0 ? ' neg' : '';
+          return `<div class="txn shared-txn">
+        <div class="txn-ico" style="background:${cat.c}20">${cat.e}</div>
+        <div class="txn-info">
+          <div class="txn-desc">${r.desc || cat.n}</div>
+          <div class="txn-meta">${r.meta || cat.n}${badge}</div>
+        </div>
+        <div class="txn-amt${amtCls}">${fmt(r.amt)}</div>
+        <div class="txn-actions">
+          ${r.canEdit ? `<button class="icon-btn gedit" data-gid="${r.groupExpId}" title="Edit group expense">✏️</button>` : ''}
+          ${r.canEdit ? `<button class="icon-btn gdel" data-gid="${r.groupExpId}" title="Delete group expense">×</button>` : ''}
+          ${r.settleId ? `<button class="icon-btn settle" data-settle="${r.settleId}" title="Mark my share done">✓</button>` : ''}
+        </div>
+      </div>`;
+        }
         return `<div class="txn">
         <div class="txn-ico" style="background:${cat.c}20">${cat.e}</div>
         <div class="txn-info">
@@ -58,12 +78,34 @@ export function renderDateGroups(rows, container) {
 
 // Attach the shared delete / edit / collapse click handling to a list container.
 // The render callbacks are passed in to avoid circular imports between views.
-export function attachListHandler(container, { onEdit, rerender }) {
+// onSettle (optional) handles the "mark my share done" ✓ button on shared rows.
+export function attachListHandler(container, { onEdit, rerender, onSettle, onEditGroup, onDeleteGroup }) {
   container.addEventListener('click', (e) => {
+    const gdel = e.target.closest('.gdel');
+    if (gdel) {
+      if (onDeleteGroup) onDeleteGroup(gdel.dataset.gid);
+      return;
+    }
+    const gedit = e.target.closest('.gedit');
+    if (gedit) {
+      if (onEditGroup) onEditGroup(gedit.dataset.gid);
+      return;
+    }
+    const settle = e.target.closest('.settle');
+    if (settle) {
+      if (onSettle) onSettle(settle.dataset.settle);
+      return;
+    }
     const del = e.target.closest('.del');
     if (del) {
       if (!confirm('Delete this entry?')) return;
-      state.recs = state.recs.filter((r) => r.id != del.dataset.id);
+      const id = del.dataset.id;
+      if (syncOn()) {
+        // Soft-delete so the removal propagates to other devices via the cloud.
+        const rec = state.recs.find((r) => r.id == id);
+        if (rec) pushRecord({ ...rec, deleted: true, updated: Date.now() });
+      }
+      state.recs = state.recs.filter((r) => r.id != id);
       persist();
       rerender();
       return;

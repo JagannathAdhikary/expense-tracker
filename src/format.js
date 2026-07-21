@@ -3,7 +3,7 @@
 import { state } from './state.js';
 import { MN, DAYS, BUILTIN_PAYS } from './constants.js';
 
-export const fmt = (n) => '₹' + Math.round(n).toLocaleString('en-IN');
+export const fmt = (n) => '₹' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export const isoDay = (d) => d.toISOString().split('T')[0];
 
