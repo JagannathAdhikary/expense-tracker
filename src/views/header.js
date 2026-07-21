@@ -39,6 +39,11 @@ export function initHeader() {
   if (closeBtn) closeBtn.innerHTML = icon.close({ size: 20 });
   const addBtn = $('addbtn');
   if (addBtn) addBtn.innerHTML = icon.plus({ size: 28 });
+  // Circular icon back buttons across screens.
+  ['catbackbtn', 'groupsBackBtn', 'backbtn'].forEach((id) => {
+    const el = $(id);
+    if (el) el.innerHTML = icon.back({ size: 20 });
+  });
 
   $('mprev').onclick = () => {
     state.cur = new Date(state.cur.getFullYear(), state.cur.getMonth() - 1, 1);

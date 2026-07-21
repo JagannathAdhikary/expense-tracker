@@ -43,7 +43,10 @@ function renderGroupList() {
 function renderGroupDetail() {
   const g = state.groups.find((x) => x.id === state.openGroupId);
   if (!g) {
-    showGroupsList();
+    // Group no longer available — go home and reopen the list popover.
+    state.openGroupId = null;
+    $('groups').classList.remove('active');
+    $('home').classList.add('active');
     return;
   }
   $('groupDetailTitle').textContent = g.name;
@@ -114,55 +117,57 @@ function renderGroupDetail() {
   }
 }
 
+// Open the Groups popover (list + create/join). Group detail remains a full page.
 export function showGroups() {
   $('overlay').classList.remove('open');
-  ['home', 'catview', 'add'].forEach((id) => $(id).classList.remove('active'));
-  $('groups').classList.add('active');
+  loadCloudData(); // refresh in background; onGroupData re-renders the list
   if (!cloudEnabled()) {
     $('groupsAuthGate').style.display = 'block';
     $('groupsContent').style.display = 'none';
     $('groupsAuthGate').textContent = 'Cloud sync is not configured, so group features are unavailable.';
-    return;
-  }
-  if (!state.user) {
+  } else if (!state.user) {
     $('groupsAuthGate').style.display = 'block';
     $('groupsContent').style.display = 'none';
-    $('groupsAuthGate').textContent = 'Sign in with Google (Options → Sign in) to create and join groups.';
-    return;
+    $('groupsAuthGate').textContent = 'Sign in with Google (menu → Sign in) to create and join groups.';
+  } else {
+    $('groupsAuthGate').style.display = 'none';
+    $('groupsContent').style.display = 'block';
+    renderGroupList();
   }
-  $('groupsAuthGate').style.display = 'none';
-  $('groupsContent').style.display = 'block';
-  showGroupsList();
-  loadCloudData(); // refresh in background; onGroupData re-renders
+  $('groupsOverlay').classList.add('open');
 }
 
-function showGroupsList() {
-  state.openGroupId = null;
-  $('groupDetail').style.display = 'none';
-  $('groupsMain').style.display = 'block';
-  renderGroupList();
+function closeGroupsPopover() {
+  $('groupsOverlay').classList.remove('open');
 }
 
+// Open a group's full detail page (from the popover).
 function showGroupDetail(id) {
   state.openGroupId = id;
-  $('groupsMain').style.display = 'none';
-  $('groupDetail').style.display = 'block';
+  closeGroupsPopover();
+  ['home', 'catview', 'add'].forEach((sid) => $(sid).classList.remove('active'));
+  $('groups').classList.add('active');
   renderGroupDetail();
 }
 
-// Re-render whatever groups view is currently visible (called on cloud data reload).
+// Re-render whatever group view is currently visible (called on cloud data reload).
 export function refreshGroupsView() {
-  if (!$('groups').classList.contains('active')) return;
-  if (state.openGroupId) renderGroupDetail();
-  else renderGroupList();
+  if ($('groupsOverlay').classList.contains('open') && state.user) renderGroupList();
+  if ($('groups').classList.contains('active') && state.openGroupId) renderGroupDetail();
 }
 
 export function initGroupsView() {
+  // Groups screen (detail) back button -> home.
   $('groupsBackBtn').onclick = () => {
-    ['groups', 'catview', 'add'].forEach((id) => $(id).classList.remove('active'));
+    state.openGroupId = null;
+    $('groups').classList.remove('active');
     $('home').classList.add('active');
   };
-  $('groupDetailBackBtn').onclick = showGroupsList;
+  // Popover close + backdrop click.
+  $('closeGroupsSheet').onclick = closeGroupsPopover;
+  $('groupsOverlay').onclick = (e) => {
+    if (e.target === $('groupsOverlay')) closeGroupsPopover();
+  };
 
   $('groupList').addEventListener('click', (e) => {
     const row = e.target.closest('.group-row');
