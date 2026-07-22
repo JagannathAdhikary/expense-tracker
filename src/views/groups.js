@@ -5,13 +5,14 @@
 import { state } from '../state.js';
 import { cloudEnabled } from '../supabase.js';
 import { fmt } from '../format.js';
+import { friendlyDate, payBadge } from '../format.js';
 import { $ } from '../dom.js';
 import { loadCloudData, markShareDone, deleteGroupExpense, settleWithPayer } from '../features/groups.js';
-import { netForUser } from '../split.js';
 import { openEditGroup } from './addEdit.js';
-import { expenseHasPayment, owedByUserInGroup } from '../cloudrows.js';
+import { expenseHasPayment, owedByUserInGroup, owedToUserInGroup } from '../cloudrows.js';
 import { toastError, toastSuccess } from '../toast.js';
 import { icon } from '../icons.js';
+import { confirmModal, pickSettlePayment } from '../confirm.js';
 
 function memberName(group, userId) {
   const m = group.members.find((x) => x.id === userId);
@@ -20,6 +21,16 @@ function memberName(group, userId) {
 
 // Splits belonging to a given expense.
 const splitsFor = (expId) => state.mySplits.filter((s) => s.expense_id === expId);
+
+// "Wed, 5 Feb · 3:42 PM" — friendly spent-on date plus the recorded time.
+function dateTimeLabel(spentOn, createdAt) {
+  const label = friendlyDate(spentOn);
+  if (!createdAt) return label;
+  const t = new Date(createdAt);
+  if (isNaN(t)) return label;
+  const time = t.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
+  return `${label} · ${time}`;
+}
 
 function renderGroupList() {
   const wrap = $('groupList');
@@ -40,6 +51,30 @@ function renderGroupList() {
       </div>`;
     })
     .join('');
+}
+
+// Show the per-member paid/pending breakdown for a group expense in a modal.
+function showBreakdown(expId) {
+  const g = state.groups.find((x) => x.id === state.openGroupId);
+  const exp = state.groupExpenses.find((e) => e.id === expId);
+  if (!g || !exp) return;
+  $('breakdownTitle').textContent = exp.description || 'Who’s paid';
+  const rows = splitsFor(expId)
+    .slice()
+    .sort((a, b) => (a.debtor_id === exp.payer_id ? -1 : b.debtor_id === exp.payer_id ? 1 : 0))
+    .map((s) => {
+      const isPayer = s.debtor_id === exp.payer_id;
+      const name = memberName(g, s.debtor_id) + (s.debtor_id === state.user?.id ? ' (you)' : '');
+      const badge = isPayer
+        ? '<span class="pay-badge pay-custom">paid all</span>'
+        : s.status === 'done'
+          ? '<span class="pay-badge shared-done">paid ✓</span>'
+          : '<span class="pay-badge shared-pending">pending</span>';
+      return `<div class="cat-manage-row"><div class="cm-name">${name}</div><span class="cm-count">${fmt(s.share_amount)}</span>${badge}</div>`;
+    })
+    .join('');
+  $('breakdownList').innerHTML = rows || '<div style="color:#888;font-size:13px">No splits.</div>';
+  $('breakdownModal').classList.add('open');
 }
 
 function renderGroupDetail() {
@@ -78,14 +113,21 @@ function renderGroupDetail() {
   }
 
   const exps = state.groupExpenses.filter((e) => e.group_id === g.id);
-  const expIds = new Set(exps.map((e) => e.id));
-  const splits = state.mySplits.filter((s) => expIds.has(s.expense_id));
 
-  // Per-member effective balances.
-  const balances = g.members
-    .map((m) => `<div class="cat-manage-row"><div class="cm-ico" style="background:#eef1f6">${m.avatar ? `<img src="${m.avatar}" style="width:34px;height:34px;border-radius:50%"/>` : '👤'}</div><div class="cm-name">${m.name}${m.id === state.user?.id ? ' (you)' : ''}</div><span class="cm-count">${fmt(netForUser(exps, splits, m.id))}</span></div>`)
-    .join('');
-  $('groupBalances').innerHTML = balances || '<div style="color:#888;font-size:13px">No members.</div>';
+  // "Owed to you" summary: who still owes the current user, per person.
+  const owedTo = owedToUserInGroup(g.id);
+  if (owedTo.total > 0) {
+    const rows = owedTo.byDebtor
+      .map((o) => `<div class="owe-row"><span class="owe-name">${memberName(g, o.debtorId)}</span><span class="owe-amt owed-to">${fmt(o.amount)}</span></div>`)
+      .join('');
+    $('groupOwedTo').innerHTML = `
+      <div class="owe-card owed-to-card">
+        <div class="owe-head owed-to-head"><span>Owed to you</span><span class="owe-total">${fmt(owedTo.total)}</span></div>
+        ${rows}
+      </div>`;
+  } else {
+    $('groupOwedTo').innerHTML = '';
+  }
 
   // Expense list with the current user's split status / settle action.
   if (!exps.length) {
@@ -102,18 +144,31 @@ function renderGroupDetail() {
               ? `<button class="chip" data-settle="${mine.id}" style="border-color:#C0392B;color:#C0392B">Owe ${fmt(mine.share_amount)} · Mark done</button>`
               : `<span class="pay-badge" style="background:#e9f7ef;color:#1a6b3a">settled ${fmt(mine.share_amount)}</span>`;
         } else if (iPaid) {
+          // No "you paid" text (the meta line already says "You paid X"); show a
+          // tappable pending count / settled badge that opens the breakdown.
           const pend = splitsFor(e.id).filter((s) => s.debtor_id !== state.user?.id && s.status === 'pending').length;
-          action = `<span class="pay-badge pay-custom">you paid${pend ? ` · ${pend} pending` : ' · all settled'}</span>`;
+          action =
+            pend > 0
+              ? `<button class="pay-badge status-btn shared-pending" data-breakdown="${e.id}">${pend} pending</button>`
+              : `<button class="pay-badge status-btn shared-done" data-breakdown="${e.id}">all settled</button>`;
         }
-        const editBtn = iPaid ? `<button class="icon-btn gedit" data-gid="${e.id}" title="Edit">✏️</button>` : '';
-        const delBtn = iPaid ? `<button class="icon-btn gdel" data-gid="${e.id}" title="Delete">×</button>` : '';
-        return `<div class="txn">
+        const editBtn = iPaid ? `<button class="icon-btn gedit" data-gid="${e.id}" title="Edit" aria-label="Edit">${icon.edit({ size: 17 })}</button>` : '';
+        const delBtn = iPaid && !expenseHasPayment(e.id) ? `<button class="icon-btn gdel" data-gid="${e.id}" title="Delete" aria-label="Delete">${icon.trash({ size: 17 })}</button>` : '';
+        // Line 1: note/title. Line 2: "<Person> paid <amount>". Line 3: date · time.
+        const who = iPaid ? 'You' : memberName(g, e.payer_id);
+        const when = dateTimeLabel(e.spent_on, e.created_at);
+        // Payment method: payer sees how they paid (e.pay); a debtor sees only
+        // their own settlement method (mine.pay), never the payer's.
+        const payMethod = iPaid ? e.pay : mine && mine.pay;
+        const rowClass = iPaid ? 'txn ge-row ge-paid' : mine && mine.status === 'pending' ? 'txn ge-row ge-owe' : 'txn ge-row';
+        return `<div class="${rowClass}">
           <div class="txn-ico" style="background:#eef1f620">🧾</div>
           <div class="txn-info">
             <div class="txn-desc">${e.description || 'Expense'}</div>
-            <div class="txn-meta">${memberName(g, e.payer_id)} paid ${fmt(e.amount)} · ${e.spent_on}</div>
+            <div class="txn-meta ge-payer">${who} paid ${fmt(e.amount)}${payBadge(payMethod)}</div>
+            <div class="txn-meta ge-when">${when}</div>
           </div>
-          <div style="display:flex;align-items:center;gap:6px">${action}${editBtn}${delBtn}</div>
+          <div class="ge-actions">${action}<div class="ge-btns">${editBtn}${delBtn}</div></div>
         </div>`;
       })
       .join('');
@@ -194,12 +249,19 @@ export function initGroupsView() {
     if (!btn) return;
     const g = state.groups.find((x) => x.id === state.openGroupId);
     const name = g ? memberName(g, btn.dataset.payer) : 'this person';
-    if (!confirm(`Settle everything you owe ${name}? This marks all your pending shares to them as paid.`)) return;
-    await settleWithPayer(state.openGroupId, btn.dataset.payer);
+    if (!(await confirmModal(`Settle everything you owe ${name}? This marks all your pending shares to them as paid.`, { title: 'Settle up', confirmLabel: 'Continue' }))) return;
+    const { confirmed, pay } = await pickSettlePayment();
+    if (!confirmed) return;
+    await settleWithPayer(state.openGroupId, btn.dataset.payer, pay);
     renderGroupDetail();
   });
 
   $('groupExpenseList').addEventListener('click', async (e) => {
+    const breakdownBtn = e.target.closest('[data-breakdown]');
+    if (breakdownBtn) {
+      showBreakdown(breakdownBtn.dataset.breakdown);
+      return;
+    }
     const editBtn = e.target.closest('.gedit');
     if (editBtn) {
       openEditGroup(editBtn.dataset.gid);
@@ -212,15 +274,23 @@ export function initGroupsView() {
         toastError('This expense already has a settled share, so it can no longer be deleted.');
         return;
       }
-      if (!confirm('Delete this group expense for everyone? This cannot be undone.')) return;
+      if (!(await confirmModal('Delete this group expense for everyone? This cannot be undone.', { title: 'Delete expense', confirmLabel: 'Delete', danger: true }))) return;
       await deleteGroupExpense(gid);
       renderGroupDetail();
       return;
     }
     const btn = e.target.closest('[data-settle]');
     if (!btn) return;
-    if (!confirm('Mark your share as settled? This records that you have paid it back.')) return;
-    await markShareDone(btn.dataset.settle);
+    const { confirmed, pay } = await pickSettlePayment();
+    if (!confirmed) return;
+    await markShareDone(btn.dataset.settle, pay);
     renderGroupDetail();
   });
+
+  // Breakdown modal close.
+  $('breakdownClose').innerHTML = icon.close({ size: 20 });
+  $('breakdownClose').onclick = () => $('breakdownModal').classList.remove('open');
+  $('breakdownModal').onclick = (e) => {
+    if (e.target === $('breakdownModal')) $('breakdownModal').classList.remove('open');
+  };
 }

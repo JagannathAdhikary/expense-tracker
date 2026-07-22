@@ -33,6 +33,7 @@ export const state = {
   splitWeights: {}, // per-member weights for amount/percent modes (keyed by user id)
   editGroupExpId: null, // when set, the add form is editing this cloud group expense
   groupEditLocked: false, // when editing a group expense that already has a payment: lock amount/group/split
+  editMySplitId: null, // when set, editing only my personal cat/pay/note on a settled group split
 };
 
 // Set of date strings whose groups are collapsed; default all expanded.

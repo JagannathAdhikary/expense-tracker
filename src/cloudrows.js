@@ -51,6 +51,24 @@ export function owedByUserInGroup(groupId) {
   return { byPayer, total };
 }
 
+// What others owe the current user within a group, aggregated per debtor.
+// Returns { byDebtor: [{debtorId, amount}], total } over pending shares of
+// expenses the current user paid.
+export function owedToUserInGroup(groupId) {
+  if (!state.user) return { byDebtor: [], total: 0 };
+  const uid = state.user.id;
+  // Expenses in this group that I paid.
+  const myExpIds = new Set(state.groupExpenses.filter((e) => e.group_id === groupId && e.payer_id === uid).map((e) => e.id));
+  const totals = {}; // debtorId -> paise
+  for (const s of state.mySplits) {
+    if (!myExpIds.has(s.expense_id) || s.status !== 'pending' || s.debtor_id === uid) continue;
+    totals[s.debtor_id] = (totals[s.debtor_id] || 0) + Math.round(Number(s.share_amount) * 100);
+  }
+  const byDebtor = Object.entries(totals).map(([debtorId, paise]) => ({ debtorId, amount: paise / 100 }));
+  const total = byDebtor.reduce((s, x) => s + x.amount, 0);
+  return { byDebtor, total };
+}
+
 // All shared rows for the user, unfiltered by month.
 export function sharedRows() {
   if (!state.user) return [];
@@ -61,14 +79,20 @@ export function sharedRows() {
   for (const exp of state.groupExpenses) {
     const rowsFor = byExp.get(exp.id) || [];
     const iPaid = exp.payer_id === uid;
+    // Deletable only by the payer, and only while no one has settled a share yet.
+    const anySettled = rowsFor.some((s) => s.debtor_id !== exp.payer_id && s.status === 'done');
     const base = {
       shared: true,
       cat: exp.category || 'Other',
       desc: exp.description || 'Group expense',
+      pay: exp.pay || null,
       date: exp.spent_on,
+      // Sortable timestamp: when the expense was recorded (falls back to the date).
+      ts: exp.created_at ? new Date(exp.created_at).getTime() : new Date(exp.spent_on).getTime(),
       id: exp.id,
       groupExpId: exp.id, // stable id of the group_expenses row (for edit)
       canEdit: iPaid, // only the payer may edit
+      canDelete: iPaid && !anySettled, // payer, and only before anyone settles
     };
     if (iPaid) {
       // Own share (always counts) + any not-yet-settled others' shares (still fronted).
@@ -84,14 +108,17 @@ export function sharedRows() {
           : others.length > 0
             ? { label: 'all settled', cls: 'shared-done' }
             : { label: 'you paid', cls: 'shared-neutral' };
-      rows.push({ ...base, amt, pending: false, badge, meta: `${groupName(exp.group_id)} · you paid` });
+      rows.push({ ...base, amt, pending: false, badge, meta: groupName(exp.group_id) });
     } else {
       const mine = rowsFor.find((s) => s.debtor_id === uid);
       if (!mine) continue; // not involved
+      // Debtor's personal category/note; payment is ONLY their own settlement method
+      // (never the payer's — that's private to the payer).
+      const personal = { cat: mine.cat || base.cat, desc: mine.note || base.desc, pay: mine.pay || null };
       if (mine.status === 'pending') {
-        rows.push({ ...base, amt: -Number(mine.share_amount), pending: true, settleId: mine.id, badge: { label: 'you owe', cls: 'shared-pending' }, meta: `${groupName(exp.group_id)} · you owe` });
+        rows.push({ ...base, ...personal, amt: -Number(mine.share_amount), pending: true, settleId: mine.id, badge: { label: 'you owe', cls: 'shared-pending' }, meta: groupName(exp.group_id) });
       } else {
-        rows.push({ ...base, amt: Number(mine.share_amount), pending: false, badge: { label: 'settled', cls: 'shared-done' }, meta: `${groupName(exp.group_id)} · your share` });
+        rows.push({ ...base, ...personal, amt: Number(mine.share_amount), pending: false, badge: { label: 'settled', cls: 'shared-done' }, meta: groupName(exp.group_id), editSplitId: mine.id });
       }
     }
   }

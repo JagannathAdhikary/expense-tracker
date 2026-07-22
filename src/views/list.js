@@ -5,6 +5,8 @@ import { state, collapsed } from '../state.js';
 import { fmt, friendlyDate, payBadge, catByName } from '../format.js';
 import { persist } from '../storage.js';
 import { pushRecord, syncOn } from '../features/sync.js';
+import { icon } from '../icons.js';
+import { confirmModal } from '../confirm.js';
 
 // Render a list of rows grouped by date into a container element.
 export function renderDateGroups(rows, container) {
@@ -33,17 +35,23 @@ export function renderDateGroups(rows, container) {
           const b = r.badge || { label: r.pending ? 'pending' : 'settled', cls: r.pending ? 'shared-pending' : 'shared-done' };
           const badge = `<span class="pay-badge ${b.cls}">${b.label}</span>`;
           const amtCls = r.amt < 0 ? ' neg' : '';
+          // Drop the minus sign on owed amounts — the red colour already signals it.
+          const amtDisplay = fmt(Math.abs(r.amt));
           return `<div class="txn shared-txn">
         <div class="txn-ico" style="background:${cat.c}20">${cat.e}</div>
         <div class="txn-info">
           <div class="txn-desc">${r.desc || cat.n}</div>
-          <div class="txn-meta">${r.meta || cat.n}${badge}</div>
+          <div class="txn-meta">${r.meta || cat.n}${payBadge(r.pay)}</div>
         </div>
-        <div class="txn-amt${amtCls}">${fmt(r.amt)}</div>
-        <div class="txn-actions">
-          ${r.canEdit ? `<button class="icon-btn gedit" data-gid="${r.groupExpId}" title="Edit group expense">✏️</button>` : ''}
-          ${r.canEdit ? `<button class="icon-btn gdel" data-gid="${r.groupExpId}" title="Delete group expense">×</button>` : ''}
-          ${r.settleId ? `<button class="icon-btn settle" data-settle="${r.settleId}" title="Mark my share done">✓</button>` : ''}
+        <div class="txn-right">
+          ${badge}
+          <div class="txn-amt${amtCls}">${amtDisplay}</div>
+        </div>
+        <div class="txn-actions row-btns">
+          ${r.canEdit ? `<button class="icon-btn gedit" data-gid="${r.groupExpId}" title="Edit group expense" aria-label="Edit">${icon.edit({ size: 16 })}</button>` : ''}
+          ${r.canDelete ? `<button class="icon-btn gdel" data-gid="${r.groupExpId}" title="Delete group expense" aria-label="Delete">${icon.trash({ size: 16 })}</button>` : ''}
+          ${r.editSplitId ? `<button class="icon-btn myedit" data-mysplit="${r.editSplitId}" title="Personalize (your label)" aria-label="Personalize">${icon.edit({ size: 16 })}</button>` : ''}
+          ${r.settleId ? `<button class="icon-btn settle" data-settle="${r.settleId}" title="Mark my share done" aria-label="Settle">${icon.check({ size: 17 })}</button>` : ''}
         </div>
       </div>`;
         }
@@ -54,9 +62,9 @@ export function renderDateGroups(rows, container) {
           <div class="txn-meta">${cat.n}${payBadge(r.pay || 'UPI')}</div>
         </div>
         <div class="txn-amt">${fmt(r.amt)}</div>
-        <div class="txn-actions">
-          <button class="icon-btn edit" data-id="${r.id}">✏️</button>
-          <button class="icon-btn del" data-id="${r.id}">×</button>
+        <div class="txn-actions row-btns">
+          <button class="icon-btn edit" data-id="${r.id}" title="Edit" aria-label="Edit">${icon.edit({ size: 16 })}</button>
+          <button class="icon-btn del" data-id="${r.id}" title="Delete" aria-label="Delete">${icon.trash({ size: 16 })}</button>
         </div>
       </div>`;
       })
@@ -79,8 +87,13 @@ export function renderDateGroups(rows, container) {
 // Attach the shared delete / edit / collapse click handling to a list container.
 // The render callbacks are passed in to avoid circular imports between views.
 // onSettle (optional) handles the "mark my share done" ✓ button on shared rows.
-export function attachListHandler(container, { onEdit, rerender, onSettle, onEditGroup, onDeleteGroup }) {
-  container.addEventListener('click', (e) => {
+export function attachListHandler(container, { onEdit, rerender, onSettle, onEditGroup, onDeleteGroup, onEditMySplit }) {
+  container.addEventListener('click', async (e) => {
+    const myedit = e.target.closest('.myedit');
+    if (myedit) {
+      if (onEditMySplit) onEditMySplit(myedit.dataset.mysplit);
+      return;
+    }
     const gdel = e.target.closest('.gdel');
     if (gdel) {
       if (onDeleteGroup) onDeleteGroup(gdel.dataset.gid);
@@ -98,7 +111,7 @@ export function attachListHandler(container, { onEdit, rerender, onSettle, onEdi
     }
     const del = e.target.closest('.del');
     if (del) {
-      if (!confirm('Delete this entry?')) return;
+      if (!(await confirmModal('Delete this entry?', { title: 'Delete', confirmLabel: 'Delete', danger: true }))) return;
       const id = del.dataset.id;
       if (syncOn()) {
         // Soft-delete so the removal propagates to other devices via the cloud.

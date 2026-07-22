@@ -46,6 +46,13 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .card:first-child .val{color:#fff}
 .card .lbl{font-size:12px;color:var(--ink-mute);margin-bottom:6px;font-weight:500}
 .card .val{font-size:24px;font-weight:700;color:var(--accent);letter-spacing:-.5px}
+/* Settled | Pending 2-column split in the Transactions card */
+.split-counts{display:flex;gap:10px;margin-top:2px}
+.split-counts .sc{flex:1;display:flex;flex-direction:column;line-height:1.1}
+.split-counts .sc-num{font-size:22px;font-weight:700;letter-spacing:-.5px}
+.split-counts .sc-lbl{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-top:2px}
+.split-counts .sc-settled .sc-num,.split-counts .sc-settled .sc-lbl{color:var(--pos)}
+.split-counts .sc-pending .sc-num,.split-counts .sc-pending .sc-lbl{color:var(--warn)}
 .section-title{font-size:11.5px;font-weight:700;color:var(--ink-mute);text-transform:uppercase;letter-spacing:.7px;margin-bottom:.7rem}
 .cat-bars{display:flex;flex-direction:column;gap:10px;margin-bottom:1.4rem}
 .cat-row{display:flex;align-items:center;gap:10px;cursor:pointer;padding:6px;border-radius:var(--radius-sm);transition:background .15s}
@@ -76,7 +83,19 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .txn-desc{font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .txn-meta{font-size:12px;color:var(--ink-soft);margin-top:2px}
 .txn-amt{font-size:15px;font-weight:700;white-space:nowrap;letter-spacing:-.2px}
+/* Shared row right column: status badge stacked above the amount */
+.txn-right{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0}
+.txn-right .pay-badge{margin:0}
+.txn-right .txn-amt{font-size:15px}
 .txn-actions{display:flex;flex-direction:column;gap:2px}
+/* SVG icon action buttons in list rows (stacked vertically) */
+.row-btns{flex-direction:column;gap:4px;align-items:center}
+.row-btns .icon-btn{width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:8px;color:var(--ink-mute);background:var(--bg-2)}
+.row-btns .icon-btn svg{display:block}
+.row-btns .edit:hover,.row-btns .gedit:hover{color:var(--accent);background:#e8eef7}
+.row-btns .del:hover,.row-btns .gdel:hover{color:var(--neg);background:#fdece9}
+.row-btns .settle{color:var(--pos)}
+.row-btns .settle:hover{color:#0e6655;background:#e6f5ec}
 .icon-btn{background:none;border:none;font-size:16px;color:#c3c9d4;cursor:pointer;padding:3px;line-height:1;transition:color .15s}
 .icon-btn:hover{color:var(--ink-soft)}
 .icon-btn.del:hover{color:var(--neg)}
@@ -144,6 +163,7 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .modal-actions button{flex:1;padding:12px;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;border:1.5px solid var(--line);background:var(--surface);color:var(--ink-soft);transition:all .15s}
 .modal-actions button:hover{border-color:#c9d1de}
 .modal-actions button.primary{background:var(--grad-accent);color:#fff;border-color:transparent;box-shadow:0 3px 10px rgba(30,58,95,.25)}
+.modal-actions button.danger-btn{background:linear-gradient(135deg,#d0463a 0%,#a5271b 100%);color:#fff;border-color:transparent;box-shadow:0 3px 10px rgba(192,57,43,.28)}
 .color-swatches{display:flex;flex-wrap:wrap;gap:8px}
 .swatch{width:32px;height:32px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:transform .12s}
 .swatch:hover{transform:scale(1.1)}
@@ -177,8 +197,18 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 
 /* Group detail lists: give the tiles breathing room */
 #groupExpenseList{display:flex;flex-direction:column;gap:10px}
-#groupBalances{gap:10px}
-#groupExpenseList .txn{padding:.9rem 1rem}
+#groupExpenseList .txn{padding:.9rem 1rem;align-items:flex-start}
+/* 3-line group expense row */
+.ge-row .txn-desc{font-size:14.5px;font-weight:700}
+.ge-payer{font-weight:600;color:var(--ink);margin-top:3px}
+.ge-when{color:var(--ink-mute);margin-top:1px}
+.ge-actions{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0}
+.ge-btns{display:flex;gap:2px}
+.ge-btns .icon-btn{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:9px;color:var(--ink-soft);background:var(--bg-2)}
+.ge-btns .icon-btn svg{display:block}
+.ge-btns .gedit:hover{color:var(--accent);background:#e8eef7}
+.ge-btns .gdel:hover{color:var(--neg);background:#fdece9}
+.status-btn{border:none;cursor:pointer;font-size:10px}
 
 /* "You owe" summary card in group detail */
 .owe-card{background:linear-gradient(135deg,#fff 0%,#fff8f3 100%);border:1px solid #f4dccb;border-radius:var(--radius);padding:14px 16px;margin:12px 0 4px;box-shadow:var(--sh-md)}
@@ -189,6 +219,15 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .owe-amt{font-size:14px;font-weight:700;color:var(--warn)}
 .owe-settle{border:none;background:var(--grad-accent);color:#fff;font-size:12px;font-weight:700;padding:7px 14px;border-radius:var(--radius-pill);cursor:pointer;box-shadow:0 2px 8px rgba(30,58,95,.25);transition:transform .1s}
 .owe-settle:active{transform:scale(.95)}
+
+/* "Owed to you" card (money coming to you) — green accent vs the orange "you owe" */
+.owe-card.owed-to-card{background:linear-gradient(135deg,#fff 0%,#f2fbf5 100%);border-color:#cfe9d8}
+.owe-head.owed-to-head{color:var(--pos)}
+.owe-amt.owed-to{color:var(--pos)}
+
+/* Group expense rows: distinguish what you paid vs what you owe */
+.ge-paid{border-left:4px solid var(--pos);background:linear-gradient(135deg,#fff 0%,#f4fbf6 100%)}
+.ge-owe{border-left:4px solid var(--warn);background:linear-gradient(135deg,#fff 0%,#fdf6f1 100%)}
 
 /* locked (uneditable) form controls when a group payment is already made */
 .chip.locked,.pay-chip.locked{opacity:.5;pointer-events:none}
