@@ -41,7 +41,7 @@ export async function loadCloudData() {
   // Groups I'm a member of. Filter to MY membership rows: RLS lets co-members see
   // each other, so an unfiltered select returns one row per member of each group
   // (which would make a group appear multiple times in the list).
-  const { data: memberships, error: mErr } = await supabase.from('group_members').select('group_id, role, groups(id, name, invite_code)').eq('user_id', state.user.id);
+  const { data: memberships, error: mErr } = await supabase.from('group_members').select('group_id, role, groups(id, name, invite_code, icon, color)').eq('user_id', state.user.id);
   if (mErr) {
     console.error('load groups failed', mErr);
     return;
@@ -65,6 +65,8 @@ export async function loadCloudData() {
     id: m.groups.id,
     name: m.groups.name,
     invite_code: m.groups.invite_code,
+    icon: m.groups.icon || null,
+    color: m.groups.color || null,
     role: m.role,
     members: membersByGroup[m.group_id] || [],
   }));
@@ -207,6 +209,18 @@ export async function deleteGroupExpense(expenseId) {
   const { error } = await supabase.from('group_expenses').delete().eq('id', expenseId).eq('payer_id', state.user.id);
   if (error) {
     toastError('Could not delete: ' + error.message);
+    return false;
+  }
+  await loadCloudData();
+  return true;
+}
+
+// Set a group's icon (emoji) and color tile. Any member may change these.
+export async function setGroupIcon(groupId, { icon, color }) {
+  if (!cloudEnabled() || !state.user) return false;
+  const { error } = await supabase.from('groups').update({ icon, color }).eq('id', groupId);
+  if (error) {
+    toastError('Could not update group icon: ' + error.message);
     return false;
   }
   await loadCloudData();

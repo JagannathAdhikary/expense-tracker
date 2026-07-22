@@ -62,7 +62,11 @@
     <button class="back-btn danger-icon" id="deleteGroupBtn" aria-label="Delete group" style="display:none"></button>
   </header>
   <div id="groupDetail">
-    <p class="section-title">Invite code: <span id="groupInviteCode" style="text-transform:none;color:#1E3A5F;font-weight:600"></span><button class="copy-btn" id="copyCodeBtn" aria-label="Copy code"></button></p>
+    <button class="group-icon-btn" id="groupIconBtn" aria-label="Change group icon">
+      <span class="txn-ico" id="groupIconBig">👥</span>
+      <span class="group-icon-edit" id="groupIconEditBadge"></span>
+    </button>
+    <p class="section-title" style="text-align:center;margin-top:6px">Invite code: <span id="groupInviteCode" style="text-transform:none;color:#1E3A5F;font-weight:600"></span><button class="copy-btn" id="copyCodeBtn" aria-label="Copy code"></button></p>
     <div id="groupOwe"></div>
     <div id="groupOwedTo"></div>
     <p class="section-title" style="margin-top:14px">Expenses</p>
@@ -290,6 +294,30 @@
     <div class="modal-actions">
       <button id="settlePaySkip">Skip</button>
       <button class="primary" id="settlePayConfirm">Settle</button>
+    </div>
+  </div>
+</div>
+
+<!-- GROUP ICON EDITOR MODAL -->
+<div class="modal" id="groupIconModal">
+  <div class="modal-box">
+    <h3>Group icon</h3>
+    <div class="field">
+      <label>Icon</label>
+      <div class="chips" id="giconPresets"></div>
+      <input type="text" id="giconCustom" placeholder="Or type any emoji 🎯" maxlength="4" style="font-size:20px;margin-top:8px"/>
+    </div>
+    <div class="field">
+      <label>Color</label>
+      <div class="color-swatches" id="giconSwatches"></div>
+    </div>
+    <div class="field">
+      <label>Preview</label>
+      <div class="gicon-preview"><span class="txn-ico" id="giconPreview">👥</span></div>
+    </div>
+    <div class="modal-actions">
+      <button id="giconCancel">Cancel</button>
+      <button class="primary" id="giconSave">Save</button>
     </div>
   </div>
 </div>

@@ -25,3 +25,10 @@ create policy splits_delete on public.expense_splits
 drop policy if exists groups_delete on public.groups;
 create policy groups_delete on public.groups
   for delete using (created_by = auth.uid());
+
+-- Group icon + color (emoji + hex tile), editable by any member.
+alter table public.groups add column if not exists icon text;
+alter table public.groups add column if not exists color text;
+drop policy if exists groups_update on public.groups;
+create policy groups_update on public.groups
+  for update using (public.is_group_member(id) or created_by = auth.uid());

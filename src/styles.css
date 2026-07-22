@@ -191,8 +191,18 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .pay-badge.shared-neutral{background:#eef1f6;color:var(--accent)}
 .icon-btn.settle{color:var(--pos);font-weight:700}
 .icon-btn.settle:hover{color:#0e6655}
+#groupList{display:flex;flex-direction:column;gap:10px}
 .group-row{cursor:pointer}
 .group-row .chevron{font-size:22px;color:var(--ink-mute);transform:none}
+
+/* Group detail: big tappable icon with an edit badge */
+.group-icon-btn{position:relative;display:block;margin:4px auto 0;border:none;background:none;cursor:pointer;padding:0}
+.group-icon-btn .txn-ico{width:72px;height:72px;border-radius:22px;font-size:36px;box-shadow:var(--sh-sm)}
+.group-icon-edit{position:absolute;right:-2px;bottom:-2px;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:var(--sh-sm)}
+.group-icon-edit svg{display:block}
+.gicon-preview{display:flex;justify-content:center}
+.gicon-preview .txn-ico{width:64px;height:64px;border-radius:20px;font-size:32px}
+.gicon-chip{padding:8px 10px}
 
 /* Groups popover: create/join action rows */
 .grp-actions{display:flex;flex-direction:column;gap:10px;margin-top:6px;padding-top:14px;border-top:1px solid var(--line)}
