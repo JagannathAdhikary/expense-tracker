@@ -17,7 +17,7 @@ export function renderHomeActions() {
   const gear = `<button class="hdr-btn icon-only" id="gearBtn" aria-label="Menu">${icon.gear()}</button>`;
 
   if (cloudEnabled() && state.user) {
-    box.innerHTML = `<button class="hdr-btn" id="groupsHdrBtn">${icon.users({ size: 18 })}<span>Groups</span></button>${gear}`;
+    box.innerHTML = `<button class="hdr-btn icon-only" id="groupsHdrBtn" aria-label="Groups">${icon.users({ size: 19 })}</button>${gear}`;
     $('groupsHdrBtn').onclick = showGroups;
   } else if (cloudEnabled()) {
     box.innerHTML = `<button class="hdr-btn primary" id="loginHdrBtn">${icon.login({ size: 18 })}<span>Login</span></button>${gear}`;

@@ -55,7 +55,7 @@
     <span style="width:38px"></span>
   </header>
   <div id="groupDetail">
-    <p class="section-title">Invite code: <span id="groupInviteCode" style="text-transform:none;color:#1E3A5F;font-weight:600"></span></p>
+    <p class="section-title">Invite code: <span id="groupInviteCode" style="text-transform:none;color:#1E3A5F;font-weight:600"></span><button class="copy-btn" id="copyCodeBtn" aria-label="Copy code"></button></p>
     <div id="groupOwe"></div>
     <p class="section-title" style="margin-top:14px">Balances</p>
     <div class="cat-manage-list" id="groupBalances"></div>
@@ -236,6 +236,18 @@
     <div class="modal-actions">
       <button id="defCancel">Cancel</button>
       <button class="primary" id="defSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- FIRST-LOGIN CLOUD UPLOAD MODAL -->
+<div class="modal" id="syncPromptModal">
+  <div class="modal-box">
+    <h3>☁️ Sync to cloud?</h3>
+    <p id="syncPromptText" style="font-size:14px;color:var(--ink-soft);line-height:1.5;margin-bottom:.5rem"></p>
+    <div class="modal-actions">
+      <button id="syncPromptNo">Not now</button>
+      <button class="primary" id="syncPromptYes">Upload &amp; sync</button>
     </div>
   </div>
 </div>

@@ -20,6 +20,8 @@ import { initAuth, onAuthChange } from './features/auth.js';
 import { initGroupsFeature, loadCloudData, onGroupData, subscribeRealtime, unsubscribeRealtime } from './features/groups.js';
 import { initGroupsView, refreshGroupsView } from './views/groups.js';
 import { renderSyncUI, onLoginSync, onSynced } from './features/sync.js';
+import { showCoachmark } from './coachmark.js';
+import { persistPrefs } from './storage.js';
 
 // Month nav (dispatched from the header) refreshes the active list views.
 document.addEventListener('month-change', () => {
@@ -53,12 +55,29 @@ onAuthChange((user) => {
   if (user) {
     loadCloudData();
     subscribeRealtime();
-    onLoginSync();
+    // Run the first-login sync prompt, then introduce Groups with a one-time tip.
+    onLoginSync().then(maybeShowGroupsTip);
   } else {
     unsubscribeRealtime();
     loadCloudData(); // clears cloud state when logged out
   }
 });
+
+// One-time coach-mark pointing at the Groups icon, shown after the first login.
+function maybeShowGroupsTip() {
+  if (!state.user || state.PREFS.groupsTipSeen) return;
+  if (!$('groupsHdrBtn')) return; // header not showing the Groups button
+  state.PREFS.groupsTipSeen = true;
+  persistPrefs();
+  // Small delay so it appears after the header/sync-modal settle.
+  setTimeout(() => {
+    showCoachmark('groupsHdrBtn', {
+      title: '👥 Split expenses with friends',
+      body: 'Tap here to create or join a group. Tag a shared expense to a group and it’s split automatically — everyone sees what they owe.',
+      cta: 'Got it',
+    });
+  }, 400);
+}
 
 // After a personal-expense sync, refresh the list views.
 onSynced(() => {

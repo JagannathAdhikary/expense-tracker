@@ -151,14 +151,38 @@ export function renderSyncUI() {
   };
 }
 
-// Turn sync on: upload current local records, then pull+merge.
+// Turn sync on: upload current local records, then pull+merge. Re-renders the
+// sync toggle so its state reflects the newly-enabled sync everywhere.
 async function enableSync() {
   const ok = await uploadAll();
-  if (!ok) return;
+  if (!ok) return false;
   state.PREFS.cloudSync = true;
   persistPrefs();
   await pullAndMerge();
+  renderSyncUI();
   notifySynced();
+  return true;
+}
+
+// Show the styled first-login upload modal; resolves true if the user accepts.
+function askUploadModal(count) {
+  return new Promise((resolve) => {
+    const modal = $('syncPromptModal');
+    $('syncPromptText').textContent = `You have ${count} expense${count === 1 ? '' : 's'} saved on this device. Upload them to the cloud and keep everything synced across your devices?`;
+    const done = (val) => {
+      modal.classList.remove('open');
+      $('syncPromptYes').onclick = null;
+      $('syncPromptNo').onclick = null;
+      modal.onclick = null;
+      resolve(val);
+    };
+    $('syncPromptYes').onclick = () => done(true);
+    $('syncPromptNo').onclick = () => done(false);
+    modal.onclick = (e) => {
+      if (e.target === modal) done(false);
+    };
+    modal.classList.add('open');
+  });
 }
 
 // Called once after login. If sync isn't already on and there are local records,
@@ -173,7 +197,7 @@ export async function onLoginSync() {
   if (state.recs.length && !state.PREFS.syncPrompted) {
     state.PREFS.syncPrompted = true;
     persistPrefs();
-    if (confirm(`Upload your ${state.recs.length} local expense${state.recs.length === 1 ? '' : 's'} to the cloud and keep them synced across devices?`)) {
+    if (await askUploadModal(state.recs.length)) {
       await enableSync();
     }
   }

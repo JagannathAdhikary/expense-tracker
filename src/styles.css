@@ -28,13 +28,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .screen{display:none;padding:1.1rem;max-width:480px;margin:0 auto;padding-bottom:6rem}
 .screen.active{display:block;animation:screen-in .25s ease}
 @keyframes screen-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.4rem;gap:10px}
+/* Sticky top bar: transparent — only the controls (pill/buttons) stay solid and
+   appear to float above the content scrolling underneath. */
+header{position:sticky;top:0;z-index:15;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:1.1rem 1.1rem .9rem;margin:-1.1rem -1.1rem 1rem;background:transparent;pointer-events:none}
+header::before{content:"";position:absolute;inset:0;background:linear-gradient(to bottom,var(--bg) 55%,transparent);pointer-events:none;z-index:-1}
+header > *{pointer-events:auto}
 header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
-.mnav{display:flex;align-items:center;gap:4px;background:var(--surface);border-radius:var(--radius-pill);padding:3px;box-shadow:var(--sh-sm)}
-.mnav button{background:transparent;border:none;border-radius:var(--radius-pill);width:32px;height:32px;font-size:18px;color:var(--ink-soft);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s}
+.mnav{display:flex;align-items:center;gap:2px;background:var(--surface);border-radius:var(--radius-pill);padding:3px;box-shadow:var(--sh-sm)}
+.mnav button{background:transparent;border:none;border-radius:var(--radius-pill);width:30px;height:32px;font-size:18px;color:var(--ink-soft);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s}
 .mnav button:hover{background:var(--bg-2)}
 .mnav button:active{background:var(--line)}
-.mnav span{font-size:13px;font-weight:600;color:var(--ink);min-width:82px;text-align:center}
+.mnav span{font-size:13px;font-weight:600;color:var(--ink);min-width:76px;text-align:center}
 .summary{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:1.5rem}
 .card{background:var(--surface);border-radius:var(--radius);padding:1.05rem 1.15rem;box-shadow:var(--sh-md)}
 .card:first-child{background:var(--grad-accent);box-shadow:var(--sh-accent)}
@@ -190,6 +194,22 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .chip.locked,.pay-chip.locked{opacity:.5;pointer-events:none}
 .field input:disabled,input.split-weight:disabled{background:var(--bg-2);color:var(--ink-mute);cursor:not-allowed}
 .lock-note{font-size:11.5px;color:var(--warn);background:#fdf0e8;border-radius:var(--radius-sm);padding:9px 11px;margin-top:10px}
+
+/* Copy invite-code button */
+.copy-btn{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;margin-left:6px;padding:0;border:1px solid var(--line);background:var(--surface);color:var(--accent);border-radius:8px;cursor:pointer;vertical-align:middle;transition:background .15s,transform .1s}
+.copy-btn:hover{background:var(--bg-2)}
+.copy-btn:active{transform:scale(.9)}
+.copy-btn svg{display:block}
+
+/* Coach-mark (one-time feature tip) */
+.coach-overlay{position:fixed;inset:0;z-index:40;background:rgba(18,26,45,.35);animation:fade-in .2s ease}
+.coach-pop{position:absolute;background:var(--surface);border-radius:14px;padding:14px 16px;box-shadow:var(--sh-lg);opacity:0;transform:translateY(-6px) scale(.98);transition:opacity .2s,transform .2s}
+.coach-pop.show{opacity:1;transform:none}
+.coach-arrow{position:absolute;top:-7px;width:14px;height:14px;background:var(--surface);transform:rotate(45deg);border-radius:3px}
+.coach-title{font-size:15px;font-weight:700;color:var(--ink);margin-bottom:5px}
+.coach-body{font-size:13px;line-height:1.5;color:var(--ink-soft);margin-bottom:12px}
+.coach-cta{width:100%;padding:10px;border:none;border-radius:10px;background:var(--grad-accent);color:#fff;font-size:13.5px;font-weight:700;cursor:pointer;box-shadow:0 3px 10px rgba(30,58,95,.25)}
+.coach-cta:active{transform:scale(.98)}
 
 /* Toasts */
 .toast-wrap{position:fixed;left:0;right:0;bottom:calc(1.5rem + env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:center;gap:8px;z-index:1000;pointer-events:none;padding:0 1rem}

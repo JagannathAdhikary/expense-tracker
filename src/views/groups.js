@@ -10,7 +10,8 @@ import { loadCloudData, markShareDone, deleteGroupExpense, settleWithPayer } fro
 import { netForUser } from '../split.js';
 import { openEditGroup } from './addEdit.js';
 import { expenseHasPayment, owedByUserInGroup } from '../cloudrows.js';
-import { toastError } from '../toast.js';
+import { toastError, toastSuccess } from '../toast.js';
+import { icon } from '../icons.js';
 
 function memberName(group, userId) {
   const m = group.members.find((x) => x.id === userId);
@@ -52,6 +53,7 @@ function renderGroupDetail() {
   }
   $('groupDetailTitle').textContent = g.name;
   $('groupInviteCode').textContent = g.invite_code;
+  $('copyCodeBtn').innerHTML = icon.copy({ size: 15 });
 
   // "You owe" summary: per-creditor totals with a one-tap settle-all button.
   const owe = owedByUserInGroup(g.id);
@@ -174,6 +176,18 @@ export function initGroupsView() {
     const row = e.target.closest('.group-row');
     if (row) showGroupDetail(row.dataset.group);
   });
+
+  // Copy the invite code to the clipboard.
+  $('copyCodeBtn').onclick = async () => {
+    const code = $('groupInviteCode').textContent.trim();
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(code);
+      toastSuccess('Invite code copied');
+    } catch (err) {
+      toastError('Could not copy — code is ' + code);
+    }
+  };
 
   $('groupOwe').addEventListener('click', async (e) => {
     const btn = e.target.closest('.owe-settle');
