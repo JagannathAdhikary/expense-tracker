@@ -41,3 +41,4 @@ export function showToast(msg, type = 'info', ms = 3000) {
 
 export const toastError = (msg) => showToast(msg, 'error', 4000);
 export const toastSuccess = (msg) => showToast(msg, 'success', 2500);
+export const toastInfo = (msg) => showToast(msg, 'info', 3000);

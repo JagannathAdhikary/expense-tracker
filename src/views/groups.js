@@ -7,12 +7,22 @@ import { cloudEnabled } from '../supabase.js';
 import { fmt } from '../format.js';
 import { friendlyDate, payBadge } from '../format.js';
 import { $ } from '../dom.js';
-import { loadCloudData, markShareDone, deleteGroupExpense, settleWithPayer } from '../features/groups.js';
+import { loadCloudData, markShareDone, deleteGroupExpense, settleWithPayer, deleteGroup } from '../features/groups.js';
 import { openEditGroup } from './addEdit.js';
 import { expenseHasPayment, owedByUserInGroup, owedToUserInGroup } from '../cloudrows.js';
 import { toastError, toastSuccess } from '../toast.js';
 import { icon } from '../icons.js';
 import { confirmModal, pickSettlePayment } from '../confirm.js';
+import { setGroupIcon } from '../features/groups.js';
+
+// Preset icons + colors for the group icon editor.
+const GROUP_ICONS = ['👥', '🏠', '✈️', '🍽️', '🎉', '🛒', '🏖️', '🏔️', '🎬', '⚽', '🎓', '💼', '🚗', '🏥', '🐾', '💡'];
+const GROUP_COLORS = ['#1E3A5F', '#1A6B3A', '#7D3C98', '#C0392B', '#D35400', '#0E6655', '#2874A6', '#B7950B', '#CA6F1E', '#5B2C6F', '#34495E', '#808B96'];
+const DEFAULT_GROUP_ICON = '👥';
+const DEFAULT_GROUP_COLOR = '#1E3A5F';
+
+const groupIcon = (g) => g.icon || DEFAULT_GROUP_ICON;
+const groupColor = (g) => g.color || DEFAULT_GROUP_COLOR;
 
 function memberName(group, userId) {
   const m = group.members.find((x) => x.id === userId);
@@ -42,7 +52,7 @@ function renderGroupList() {
     .map((g) => {
       const expCount = state.groupExpenses.filter((e) => e.group_id === g.id).length;
       return `<div class="txn group-row" data-group="${g.id}">
-        <div class="txn-ico" style="background:#eef1f6">👥</div>
+        <div class="txn-ico" style="background:${groupColor(g)}20">${groupIcon(g)}</div>
         <div class="txn-info">
           <div class="txn-desc">${g.name}</div>
           <div class="txn-meta">${g.members.length} member${g.members.length === 1 ? '' : 's'} · ${expCount} expense${expCount === 1 ? '' : 's'}</div>
@@ -77,6 +87,28 @@ function showBreakdown(expId) {
   $('breakdownModal').classList.add('open');
 }
 
+// Group icon editor — presets + custom emoji + color, editable by any member.
+let giSelIcon = DEFAULT_GROUP_ICON;
+let giSelColor = DEFAULT_GROUP_COLOR;
+
+function renderIconModal() {
+  $('giconPresets').innerHTML = GROUP_ICONS.map((e) => `<div class="chip gicon-chip${e === giSelIcon ? ' on' : ''}" data-icon="${e}" style="font-size:20px">${e}</div>`).join('');
+  $('giconSwatches').innerHTML = GROUP_COLORS.map((c) => `<div class="swatch${c === giSelColor ? ' on' : ''}" data-c="${c}" style="background:${c}"></div>`).join('');
+  const prev = $('giconPreview');
+  prev.textContent = giSelIcon;
+  prev.style.background = giSelColor + '20';
+}
+
+function openGroupIconModal() {
+  const g = state.groups.find((x) => x.id === state.openGroupId);
+  if (!g) return;
+  giSelIcon = groupIcon(g);
+  giSelColor = groupColor(g);
+  $('giconCustom').value = '';
+  renderIconModal();
+  $('groupIconModal').classList.add('open');
+}
+
 function renderGroupDetail() {
   const g = state.groups.find((x) => x.id === state.openGroupId);
   if (!g) {
@@ -89,6 +121,17 @@ function renderGroupDetail() {
   $('groupDetailTitle').textContent = g.name;
   $('groupInviteCode').textContent = g.invite_code;
   $('copyCodeBtn').innerHTML = icon.copy({ size: 15 });
+  // Big group icon (tap to edit — any member).
+  const bigIco = $('groupIconBig');
+  bigIco.textContent = groupIcon(g);
+  bigIco.style.background = groupColor(g) + '20';
+  $('groupIconEditBadge').innerHTML = icon.edit({ size: 13 });
+  // Owner-only delete-group action in the header. Keep it in layout (hidden) for
+  // non-owners so the title stays centered.
+  const delGroupBtn = $('deleteGroupBtn');
+  delGroupBtn.innerHTML = icon.trash({ size: 18 });
+  delGroupBtn.style.display = '';
+  delGroupBtn.style.visibility = g.role === 'owner' ? 'visible' : 'hidden';
 
   // "You owe" summary: per-creditor totals with a one-tap settle-all button.
   const owe = owedByUserInGroup(g.id);
@@ -221,7 +264,57 @@ export function initGroupsView() {
     $('groups').classList.remove('active');
     $('home').classList.add('active');
   };
+  // Group icon editor (any member).
+  $('groupIconBtn').onclick = openGroupIconModal;
+  $('giconPresets').addEventListener('click', (e) => {
+    const chip = e.target.closest('.gicon-chip');
+    if (!chip) return;
+    giSelIcon = chip.dataset.icon;
+    $('giconCustom').value = '';
+    renderIconModal();
+  });
+  $('giconCustom').addEventListener('input', (e) => {
+    const v = e.target.value.trim();
+    if (v) {
+      giSelIcon = v;
+      renderIconModal();
+    }
+  });
+  $('giconSwatches').addEventListener('click', (e) => {
+    const sw = e.target.closest('.swatch');
+    if (!sw) return;
+    giSelColor = sw.dataset.c;
+    renderIconModal();
+  });
+  $('giconCancel').onclick = () => $('groupIconModal').classList.remove('open');
+  $('groupIconModal').onclick = (e) => {
+    if (e.target === $('groupIconModal')) $('groupIconModal').classList.remove('open');
+  };
+  $('giconSave').onclick = async () => {
+    const custom = $('giconCustom').value.trim();
+    const chosen = custom || giSelIcon;
+    const ok = await setGroupIcon(state.openGroupId, { icon: chosen, color: giSelColor });
+    if (ok) {
+      $('groupIconModal').classList.remove('open');
+      renderGroupDetail();
+    }
+  };
+
+  // Owner deletes the whole group.
+  $('deleteGroupBtn').onclick = async () => {
+    const g = state.groups.find((x) => x.id === state.openGroupId);
+    if (!g) return;
+    if (!(await confirmModal(`Delete the group "${g.name}"? This permanently removes it and all its expenses for everyone. This cannot be undone.`, { title: 'Delete group', confirmLabel: 'Delete group', danger: true }))) return;
+    const ok = await deleteGroup(g.id);
+    if (ok) {
+      state.openGroupId = null;
+      $('groups').classList.remove('active');
+      $('home').classList.add('active');
+      toastSuccess('Group deleted');
+    }
+  };
   // Popover close + backdrop click.
+  $('closeGroupsSheet').innerHTML = icon.close({ size: 20 });
   $('closeGroupsSheet').onclick = closeGroupsPopover;
   $('groupsOverlay').onclick = (e) => {
     if (e.target === $('groupsOverlay')) closeGroupsPopover();

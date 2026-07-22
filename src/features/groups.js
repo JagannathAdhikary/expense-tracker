@@ -5,7 +5,7 @@
 import { supabase, cloudEnabled } from '../supabase.js';
 import { state } from '../state.js';
 import { $ } from '../dom.js';
-import { toastError } from '../toast.js';
+import { toastError, toastSuccess, toastInfo } from '../toast.js';
 
 // Callbacks fired after cloud data (groups/expenses/splits) is (re)loaded.
 const dataListeners = [];
@@ -41,7 +41,7 @@ export async function loadCloudData() {
   // Groups I'm a member of. Filter to MY membership rows: RLS lets co-members see
   // each other, so an unfiltered select returns one row per member of each group
   // (which would make a group appear multiple times in the list).
-  const { data: memberships, error: mErr } = await supabase.from('group_members').select('group_id, role, groups(id, name, invite_code)').eq('user_id', state.user.id);
+  const { data: memberships, error: mErr } = await supabase.from('group_members').select('group_id, role, groups(id, name, invite_code, icon, color)').eq('user_id', state.user.id);
   if (mErr) {
     console.error('load groups failed', mErr);
     return;
@@ -65,6 +65,8 @@ export async function loadCloudData() {
     id: m.groups.id,
     name: m.groups.name,
     invite_code: m.groups.invite_code,
+    icon: m.groups.icon || null,
+    color: m.groups.color || null,
     role: m.role,
     members: membersByGroup[m.group_id] || [],
   }));
@@ -113,12 +115,23 @@ export async function joinGroupByCode(code) {
     toastError('No group found with that code.');
     return null;
   }
+  // Already a member? Tell them, don't silently "join" again.
+  if (state.groups.some((g) => g.id === grp.id)) {
+    toastInfo(`You're already in "${grp.name}".`);
+    return null;
+  }
   const { error: jErr } = await supabase.from('group_members').insert({ group_id: grp.id, user_id: state.user.id, role: 'member' });
-  // Unique-violation = already a member; treat as success.
-  if (jErr && jErr.code !== '23505') {
+  if (jErr) {
+    // Unique-violation = already a member (race / stale state).
+    if (jErr.code === '23505') {
+      toastInfo(`You're already in "${grp.name}".`);
+      await loadCloudData();
+      return null;
+    }
     toastError('Could not join: ' + jErr.message);
     return null;
   }
+  toastSuccess(`Joined "${grp.name}".`);
   await loadCloudData();
   return grp;
 }
@@ -196,6 +209,31 @@ export async function deleteGroupExpense(expenseId) {
   const { error } = await supabase.from('group_expenses').delete().eq('id', expenseId).eq('payer_id', state.user.id);
   if (error) {
     toastError('Could not delete: ' + error.message);
+    return false;
+  }
+  await loadCloudData();
+  return true;
+}
+
+// Set a group's icon (emoji) and color tile. Any member may change these.
+export async function setGroupIcon(groupId, { icon, color }) {
+  if (!cloudEnabled() || !state.user) return false;
+  const { error } = await supabase.from('groups').update({ icon, color }).eq('id', groupId);
+  if (error) {
+    toastError('Could not update group icon: ' + error.message);
+    return false;
+  }
+  await loadCloudData();
+  return true;
+}
+
+// Delete an entire group (creator/owner only). Cascades to members, expenses,
+// and splits via ON DELETE CASCADE.
+export async function deleteGroup(groupId) {
+  if (!cloudEnabled() || !state.user) return false;
+  const { error } = await supabase.from('groups').delete().eq('id', groupId).eq('created_by', state.user.id);
+  if (error) {
+    toastError('Could not delete group: ' + error.message);
     return false;
   }
   await loadCloudData();
@@ -284,25 +322,40 @@ export function initGroupsFeature() {
   const createBtn = $('grpCreateBtn');
   if (!createBtn) return; // markup not present
 
-  $('grpCreateBtn').onclick = async () => {
-    const name = $('grpNameInput').value.trim();
-    if (!name) {
-      $('grpNameInput').focus();
-      return;
-    }
-    const grp = await createGroup(name);
-    if (grp) {
-      $('grpNameInput').value = '';
+  // Run an async button action with a busy state (disabled + label) to prevent
+  // accidental double-submits during the network round-trip.
+  const withBusy = async (btn, busyLabel, fn) => {
+    if (btn.disabled) return;
+    const orig = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = busyLabel;
+    try {
+      await fn();
+    } finally {
+      btn.disabled = false;
+      btn.textContent = orig;
     }
   };
 
-  $('grpJoinBtn').onclick = async () => {
-    const code = $('grpCodeInput').value.trim();
-    if (!code) {
-      $('grpCodeInput').focus();
-      return;
-    }
-    const grp = await joinGroupByCode(code);
-    if (grp) $('grpCodeInput').value = '';
-  };
+  $('grpCreateBtn').onclick = () =>
+    withBusy($('grpCreateBtn'), 'Creating…', async () => {
+      const name = $('grpNameInput').value.trim();
+      if (!name) {
+        $('grpNameInput').focus();
+        return;
+      }
+      const grp = await createGroup(name);
+      if (grp) $('grpNameInput').value = '';
+    });
+
+  $('grpJoinBtn').onclick = () =>
+    withBusy($('grpJoinBtn'), 'Joining…', async () => {
+      const code = $('grpCodeInput').value.trim();
+      if (!code) {
+        $('grpCodeInput').focus();
+        return;
+      }
+      const grp = await joinGroupByCode(code);
+      if (grp) $('grpCodeInput').value = '';
+    });
 }

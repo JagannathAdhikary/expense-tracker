@@ -34,6 +34,7 @@ header{position:sticky;top:0;z-index:15;display:flex;align-items:center;justify-
 header::before{content:"";position:absolute;inset:0;background:linear-gradient(to bottom,var(--bg) 55%,transparent);pointer-events:none;z-index:-1}
 header > *{pointer-events:auto}
 header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
+#groups header h1{flex:1;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mnav{display:flex;align-items:center;gap:2px;background:var(--surface);border-radius:var(--radius-pill);padding:3px;box-shadow:var(--sh-sm)}
 .mnav button{background:transparent;border:none;border-radius:var(--radius-pill);width:30px;height:32px;font-size:18px;color:var(--ink-soft);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s}
 .mnav button:hover{background:var(--bg-2)}
@@ -92,10 +93,13 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .row-btns{flex-direction:column;gap:4px;align-items:center}
 .row-btns .icon-btn{width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:8px;color:var(--ink-mute);background:var(--bg-2)}
 .row-btns .icon-btn svg{display:block}
-.row-btns .edit:hover,.row-btns .gedit:hover{color:var(--accent);background:#e8eef7}
-.row-btns .del:hover,.row-btns .gdel:hover{color:var(--neg);background:#fdece9}
-.row-btns .settle{color:var(--pos)}
-.row-btns .settle:hover{color:#0e6655;background:#e6f5ec}
+/* Semantic colors by default (not just on hover): edit=blue, delete=red, settle=green */
+.row-btns .edit,.row-btns .gedit,.row-btns .myedit{color:var(--accent);background:#eaf0f8}
+.row-btns .edit:hover,.row-btns .gedit:hover,.row-btns .myedit:hover{background:#dbe6f4}
+.row-btns .del,.row-btns .gdel{color:var(--neg);background:#fdeeeb}
+.row-btns .del:hover,.row-btns .gdel:hover{background:#fbddd7}
+.row-btns .settle{color:var(--pos);background:#e6f5ec}
+.row-btns .settle:hover{background:#d6efe0}
 .icon-btn{background:none;border:none;font-size:16px;color:#c3c9d4;cursor:pointer;padding:3px;line-height:1;transition:color .15s}
 .icon-btn:hover{color:var(--ink-soft)}
 .icon-btn.del:hover{color:var(--neg)}
@@ -116,6 +120,8 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .back-btn:hover{background:var(--bg-2)}
 .back-btn:active{transform:scale(.92)}
 .back-btn svg{display:block}
+.back-btn.danger-icon{color:var(--neg)}
+.back-btn.danger-icon:hover{background:#fdeeeb}
 .form{display:flex;flex-direction:column;gap:18px;margin-top:.5rem}
 .field label{font-size:13px;color:var(--ink-soft);margin-bottom:7px;display:block;font-weight:600}
 .field input{width:100%;padding:13px 15px;font-size:16px;border-radius:var(--radius-sm);border:1.5px solid var(--line);background:var(--surface);outline:none;color:var(--ink);transition:border-color .15s,box-shadow .15s}
@@ -185,8 +191,18 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .pay-badge.shared-neutral{background:#eef1f6;color:var(--accent)}
 .icon-btn.settle{color:var(--pos);font-weight:700}
 .icon-btn.settle:hover{color:#0e6655}
+#groupList{display:flex;flex-direction:column;gap:10px}
 .group-row{cursor:pointer}
 .group-row .chevron{font-size:22px;color:var(--ink-mute);transform:none}
+
+/* Group detail: big tappable icon with an edit badge */
+.group-icon-btn{position:relative;display:block;margin:4px auto 0;border:none;background:none;cursor:pointer;padding:0}
+.group-icon-btn .txn-ico{width:72px;height:72px;border-radius:22px;font-size:36px;box-shadow:var(--sh-sm)}
+.group-icon-edit{position:absolute;right:-2px;bottom:-2px;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:var(--sh-sm)}
+.group-icon-edit svg{display:block}
+.gicon-preview{display:flex;justify-content:center}
+.gicon-preview .txn-ico{width:64px;height:64px;border-radius:20px;font-size:32px}
+.gicon-chip{padding:8px 10px}
 
 /* Groups popover: create/join action rows */
 .grp-actions{display:flex;flex-direction:column;gap:10px;margin-top:6px;padding-top:14px;border-top:1px solid var(--line)}
@@ -204,10 +220,12 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .ge-when{color:var(--ink-mute);margin-top:1px}
 .ge-actions{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0}
 .ge-btns{display:flex;gap:2px}
-.ge-btns .icon-btn{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:9px;color:var(--ink-soft);background:var(--bg-2)}
+.ge-btns .icon-btn{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:9px;background:var(--bg-2)}
 .ge-btns .icon-btn svg{display:block}
-.ge-btns .gedit:hover{color:var(--accent);background:#e8eef7}
-.ge-btns .gdel:hover{color:var(--neg);background:#fdece9}
+.ge-btns .gedit{color:var(--accent);background:#eaf0f8}
+.ge-btns .gedit:hover{background:#dbe6f4}
+.ge-btns .gdel{color:var(--neg);background:#fdeeeb}
+.ge-btns .gdel:hover{background:#fbddd7}
 .status-btn{border:none;cursor:pointer;font-size:10px}
 
 /* "You owe" summary card in group detail */
@@ -267,6 +285,7 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .hdr-btn.primary{background:var(--grad-accent);border-color:transparent;color:#fff;box-shadow:0 3px 10px rgba(30,58,95,.28)}
 .hdr-btn.primary:hover{filter:brightness(1.05)}
 .hdr-btn.icon-only{padding:0;width:38px;justify-content:center;color:var(--ink-soft)}
+.hdr-btn:disabled{opacity:.6;cursor:default}
 
 /* ---- Menu sheet refinements ---- */
 .sheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}

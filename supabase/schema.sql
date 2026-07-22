@@ -21,9 +21,14 @@ create table if not exists public.groups (
   id          uuid primary key default gen_random_uuid(),
   name        text not null,
   invite_code text not null unique,           -- short shareable code to join
+  icon        text,                            -- emoji shown as the group's icon
+  color       text,                            -- hex tile background for the icon
   created_by  uuid not null references public.profiles(id) on delete cascade,
   created_at  timestamptz not null default now()
 );
+-- For projects created before group icon/color were added:
+alter table public.groups add column if not exists icon text;
+alter table public.groups add column if not exists color text;
 
 create table if not exists public.group_members (
   group_id  uuid not null references public.groups(id) on delete cascade,
@@ -153,9 +158,16 @@ drop policy if exists groups_insert on public.groups;
 create policy groups_insert on public.groups
   for insert with check (created_by = auth.uid());
 
+-- Any member may update the group (e.g. its icon/color). Renaming/other edits
+-- are still member-level; deletion remains creator-only.
 drop policy if exists groups_update on public.groups;
 create policy groups_update on public.groups
-  for update using (created_by = auth.uid());
+  for update using (public.is_group_member(id) or created_by = auth.uid());
+
+-- Only the creator/owner may delete the group (cascades to members/expenses/splits).
+drop policy if exists groups_delete on public.groups;
+create policy groups_delete on public.groups
+  for delete using (created_by = auth.uid());
 
 -- Allow looking up a group by invite code in order to join (read the row to get its id).
 drop policy if exists groups_select_by_code on public.groups;
