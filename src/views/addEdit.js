@@ -12,9 +12,9 @@ import { openPayModal } from '../features/payments.js';
 import { cloudEnabled } from '../supabase.js';
 import { computeSplits } from '../split.js';
 import { saveGroupExpense, editGroupExpense, updateMySplitMeta } from '../features/groups.js';
-import { pushRecord } from '../features/sync.js';
+import { pushRecord, syncOn } from '../features/sync.js';
 import { expenseHasPayment } from '../cloudrows.js';
-import { toastError } from '../toast.js';
+import { toastError, toastSuccess } from '../toast.js';
 
 export function renderCatChips() {
   const html =
@@ -161,10 +161,13 @@ export function showEdit(id) {
     state.PAYS.push({ n: state.selPay, e: '💰' });
   }
   $('form-title').textContent = 'Edit expense';
-  state.selGroup = null; // group expenses are cloud-managed; local edit only
-  $('groupField').style.display = 'none';
+  // Allow tagging a group to MOVE this personal expense into a group.
+  state.selGroup = null;
+  state.selSplitMode = 'equal';
+  state.splitWeights = {};
   renderCatChips();
   renderPayChips();
+  renderGroupChips();
   $('iamt').value = r.amt;
   $('idesc').value = r.desc || '';
   $('idate').value = r.date;
@@ -365,8 +368,9 @@ export function initAddEdit() {
     const desc = $('idesc').value.trim();
     const date = $('idate').value || isoDay(new Date());
 
-    // Group expense (new or edit): write to the cloud, then return home.
-    if (state.selGroup && !state.editId) {
+    // Group expense: creating new, editing an existing group expense, or MOVING
+    // a personal expense into a group. (Not when plain-editing a personal record.)
+    if (state.selGroup && !state.editMySplitId) {
       const members = taggedGroupMembers().map((m) => m.id);
       let shares;
       try {
@@ -396,7 +400,18 @@ export function initAddEdit() {
             splitMode: state.selSplitMode,
             shares,
           });
-      if (ok) showHome();
+      if (ok) {
+        // Converting an existing personal expense: remove the local record (it
+        // now lives in the group). Tombstone it if cloud sync is on.
+        if (state.editId) {
+          const rec = state.recs.find((r) => r.id === state.editId);
+          if (rec && syncOn()) pushRecord({ ...rec, deleted: true, updated: Date.now() });
+          state.recs = state.recs.filter((r) => r.id !== state.editId);
+          persist();
+          toastSuccess('Moved to group');
+        }
+        showHome();
+      }
       return;
     }
 
