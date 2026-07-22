@@ -40,10 +40,13 @@ create table if not exists public.group_expenses (
   amount      numeric(12,2) not null check (amount > 0),
   description text,
   category    text,
+  pay         text,
   spent_on    date not null default current_date,
   split_mode  text not null default 'equal' check (split_mode in ('equal','amount','percent')),
   created_at  timestamptz not null default now()
 );
+-- For projects created before payment method was added:
+alter table public.group_expenses add column if not exists pay text;
 
 create table if not exists public.expense_splits (
   id           uuid primary key default gen_random_uuid(),
@@ -52,8 +55,16 @@ create table if not exists public.expense_splits (
   share_amount numeric(12,2) not null check (share_amount >= 0),
   status       text not null default 'pending' check (status in ('pending','done')),
   settled_at   timestamptz,
+  -- Per-user personalization of a group expense (does not affect other members):
+  cat          text,
+  pay          text,
+  note         text,
   unique (expense_id, debtor_id)
 );
+-- For projects created before personalization was added:
+alter table public.expense_splits add column if not exists cat text;
+alter table public.expense_splits add column if not exists pay text;
+alter table public.expense_splits add column if not exists note text;
 
 create index if not exists idx_group_members_user on public.group_members(user_id);
 create index if not exists idx_group_expenses_group on public.group_expenses(group_id);
@@ -212,6 +223,16 @@ create policy splits_update on public.expense_splits
   for update using (
     debtor_id = auth.uid()
     or exists (
+      select 1 from public.group_expenses ge
+      where ge.id = expense_splits.expense_id and ge.payer_id = auth.uid()
+    )
+  );
+
+-- The payer may delete their expense's splits (needed when re-splitting on edit).
+drop policy if exists splits_delete on public.expense_splits;
+create policy splits_delete on public.expense_splits
+  for delete using (
+    exists (
       select 1 from public.group_expenses ge
       where ge.id = expense_splits.expense_id and ge.payer_id = auth.uid()
     )

@@ -21,7 +21,14 @@
   </header>
   <div class="summary">
     <div class="card"><div class="lbl">Total spent</div><div class="val" id="tot">₹0</div></div>
-    <div class="card"><div class="lbl">Transactions</div><div class="val" id="cnt">0</div></div>
+    <div class="card" id="txnCard">
+      <div class="lbl">Transactions</div>
+      <div class="val" id="cnt">0</div>
+      <div class="split-counts" id="splitCounts" style="display:none">
+        <div class="sc sc-settled"><span class="sc-num" id="scSettled">0</span><span class="sc-lbl">settled</span></div>
+        <div class="sc sc-pending"><span class="sc-num" id="scPending">0</span><span class="sc-lbl">pending</span></div>
+      </div>
+    </div>
   </div>
   <div id="cat-section" style="display:none">
     <p class="section-title">By category <span style="text-transform:none;color:#bbb;font-weight:400">(tap to filter)</span></p>
@@ -57,8 +64,7 @@
   <div id="groupDetail">
     <p class="section-title">Invite code: <span id="groupInviteCode" style="text-transform:none;color:#1E3A5F;font-weight:600"></span><button class="copy-btn" id="copyCodeBtn" aria-label="Copy code"></button></p>
     <div id="groupOwe"></div>
-    <p class="section-title" style="margin-top:14px">Balances</p>
-    <div class="cat-manage-list" id="groupBalances"></div>
+    <div id="groupOwedTo"></div>
     <p class="section-title" style="margin-top:14px">Expenses</p>
     <div id="groupExpenseList"></div>
   </div>
@@ -97,7 +103,7 @@
     <span style="width:40px"></span>
   </header>
   <div class="form">
-    <div class="field">
+    <div class="field" id="amtField">
       <label>Amount (₹)</label>
       <div class="amt-wrap">
         <span class="amt-prefix">₹</span>
@@ -248,6 +254,42 @@
     <div class="modal-actions">
       <button id="syncPromptNo">Not now</button>
       <button class="primary" id="syncPromptYes">Upload &amp; sync</button>
+    </div>
+  </div>
+</div>
+
+<!-- GROUP EXPENSE BREAKDOWN MODAL (who paid / who hasn't) -->
+<div class="modal" id="breakdownModal">
+  <div class="modal-box">
+    <div class="sheet-head">
+      <h3 id="breakdownTitle">Who's paid</h3>
+      <button class="sheet-close" id="breakdownClose" aria-label="Close"></button>
+    </div>
+    <div class="cat-manage-list" id="breakdownList"></div>
+  </div>
+</div>
+
+<!-- GENERIC CONFIRM MODAL -->
+<div class="modal" id="confirmModal">
+  <div class="modal-box">
+    <h3 id="confirmTitle">Confirm</h3>
+    <p id="confirmText" style="font-size:14px;color:var(--ink-soft);line-height:1.5;margin-bottom:.5rem"></p>
+    <div class="modal-actions">
+      <button id="confirmNo">Cancel</button>
+      <button class="primary" id="confirmYes">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETTLE PAYMENT-METHOD MODAL -->
+<div class="modal" id="settlePayModal">
+  <div class="modal-box">
+    <h3>How did you pay it back?</h3>
+    <p style="font-size:13px;color:var(--ink-soft);margin-bottom:12px">Pick the payment method you used to settle (optional — visible only to you).</p>
+    <div class="pay-chips" id="settlePayChips"></div>
+    <div class="modal-actions">
+      <button id="settlePaySkip">Skip</button>
+      <button class="primary" id="settlePayConfirm">Settle</button>
     </div>
   </div>
 </div>

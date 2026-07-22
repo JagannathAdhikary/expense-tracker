@@ -126,11 +126,11 @@ export async function joinGroupByCode(code) {
 // Create a group expense plus one split row per member. The payer's own share is
 // recorded as 'done' immediately; everyone else's is 'pending' (the borrowed row).
 // `shares` is [{userId, share}] from computeSplits and sums exactly to `amount`.
-export async function saveGroupExpense({ groupId, amount, description, category, spentOn, splitMode, shares }) {
+export async function saveGroupExpense({ groupId, amount, description, category, pay, spentOn, splitMode, shares }) {
   if (!cloudEnabled() || !state.user) return false;
   const { data: exp, error } = await supabase
     .from('group_expenses')
-    .insert({ group_id: groupId, payer_id: state.user.id, amount, description, category, spent_on: spentOn, split_mode: splitMode })
+    .insert({ group_id: groupId, payer_id: state.user.id, amount, description, category, pay, spent_on: spentOn, split_mode: splitMode })
     .select()
     .single();
   if (error) {
@@ -156,11 +156,11 @@ export async function saveGroupExpense({ groupId, amount, description, category,
 // Edit a group expense (payer only). Updates the expense row and rebuilds its
 // split rows from the new shares. Any share that changes resets to 'pending'
 // (except the payer's own, which stays 'done'), so re-splitting re-collects.
-export async function editGroupExpense({ expenseId, amount, description, category, spentOn, splitMode, shares }) {
+export async function editGroupExpense({ expenseId, amount, description, category, pay, spentOn, splitMode, shares }) {
   if (!cloudEnabled() || !state.user) return false;
   const { error: uErr } = await supabase
     .from('group_expenses')
-    .update({ amount, description, category, spent_on: spentOn, split_mode: splitMode })
+    .update({ amount, description, category, pay, spent_on: spentOn, split_mode: splitMode })
     .eq('id', expenseId)
     .eq('payer_id', state.user.id);
   if (uErr) {
@@ -168,7 +168,12 @@ export async function editGroupExpense({ expenseId, amount, description, categor
     return false;
   }
   // Rebuild splits: delete existing, insert fresh (payer's share auto-done).
-  await supabase.from('expense_splits').delete().eq('expense_id', expenseId);
+  // Requires the splits_delete RLS policy (payer may delete their expense's splits).
+  const { error: dErr } = await supabase.from('expense_splits').delete().eq('expense_id', expenseId);
+  if (dErr) {
+    toastError('Could not update splits: ' + dErr.message);
+    return false;
+  }
   const rows = shares.map((s) => ({
     expense_id: expenseId,
     debtor_id: s.userId,
@@ -197,10 +202,26 @@ export async function deleteGroupExpense(expenseId) {
   return true;
 }
 
-// Mark the current user's own split as settled ('done').
-export async function markShareDone(splitId) {
+// Update the current user's personal labels (category / payment / note) on their
+// own split of a group expense. Does not affect other members or the shared row.
+export async function updateMySplitMeta(splitId, { cat, pay, note }) {
+  if (!cloudEnabled() || !state.user) return false;
+  const { error } = await supabase.from('expense_splits').update({ cat, pay, note }).eq('id', splitId).eq('debtor_id', state.user.id);
+  if (error) {
+    toastError('Could not save your changes: ' + error.message);
+    return false;
+  }
+  await loadCloudData();
+  return true;
+}
+
+// Mark the current user's own split as settled ('done'), optionally recording the
+// payment method they used to pay it back (their own, private to them).
+export async function markShareDone(splitId, pay = null) {
   if (!cloudEnabled() || !state.user) return;
-  const { error } = await supabase.from('expense_splits').update({ status: 'done', settled_at: new Date().toISOString() }).eq('id', splitId).eq('debtor_id', state.user.id);
+  const patch = { status: 'done', settled_at: new Date().toISOString() };
+  if (pay) patch.pay = pay;
+  const { error } = await supabase.from('expense_splits').update(patch).eq('id', splitId).eq('debtor_id', state.user.id);
   if (error) {
     toastError('Could not update: ' + error.message);
     return;
@@ -210,7 +231,7 @@ export async function markShareDone(splitId) {
 
 // Settle ALL of the current user's pending shares owed to one payer within a group,
 // in a single update (e.g. B clears the ₹20 + ₹30 owed to A at once).
-export async function settleWithPayer(groupId, payerId) {
+export async function settleWithPayer(groupId, payerId, pay = null) {
   if (!cloudEnabled() || !state.user) return;
   // Expenses in this group paid by that person.
   const expIds = state.groupExpenses.filter((e) => e.group_id === groupId && e.payer_id === payerId).map((e) => e.id);
@@ -218,7 +239,9 @@ export async function settleWithPayer(groupId, payerId) {
   // My pending split ids across those expenses.
   const splitIds = state.mySplits.filter((s) => s.debtor_id === state.user.id && s.status === 'pending' && expIds.includes(s.expense_id)).map((s) => s.id);
   if (!splitIds.length) return;
-  const { error } = await supabase.from('expense_splits').update({ status: 'done', settled_at: new Date().toISOString() }).in('id', splitIds).eq('debtor_id', state.user.id);
+  const patch = { status: 'done', settled_at: new Date().toISOString() };
+  if (pay) patch.pay = pay;
+  const { error } = await supabase.from('expense_splits').update(patch).in('id', splitIds).eq('debtor_id', state.user.id);
   if (error) {
     toastError('Could not settle: ' + error.message);
     return;

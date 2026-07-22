@@ -11,7 +11,7 @@ import { openCatModal } from '../features/categories.js';
 import { openPayModal } from '../features/payments.js';
 import { cloudEnabled } from '../supabase.js';
 import { computeSplits } from '../split.js';
-import { saveGroupExpense, editGroupExpense } from '../features/groups.js';
+import { saveGroupExpense, editGroupExpense, updateMySplitMeta } from '../features/groups.js';
 import { pushRecord } from '../features/sync.js';
 import { expenseHasPayment } from '../cloudrows.js';
 import { toastError } from '../toast.js';
@@ -108,8 +108,16 @@ function renderSplitPreview() {
   }
 }
 
+// Restore the standard add/edit form fields (undo the personal-edit hiding).
+function restoreFormFields() {
+  $('amtField').style.display = '';
+  $('idate').closest('.field').style.display = '';
+}
+
 export function showAdd() {
   state.editId = null;
+  state.editMySplitId = null;
+  restoreFormFields();
   state.selCat = initialCat();
   state.selPay = initialPay();
   state.selGroup = null;
@@ -138,7 +146,9 @@ export function showEdit(id) {
   if (!r) return;
   state.editId = id;
   state.editGroupExpId = null;
+  state.editMySplitId = null;
   state.groupEditLocked = false;
+  restoreFormFields();
   $('iamt').disabled = false;
   state.selCat = r.cat;
   state.selPay = r.pay || initialPay();
@@ -176,9 +186,11 @@ export function openEditGroup(gid) {
   }
   state.editId = null;
   state.editGroupExpId = gid;
+  state.editMySplitId = null;
+  restoreFormFields();
   state.groupEditLocked = expenseHasPayment(gid);
   state.selCat = exp.category || initialCat();
-  state.selPay = initialPay();
+  state.selPay = exp.pay || initialPay();
   state.selGroup = exp.group_id;
   state.selSplitMode = exp.split_mode || 'equal';
   // Seed weights from current splits (used by amount/percent modes).
@@ -207,6 +219,38 @@ export function openEditGroup(gid) {
   $('groups').classList.remove('active');
   $('add').classList.add('active');
   setTimeout(() => $('iamt').focus(), 100);
+}
+
+// Open a limited form for a debtor to personalize their OWN settled share of a
+// group expense — category, payment type, and note only. Amount, group tag, and
+// split are hidden; nothing here affects other members or the shared expense.
+export function openEditMySplit(splitId) {
+  const split = state.mySplits.find((s) => s.id === splitId && s.debtor_id === state.user?.id);
+  if (!split) return;
+  const exp = state.groupExpenses.find((e) => e.id === split.expense_id);
+  state.editId = null;
+  state.editGroupExpId = null;
+  state.groupEditLocked = false;
+  state.editMySplitId = splitId;
+  state.selGroup = null; // no group tagging in this personal-edit mode
+  // Personal category defaults to any prior override, else the expense's category.
+  state.selCat = split.cat || exp?.category || initialCat();
+  if (!state.CATS.find((c) => c.n === state.selCat)) {
+    state.CATS.push({ n: state.selCat, e: '📦', c: '#808B96' });
+  }
+  state.selPay = split.pay || initialPay();
+  $('form-title').textContent = 'Personalize expense';
+  // Hide amount + group/split; show only category, payment, note.
+  $('amtField').style.display = 'none';
+  $('groupField').style.display = 'none';
+  $('idate').closest('.field').style.display = 'none';
+  renderCatChips();
+  renderPayChips();
+  $('idesc').value = split.note || exp?.description || '';
+  $('home').classList.remove('active');
+  $('catview').classList.remove('active');
+  $('groups').classList.remove('active');
+  $('add').classList.add('active');
 }
 
 // Enable/disable amount, group picker, and split-mode based on state.groupEditLocked.
@@ -299,6 +343,20 @@ export function initAddEdit() {
   });
 
   $('savebtn').onclick = async function () {
+    // Personal-edit mode: only my category/payment/note on a settled group split.
+    if (state.editMySplitId) {
+      const ok = await updateMySplitMeta(state.editMySplitId, {
+        cat: state.selCat,
+        pay: state.selPay,
+        note: $('idesc').value.trim() || null,
+      });
+      if (ok) {
+        state.editMySplitId = null;
+        showHome();
+      }
+      return;
+    }
+
     const amt = parseFloat($('iamt').value);
     if (!amt || amt <= 0) {
       $('iamt').focus();
@@ -323,6 +381,7 @@ export function initAddEdit() {
             amount: amt,
             description: desc,
             category: state.selCat,
+            pay: state.selPay,
             spentOn: date,
             splitMode: state.selSplitMode,
             shares,
@@ -332,6 +391,7 @@ export function initAddEdit() {
             amount: amt,
             description: desc,
             category: state.selCat,
+            pay: state.selPay,
             spentOn: date,
             splitMode: state.selSplitMode,
             shares,

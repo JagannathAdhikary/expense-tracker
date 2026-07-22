@@ -6,10 +6,11 @@ import { fmt, filtered, catByName } from '../format.js';
 import { $ } from '../dom.js';
 import { renderDateGroups, attachListHandler } from './list.js';
 import { render } from './home.js';
-import { showEdit, openEditGroup } from './addEdit.js';
+import { showEdit, openEditGroup, openEditMySplit } from './addEdit.js';
 import { sharedRowsForMonth, expenseHasPayment } from '../cloudrows.js';
 import { markShareDone, deleteGroupExpense } from '../features/groups.js';
 import { toastError } from '../toast.js';
+import { confirmModal, pickSettlePayment } from '../confirm.js';
 
 export function renderCategoryView() {
   const cat = catByName(state.filterCat);
@@ -17,7 +18,8 @@ export function renderCategoryView() {
   $('cvperiod').textContent = MN[state.cur.getMonth()] + ' ' + state.cur.getFullYear();
   const personal = filtered().filter((r) => r.cat === state.filterCat);
   const shared = sharedRowsForMonth(state.cur).filter((r) => r.cat === state.filterCat);
-  const rows = [...personal, ...shared].sort((a, b) => new Date(b.date) - new Date(a.date) || (b.id > a.id ? 1 : -1));
+  const rowTs = (r) => (r.shared ? r.ts : r.updated || r.id || new Date(r.date).getTime());
+  const rows = [...personal, ...shared].sort((a, b) => new Date(b.date) - new Date(a.date) || rowTs(b) - rowTs(a));
   // Total: personal + non-pending shared (owed rows excluded until settled), matching home.
   const total = personal.reduce((s, r) => s + r.amt, 0) + shared.filter((r) => !r.pending).reduce((s, r) => s + r.amt, 0);
   $('cvtot').textContent = fmt(total);
@@ -48,17 +50,19 @@ export function initCategory() {
     onEdit: showEdit,
     rerender,
     onSettle: async (splitId) => {
-      if (!confirm('Mark your share as settled?')) return;
-      await markShareDone(splitId);
+      const { confirmed, pay } = await pickSettlePayment();
+      if (!confirmed) return;
+      await markShareDone(splitId, pay);
       rerender();
     },
     onEditGroup: (gid) => openEditGroup(gid),
+    onEditMySplit: (sid) => openEditMySplit(sid),
     onDeleteGroup: async (gid) => {
       if (expenseHasPayment(gid)) {
         toastError('This expense already has a settled share, so it can no longer be deleted.');
         return;
       }
-      if (!confirm('Delete this group expense for everyone? This cannot be undone.')) return;
+      if (!(await confirmModal('Delete this group expense for everyone? This cannot be undone.', { title: 'Delete expense', confirmLabel: 'Delete', danger: true }))) return;
       await deleteGroupExpense(gid);
       rerender();
     },

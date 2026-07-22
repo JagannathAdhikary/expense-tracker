@@ -6,22 +6,39 @@ import { fmt, filtered, catByName } from '../format.js';
 import { $ } from '../dom.js';
 import { renderDateGroups, attachListHandler } from './list.js';
 import { showCategoryView, renderCategoryView } from './category.js';
-import { showEdit, openEditGroup } from './addEdit.js';
+import { showEdit, openEditGroup, openEditMySplit } from './addEdit.js';
 import { sharedRowsForMonth, sharedMonthTotal, expenseHasPayment } from '../cloudrows.js';
 import { markShareDone, deleteGroupExpense } from '../features/groups.js';
 import { toastError } from '../toast.js';
+import { confirmModal, pickSettlePayment } from '../confirm.js';
 
 export function render() {
   $('mlbl').textContent = MN[state.cur.getMonth()] + ' ' + state.cur.getFullYear();
   const personal = filtered();
   const shared = sharedRowsForMonth(state.cur);
-  // Merge personal + shared for the list, newest first.
-  const rows = [...personal, ...shared].sort((a, b) => new Date(b.date) - new Date(a.date) || (b.id > a.id ? 1 : -1));
+  // Sort by day (newest first), then by actual timestamp within the day so group
+  // and personal txns interleave by when they happened — not group-always-on-top.
+  const rowTs = (r) => (r.shared ? r.ts : r.updated || r.id || new Date(r.date).getTime());
+  const rows = [...personal, ...shared].sort((a, b) => new Date(b.date) - new Date(a.date) || rowTs(b) - rowTs(a));
 
   // Spent total: personal + settled/paid shared (pending owed rows excluded).
   const total = personal.reduce((s, r) => s + r.amt, 0) + sharedMonthTotal(state.cur);
   $('tot').textContent = fmt(total);
-  $('cnt').textContent = rows.length;
+
+  // Transactions box: when group expenses are in view, show a Settled | Pending
+  // split (color-coded) instead of a plain total count.
+  // Unsettled = a share you still owe, or one you paid that others haven't settled.
+  const unsettled = shared.filter((r) => r.pending || r.badge?.cls === 'shared-pending').length;
+  if (shared.length) {
+    $('cnt').style.display = 'none';
+    $('splitCounts').style.display = 'flex';
+    $('scSettled').textContent = rows.length - unsettled;
+    $('scPending').textContent = unsettled;
+  } else {
+    $('cnt').style.display = '';
+    $('cnt').textContent = rows.length;
+    $('splitCounts').style.display = 'none';
+  }
 
   // Category bars — from personal + non-pending shared rows (owed rows don't count yet).
   const byc = {};
@@ -84,17 +101,19 @@ export function initHome() {
     onEdit: showEdit,
     rerender,
     onSettle: async (splitId) => {
-      if (!confirm('Mark your share as settled?')) return;
-      await markShareDone(splitId);
+      const { confirmed, pay } = await pickSettlePayment();
+      if (!confirmed) return;
+      await markShareDone(splitId, pay);
       rerender();
     },
     onEditGroup: (gid) => openEditGroup(gid),
+    onEditMySplit: (sid) => openEditMySplit(sid),
     onDeleteGroup: async (gid) => {
       if (expenseHasPayment(gid)) {
         toastError('This expense already has a settled share, so it can no longer be deleted.');
         return;
       }
-      if (!confirm('Delete this group expense for everyone? This cannot be undone.')) return;
+      if (!(await confirmModal('Delete this group expense for everyone? This cannot be undone.', { title: 'Delete expense', confirmLabel: 'Delete', danger: true }))) return;
       await deleteGroupExpense(gid);
       rerender();
     },
