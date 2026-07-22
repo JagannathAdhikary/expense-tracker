@@ -19,3 +19,9 @@ create policy splits_delete on public.expense_splits
       where ge.id = expense_splits.expense_id and ge.payer_id = auth.uid()
     )
   );
+
+-- Allow the group creator/owner to delete the whole group (cascades to members,
+-- expenses, and splits via ON DELETE CASCADE foreign keys).
+drop policy if exists groups_delete on public.groups;
+create policy groups_delete on public.groups
+  for delete using (created_by = auth.uid());

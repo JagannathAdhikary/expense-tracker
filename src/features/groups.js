@@ -5,7 +5,7 @@
 import { supabase, cloudEnabled } from '../supabase.js';
 import { state } from '../state.js';
 import { $ } from '../dom.js';
-import { toastError } from '../toast.js';
+import { toastError, toastSuccess, toastInfo } from '../toast.js';
 
 // Callbacks fired after cloud data (groups/expenses/splits) is (re)loaded.
 const dataListeners = [];
@@ -113,12 +113,23 @@ export async function joinGroupByCode(code) {
     toastError('No group found with that code.');
     return null;
   }
+  // Already a member? Tell them, don't silently "join" again.
+  if (state.groups.some((g) => g.id === grp.id)) {
+    toastInfo(`You're already in "${grp.name}".`);
+    return null;
+  }
   const { error: jErr } = await supabase.from('group_members').insert({ group_id: grp.id, user_id: state.user.id, role: 'member' });
-  // Unique-violation = already a member; treat as success.
-  if (jErr && jErr.code !== '23505') {
+  if (jErr) {
+    // Unique-violation = already a member (race / stale state).
+    if (jErr.code === '23505') {
+      toastInfo(`You're already in "${grp.name}".`);
+      await loadCloudData();
+      return null;
+    }
     toastError('Could not join: ' + jErr.message);
     return null;
   }
+  toastSuccess(`Joined "${grp.name}".`);
   await loadCloudData();
   return grp;
 }
@@ -196,6 +207,19 @@ export async function deleteGroupExpense(expenseId) {
   const { error } = await supabase.from('group_expenses').delete().eq('id', expenseId).eq('payer_id', state.user.id);
   if (error) {
     toastError('Could not delete: ' + error.message);
+    return false;
+  }
+  await loadCloudData();
+  return true;
+}
+
+// Delete an entire group (creator/owner only). Cascades to members, expenses,
+// and splits via ON DELETE CASCADE.
+export async function deleteGroup(groupId) {
+  if (!cloudEnabled() || !state.user) return false;
+  const { error } = await supabase.from('groups').delete().eq('id', groupId).eq('created_by', state.user.id);
+  if (error) {
+    toastError('Could not delete group: ' + error.message);
     return false;
   }
   await loadCloudData();
@@ -284,25 +308,40 @@ export function initGroupsFeature() {
   const createBtn = $('grpCreateBtn');
   if (!createBtn) return; // markup not present
 
-  $('grpCreateBtn').onclick = async () => {
-    const name = $('grpNameInput').value.trim();
-    if (!name) {
-      $('grpNameInput').focus();
-      return;
-    }
-    const grp = await createGroup(name);
-    if (grp) {
-      $('grpNameInput').value = '';
+  // Run an async button action with a busy state (disabled + label) to prevent
+  // accidental double-submits during the network round-trip.
+  const withBusy = async (btn, busyLabel, fn) => {
+    if (btn.disabled) return;
+    const orig = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = busyLabel;
+    try {
+      await fn();
+    } finally {
+      btn.disabled = false;
+      btn.textContent = orig;
     }
   };
 
-  $('grpJoinBtn').onclick = async () => {
-    const code = $('grpCodeInput').value.trim();
-    if (!code) {
-      $('grpCodeInput').focus();
-      return;
-    }
-    const grp = await joinGroupByCode(code);
-    if (grp) $('grpCodeInput').value = '';
-  };
+  $('grpCreateBtn').onclick = () =>
+    withBusy($('grpCreateBtn'), 'Creating…', async () => {
+      const name = $('grpNameInput').value.trim();
+      if (!name) {
+        $('grpNameInput').focus();
+        return;
+      }
+      const grp = await createGroup(name);
+      if (grp) $('grpNameInput').value = '';
+    });
+
+  $('grpJoinBtn').onclick = () =>
+    withBusy($('grpJoinBtn'), 'Joining…', async () => {
+      const code = $('grpCodeInput').value.trim();
+      if (!code) {
+        $('grpCodeInput').focus();
+        return;
+      }
+      const grp = await joinGroupByCode(code);
+      if (grp) $('grpCodeInput').value = '';
+    });
 }

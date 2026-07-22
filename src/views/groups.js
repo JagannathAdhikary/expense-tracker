@@ -7,7 +7,7 @@ import { cloudEnabled } from '../supabase.js';
 import { fmt } from '../format.js';
 import { friendlyDate, payBadge } from '../format.js';
 import { $ } from '../dom.js';
-import { loadCloudData, markShareDone, deleteGroupExpense, settleWithPayer } from '../features/groups.js';
+import { loadCloudData, markShareDone, deleteGroupExpense, settleWithPayer, deleteGroup } from '../features/groups.js';
 import { openEditGroup } from './addEdit.js';
 import { expenseHasPayment, owedByUserInGroup, owedToUserInGroup } from '../cloudrows.js';
 import { toastError, toastSuccess } from '../toast.js';
@@ -89,6 +89,12 @@ function renderGroupDetail() {
   $('groupDetailTitle').textContent = g.name;
   $('groupInviteCode').textContent = g.invite_code;
   $('copyCodeBtn').innerHTML = icon.copy({ size: 15 });
+  // Owner-only delete-group action in the header. Keep it in layout (hidden) for
+  // non-owners so the title stays centered.
+  const delGroupBtn = $('deleteGroupBtn');
+  delGroupBtn.innerHTML = icon.trash({ size: 18 });
+  delGroupBtn.style.display = '';
+  delGroupBtn.style.visibility = g.role === 'owner' ? 'visible' : 'hidden';
 
   // "You owe" summary: per-creditor totals with a one-tap settle-all button.
   const owe = owedByUserInGroup(g.id);
@@ -221,7 +227,21 @@ export function initGroupsView() {
     $('groups').classList.remove('active');
     $('home').classList.add('active');
   };
+  // Owner deletes the whole group.
+  $('deleteGroupBtn').onclick = async () => {
+    const g = state.groups.find((x) => x.id === state.openGroupId);
+    if (!g) return;
+    if (!(await confirmModal(`Delete the group "${g.name}"? This permanently removes it and all its expenses for everyone. This cannot be undone.`, { title: 'Delete group', confirmLabel: 'Delete group', danger: true }))) return;
+    const ok = await deleteGroup(g.id);
+    if (ok) {
+      state.openGroupId = null;
+      $('groups').classList.remove('active');
+      $('home').classList.add('active');
+      toastSuccess('Group deleted');
+    }
+  };
   // Popover close + backdrop click.
+  $('closeGroupsSheet').innerHTML = icon.close({ size: 20 });
   $('closeGroupsSheet').onclick = closeGroupsPopover;
   $('groupsOverlay').onclick = (e) => {
     if (e.target === $('groupsOverlay')) closeGroupsPopover();

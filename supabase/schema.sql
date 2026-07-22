@@ -157,6 +157,11 @@ drop policy if exists groups_update on public.groups;
 create policy groups_update on public.groups
   for update using (created_by = auth.uid());
 
+-- Only the creator/owner may delete the group (cascades to members/expenses/splits).
+drop policy if exists groups_delete on public.groups;
+create policy groups_delete on public.groups
+  for delete using (created_by = auth.uid());
+
 -- Allow looking up a group by invite code in order to join (read the row to get its id).
 drop policy if exists groups_select_by_code on public.groups;
 create policy groups_select_by_code on public.groups
