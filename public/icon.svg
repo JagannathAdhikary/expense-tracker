@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg4" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2A4A72"/><stop offset="1" stop-color="#132A47"/>
+    </linearGradient>
+    <linearGradient id="pieA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5FD08A"/><stop offset="1" stop-color="#2FA968"/></linearGradient>
+    <linearGradient id="pieB" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6FA8FF"/><stop offset="1" stop-color="#3E77D6"/></linearGradient>
+    <linearGradient id="pieC" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFC24D"/><stop offset="1" stop-color="#E39A18"/></linearGradient>
+    <filter id="sh4" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#0b1c30" flood-opacity="0.35"/></filter>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#bg4)"/>
+  <circle cx="150" cy="130" r="230" fill="#ffffff" opacity="0.05"/>
+  <!-- donut chart split into 3 (represents split expenses) -->
+  <g filter="url(#sh4)" transform="translate(256,256)">
+    <!-- full ring base -->
+    <circle r="132" fill="none" stroke="#ffffff" stroke-width="0" />
+    <!-- three arcs of a donut using stroke-dasharray on circles -->
+    <circle r="104" fill="none" stroke="url(#pieA)" stroke-width="56" stroke-dasharray="272 381" transform="rotate(-90)"/>
+    <circle r="104" fill="none" stroke="url(#pieB)" stroke-width="56" stroke-dasharray="196 457" transform="rotate(60)"/>
+    <circle r="104" fill="none" stroke="url(#pieC)" stroke-width="56" stroke-dasharray="120 533" transform="rotate(168)"/>
+    <text x="0" y="34" text-anchor="middle" font-family="-apple-system,'Segoe UI',Roboto,Arial,sans-serif" font-size="120" font-weight="700" fill="#ffffff">&#8377;</text>
+  </g>
+</svg>
