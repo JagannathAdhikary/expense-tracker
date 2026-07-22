@@ -79,6 +79,8 @@ export function sharedRows() {
   for (const exp of state.groupExpenses) {
     const rowsFor = byExp.get(exp.id) || [];
     const iPaid = exp.payer_id === uid;
+    // Deletable only by the payer, and only while no one has settled a share yet.
+    const anySettled = rowsFor.some((s) => s.debtor_id !== exp.payer_id && s.status === 'done');
     const base = {
       shared: true,
       cat: exp.category || 'Other',
@@ -90,6 +92,7 @@ export function sharedRows() {
       id: exp.id,
       groupExpId: exp.id, // stable id of the group_expenses row (for edit)
       canEdit: iPaid, // only the payer may edit
+      canDelete: iPaid && !anySettled, // payer, and only before anyone settles
     };
     if (iPaid) {
       // Own share (always counts) + any not-yet-settled others' shares (still fronted).

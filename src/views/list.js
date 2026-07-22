@@ -49,7 +49,7 @@ export function renderDateGroups(rows, container) {
         </div>
         <div class="txn-actions row-btns">
           ${r.canEdit ? `<button class="icon-btn gedit" data-gid="${r.groupExpId}" title="Edit group expense" aria-label="Edit">${icon.edit({ size: 16 })}</button>` : ''}
-          ${r.canEdit ? `<button class="icon-btn gdel" data-gid="${r.groupExpId}" title="Delete group expense" aria-label="Delete">${icon.trash({ size: 16 })}</button>` : ''}
+          ${r.canDelete ? `<button class="icon-btn gdel" data-gid="${r.groupExpId}" title="Delete group expense" aria-label="Delete">${icon.trash({ size: 16 })}</button>` : ''}
           ${r.editSplitId ? `<button class="icon-btn myedit" data-mysplit="${r.editSplitId}" title="Personalize (your label)" aria-label="Personalize">${icon.edit({ size: 16 })}</button>` : ''}
           ${r.settleId ? `<button class="icon-btn settle" data-settle="${r.settleId}" title="Mark my share done" aria-label="Settle">${icon.check({ size: 17 })}</button>` : ''}
         </div>

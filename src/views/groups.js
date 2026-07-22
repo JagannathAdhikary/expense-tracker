@@ -153,7 +153,7 @@ function renderGroupDetail() {
               : `<button class="pay-badge status-btn shared-done" data-breakdown="${e.id}">all settled</button>`;
         }
         const editBtn = iPaid ? `<button class="icon-btn gedit" data-gid="${e.id}" title="Edit" aria-label="Edit">${icon.edit({ size: 17 })}</button>` : '';
-        const delBtn = iPaid ? `<button class="icon-btn gdel" data-gid="${e.id}" title="Delete" aria-label="Delete">${icon.trash({ size: 17 })}</button>` : '';
+        const delBtn = iPaid && !expenseHasPayment(e.id) ? `<button class="icon-btn gdel" data-gid="${e.id}" title="Delete" aria-label="Delete">${icon.trash({ size: 17 })}</button>` : '';
         // Line 1: note/title. Line 2: "<Person> paid <amount>". Line 3: date · time.
         const who = iPaid ? 'You' : memberName(g, e.payer_id);
         const when = dateTimeLabel(e.spent_on, e.created_at);
