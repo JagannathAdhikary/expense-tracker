@@ -346,6 +346,20 @@ export function initAddEdit() {
   });
 
   $('savebtn').onclick = async function () {
+    const btn = $('savebtn');
+    if (btn.disabled) return; // guard against double-submit
+    const origLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    try {
+      await doSave();
+    } finally {
+      btn.disabled = false;
+      btn.textContent = origLabel;
+    }
+  };
+
+  async function doSave() {
     // Personal-edit mode: only my category/payment/note on a settled group split.
     if (state.editMySplitId) {
       const ok = await updateMySplitMeta(state.editMySplitId, {
@@ -434,5 +448,5 @@ export function initAddEdit() {
       render();
       renderCategoryView();
     } else showHome();
-  };
+  }
 }
