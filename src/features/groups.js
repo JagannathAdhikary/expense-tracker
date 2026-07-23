@@ -162,7 +162,9 @@ export async function saveGroupExpense({ groupId, amount, description, category,
     toastError('Expense saved but splits failed: ' + sErr.message);
     return false;
   }
-  await loadCloudData();
+  // Refresh in the background so the form can close immediately; onGroupData
+  // re-renders the list once the reload lands.
+  loadCloudData();
   return true;
 }
 
@@ -199,7 +201,7 @@ export async function editGroupExpense({ expenseId, amount, description, categor
     toastError('Expense updated but splits failed: ' + sErr.message);
     return false;
   }
-  await loadCloudData();
+  loadCloudData(); // background refresh; form closes immediately
   return true;
 }
 
