@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2A4A72"/><stop offset="1" stop-color="#101F35"/>
+    </linearGradient>
+    <linearGradient id="pieA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5FD08A"/><stop offset="1" stop-color="#2FA968"/></linearGradient>
+    <linearGradient id="pieB" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6FA8FF"/><stop offset="1" stop-color="#3E77D6"/></linearGradient>
+    <linearGradient id="pieC" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFC24D"/><stop offset="1" stop-color="#E39A18"/></linearGradient>
+    <filter id="sh" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#050d18" flood-opacity="0.40"/></filter>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <circle cx="180" cy="120" r="360" fill="#ffffff" opacity="0.04"/>
+
+  <!-- donut logo -->
+  <g filter="url(#sh)" transform="translate(300,315)">
+    <circle r="150" fill="none" stroke="url(#pieA)" stroke-width="64" stroke-dasharray="392 550" transform="rotate(-90)"/>
+    <circle r="150" fill="none" stroke="url(#pieB)" stroke-width="64" stroke-dasharray="283 659" transform="rotate(60)"/>
+    <circle r="150" fill="none" stroke="url(#pieC)" stroke-width="64" stroke-dasharray="173 769" transform="rotate(168)"/>
+    <text x="0" y="52" text-anchor="middle" font-family="-apple-system,'Segoe UI',Roboto,Arial,sans-serif" font-size="176" font-weight="700" fill="#ffffff">&#8377;</text>
+  </g>
+
+  <!-- title + tagline -->
+  <text x="520" y="298" font-family="-apple-system,'Segoe UI',Roboto,Arial,sans-serif" font-size="72" font-weight="800" fill="#ffffff" letter-spacing="-1">Expense Tracker</text>
+  <text x="522" y="356" font-family="-apple-system,'Segoe UI',Roboto,Arial,sans-serif" font-size="30" font-weight="500" fill="#B9C6DA">Track spending and split expenses with friends.</text>
+</svg>
