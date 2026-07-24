@@ -9,7 +9,7 @@ import { friendlyDate, payBadge } from '../format.js';
 import { $ } from '../dom.js';
 import { loadCloudData, markShareDone, deleteGroupExpense, settleUpWithMember, deleteGroup } from '../features/groups.js';
 import { openEditGroup } from './addEdit.js';
-import { expenseHasPayment, owedByUserInGroup, owedToUserInGroup, netWithMember } from '../cloudrows.js';
+import { expenseHasPayment, owedByUserInGroup, owedToUserInGroup } from '../cloudrows.js';
 import { toastError, toastSuccess } from '../toast.js';
 import { icon } from '../icons.js';
 import { confirmModal, pickSettlePayment } from '../confirm.js';
@@ -182,17 +182,13 @@ function renderGroupDetail() {
         const iPaid = e.payer_id === state.user?.id;
         let action = '';
         if (mine && !iPaid) {
-          if (mine.status === 'pending') {
-            // If the net with the payer is already <= 0 (they owe me as much or more,
-            // via netting), this share is offset — don't invite a misleading payment.
-            const net = netWithMember(g.id, e.payer_id); // > 0 => I owe them overall
-            action =
-              net > 0
-                ? `<button class="chip" data-settle="${mine.id}" style="border-color:#C0392B;color:#C0392B">Owe ${fmt(mine.share_amount)} · Mark done</button>`
-                : `<span class="pay-badge shared-neutral">offset</span>`;
-          } else {
-            action = `<span class="pay-badge" style="background:#e9f7ef;color:#1a6b3a">settled ${fmt(mine.share_amount)}</span>`;
-          }
+          // A share I owe always keeps its own settle button: paying a single row
+          // is allowed and simply recomputes the net (e.g. paying the full 250 row
+          // flips the net from "you owe 50" to "they owe you 200").
+          action =
+            mine.status === 'pending'
+              ? `<button class="chip" data-settle="${mine.id}" style="border-color:#C0392B;color:#C0392B">Owe ${fmt(mine.share_amount)} · Mark done</button>`
+              : `<span class="pay-badge" style="background:#e9f7ef;color:#1a6b3a">settled ${fmt(mine.share_amount)}</span>`;
         } else if (iPaid) {
           // No "you paid" text (the meta line already says "You paid X"); show a
           // tappable pending count / settled badge that opens the breakdown.

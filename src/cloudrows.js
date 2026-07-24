@@ -46,7 +46,7 @@ function netsForGroup(groupId) {
   return others.map((m) => ({
     otherId: m.id,
     // > 0 => I owe them; < 0 => they owe me.
-    net: netBetween(exps, state.mySplits, state.settlements, uid, m.id),
+    net: netBetween(exps, state.mySplits, uid, m.id),
   }));
 }
 
@@ -74,7 +74,7 @@ export function owedToUserInGroup(groupId) {
 export function netWithMember(groupId, otherId) {
   if (!state.user) return 0;
   const exps = state.groupExpenses.filter((e) => e.group_id === groupId);
-  return netBetween(exps, state.mySplits, state.settlements, state.user.id, otherId);
+  return netBetween(exps, state.mySplits, state.user.id, otherId);
 }
 
 // All shared rows for the user, unfiltered by month.

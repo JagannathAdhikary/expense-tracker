@@ -314,7 +314,7 @@ export async function settleUpWithMember(groupId, otherId, pay = null) {
   }
 
   // Record a manual settlement for history in whichever direction had a net debt.
-  const net = netBetween(expInGroup, state.mySplits, state.settlements, uid, otherId); // >0 I owe them
+  const net = netBetween(expInGroup, state.mySplits, uid, otherId); // >0 I owe them
   const absAmt = Math.abs(net);
   if (absAmt > 0) {
     const from_user = net > 0 ? uid : otherId;
