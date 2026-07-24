@@ -294,6 +294,8 @@ export function initGroupsView() {
     $('home').classList.add('active');
   };
   // "+" on the group detail page: add an expense pre-tagged to this group.
+  // Use the same SVG plus icon as the main FAB (header.js) so they match.
+  $('groupAddBtn').innerHTML = icon.plus({ size: 28 });
   $('groupAddBtn').onclick = () => {
     if (state.openGroupId) showAddForGroup(state.openGroupId);
   };
