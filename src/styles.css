@@ -81,8 +81,8 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .txn:active{transform:scale(.995)}
 .txn-ico{width:42px;height:42px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
 .txn-info{flex:1;min-width:0}
-.txn-info.group-open{cursor:pointer}
-.txn-info.group-open:hover .txn-desc{text-decoration:underline;text-underline-offset:2px}
+.txn.group-open{cursor:pointer}
+.txn.group-open:hover .txn-desc{text-decoration:underline;text-underline-offset:2px}
 .txn-desc{font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .txn-meta{font-size:12px;color:var(--ink-soft);margin-top:2px}
 .txn-amt{font-size:15px;font-weight:700;white-space:nowrap;letter-spacing:-.2px}
@@ -247,7 +247,11 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 
 /* Group expense rows: distinguish what you paid vs what you owe */
 .ge-paid{border-left:4px solid var(--pos);background:linear-gradient(135deg,#fff 0%,#f4fbf6 100%)}
+.ge-open{cursor:pointer}
 .ge-owe{border-left:4px solid var(--warn);background:linear-gradient(135deg,#fff 0%,#fdf6f1 100%)}
+/* Flash a group expense row when opened from the main list (focus target). */
+@keyframes ge-flash{0%{box-shadow:0 0 0 2px var(--accent)}60%{box-shadow:0 0 0 2px var(--accent)}100%{box-shadow:0 0 0 0 transparent}}
+.ge-flash{animation:ge-flash 1.6s ease-out}
 
 /* locked (uneditable) form controls when a group payment is already made */
 .chip.locked,.pay-chip.locked{opacity:.5;pointer-events:none}

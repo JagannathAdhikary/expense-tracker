@@ -58,7 +58,7 @@ export function initCategory() {
     },
     onEditGroup: (gid) => openEditGroup(gid),
     onEditMySplit: (sid) => openEditMySplit(sid),
-    onOpenGroup: (gid) => showGroupDetail(gid),
+    onOpenGroup: (gid, expId) => showGroupDetail(gid, expId),
     onDeleteGroup: async (gid) => {
       if (expenseHasPayment(gid)) {
         toastError('This expense already has a settled share, so it can no longer be deleted.');

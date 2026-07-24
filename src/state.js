@@ -28,6 +28,7 @@ export const state = {
   mySplits: [], // expense_splits rows involving the user (for borrowed rows + settle)
   settlements: [], // settlements rows for the user's groups (auto-netting + manual settle-ups)
   openGroupId: null, // group currently open in the Groups detail view
+  focusGroupExpId: null, // expense to scroll to + flash when the detail view opens
   // add/edit form group tagging:
   selGroup: null, // group id tagged on the expense being added, or null
   selSplitMode: 'equal', // 'equal' | 'amount' | 'percent'

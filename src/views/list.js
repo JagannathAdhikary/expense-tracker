@@ -22,7 +22,9 @@ export function renderDateGroups(rows, container) {
   container.innerHTML = '';
   groups.forEach((g) => {
     const isCollapsed = collapsed.has(g.date);
-    const groupTotal = g.items.reduce((s, r) => s + r.amt, 0);
+    // Day total mirrors the month total: pending "you owe" rows (negative, not yet
+    // settled) don't reduce what you actually spent that day — exclude them.
+    const groupTotal = g.items.reduce((s, r) => s + (r.pending ? 0 : r.amt), 0);
     const grp = document.createElement('div');
     grp.className = 'date-group';
     grp.dataset.date = g.date;
@@ -37,9 +39,9 @@ export function renderDateGroups(rows, container) {
           const amtCls = r.amt < 0 ? ' neg' : '';
           // Drop the minus sign on owed amounts — the red colour already signals it.
           const amtDisplay = fmt(Math.abs(r.amt));
-          return `<div class="txn shared-txn">
+          return `<div class="txn shared-txn group-open" data-group-id="${r.groupId}" data-exp-id="${r.groupExpId}" role="button" tabindex="0" title="Open in group">
         <div class="txn-ico" style="background:${cat.c}20">${cat.e}</div>
-        <div class="txn-info group-open" data-group-id="${r.groupId}" role="button" tabindex="0" title="Open group">
+        <div class="txn-info">
           <div class="txn-desc">${r.desc || cat.n}</div>
           <div class="txn-meta">${r.meta || cat.n}${payBadge(r.pay)}</div>
         </div>
@@ -89,11 +91,6 @@ export function renderDateGroups(rows, container) {
 // onSettle (optional) handles the "mark my share done" ✓ button on shared rows.
 export function attachListHandler(container, { onEdit, rerender, onSettle, onEditGroup, onDeleteGroup, onEditMySplit, onOpenGroup }) {
   container.addEventListener('click', async (e) => {
-    const groupOpen = e.target.closest('.group-open');
-    if (groupOpen) {
-      if (onOpenGroup) onOpenGroup(groupOpen.dataset.groupId);
-      return;
-    }
     const myedit = e.target.closest('.myedit');
     if (myedit) {
       if (onEditMySplit) onEditMySplit(myedit.dataset.mysplit);
@@ -112,6 +109,13 @@ export function attachListHandler(container, { onEdit, rerender, onSettle, onEdi
     const settle = e.target.closest('.settle');
     if (settle) {
       if (onSettle) onSettle(settle.dataset.settle);
+      return;
+    }
+    // Tapping anywhere else on a group tile opens it in the group detail page,
+    // focused on this expense. Checked after the action buttons so those win.
+    const groupOpen = e.target.closest('.group-open');
+    if (groupOpen) {
+      if (onOpenGroup) onOpenGroup(groupOpen.dataset.groupId, groupOpen.dataset.expId);
       return;
     }
     const del = e.target.closest('.del');
