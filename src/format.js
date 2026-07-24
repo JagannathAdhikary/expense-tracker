@@ -5,7 +5,15 @@ import { MN, DAYS, BUILTIN_PAYS } from './constants.js';
 
 export const fmt = (n) => '₹' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export const isoDay = (d) => d.toISOString().split('T')[0];
+// Local-timezone YYYY-MM-DD. Using toISOString() here would convert to UTC, so
+// just after local midnight (in zones ahead of UTC, e.g. IST) it would still
+// report yesterday — stamping new expenses on the wrong day. Build from local parts.
+export const isoDay = (d) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
 
 export function friendlyDate(dateStr) {
   const d = new Date(dateStr);

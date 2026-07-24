@@ -54,6 +54,13 @@ export function renderGroupChips() {
     return;
   }
   field.style.display = 'block';
+  if (state.groupPickLocked && state.selGroup) {
+    // Adding from a group's detail page: this expense belongs to that group only.
+    const g = state.groups.find((x) => x.id === state.selGroup);
+    $('igroupchips').innerHTML = `<div class="chip on" data-group="${state.selGroup}">👥 ${g ? g.name : 'Group'}</div>`;
+    renderSplitConfig();
+    return;
+  }
   $('igroupchips').innerHTML =
     `<div class="chip${state.selGroup === null ? ' on' : ''}" data-group="">Just me</div>` +
     state.groups.map((g) => `<div class="chip${g.id === state.selGroup ? ' on' : ''}" data-group="${g.id}">👥 ${g.name}</div>`).join('');
@@ -125,6 +132,7 @@ export function showAdd() {
   state.splitWeights = {};
   state.editGroupExpId = null;
   state.groupEditLocked = false;
+  state.groupPickLocked = false;
   $('iamt').disabled = false;
   const note0 = $('groupLockNote');
   if (note0) note0.style.display = 'none';
@@ -139,6 +147,16 @@ export function showAdd() {
   $('catview').classList.remove('active');
   $('add').classList.add('active');
   setTimeout(() => $('iamt').focus(), 100);
+}
+
+// Open the add form pre-tagged to a specific group, with the group locked (no
+// "Just me" or other groups) — used by the + button on the group detail page.
+export function showAddForGroup(groupId) {
+  showAdd();
+  if (!state.groups.some((g) => g.id === groupId)) return; // not a real group; leave as normal add
+  state.selGroup = groupId;
+  state.groupPickLocked = true;
+  renderGroupChips();
 }
 
 export function showEdit(id) {
@@ -315,7 +333,7 @@ export function initAddEdit() {
 
   // Group picker: "Just me" (null) or a specific group.
   $('igroupchips').addEventListener('click', (e) => {
-    if (state.groupEditLocked) return; // locked once a payment is made
+    if (state.groupEditLocked || state.groupPickLocked) return; // locked (payment made, or added from group page)
     const chip = e.target.closest('.chip');
     if (!chip) return;
     state.selGroup = chip.dataset.group || null;
@@ -424,7 +442,17 @@ export function initAddEdit() {
           persist();
           toastSuccess('Moved to group');
         }
-        showHome();
+        // Added from a group's detail page → return there; otherwise go home.
+        // Dynamic import avoids a static cycle with groups.js.
+        if (state.groupPickLocked && state.selGroup) {
+          const gid = state.selGroup;
+          state.groupPickLocked = false;
+          const { showGroupDetail } = await import('./groups.js');
+          $('add').classList.remove('active');
+          showGroupDetail(gid);
+        } else {
+          showHome();
+        }
       }
       return;
     }

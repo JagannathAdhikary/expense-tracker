@@ -8,7 +8,7 @@ import { fmt } from '../format.js';
 import { friendlyDate, payBadge } from '../format.js';
 import { $ } from '../dom.js';
 import { loadCloudData, markShareDone, deleteGroupExpense, settleUpWithMember, deleteGroup } from '../features/groups.js';
-import { openEditGroup } from './addEdit.js';
+import { openEditGroup, showAddForGroup } from './addEdit.js';
 import { expenseHasPayment, owedByUserInGroup, owedToUserInGroup } from '../cloudrows.js';
 import { toastError, toastSuccess } from '../toast.js';
 import { icon } from '../icons.js';
@@ -156,7 +156,16 @@ function renderGroupDetail() {
     $('groupOwe').innerHTML = '';
   }
 
-  const exps = state.groupExpenses.filter((e) => e.group_id === g.id);
+  // Most recent first. spent_on is date-only (ties on the same day), so break ties
+  // by created_at — the actual record time — newest at the top.
+  const exps = state.groupExpenses
+    .filter((e) => e.group_id === g.id)
+    .slice()
+    .sort((a, b) => {
+      const at = a.created_at ? new Date(a.created_at).getTime() : new Date(a.spent_on).getTime();
+      const bt = b.created_at ? new Date(b.created_at).getTime() : new Date(b.spent_on).getTime();
+      return new Date(b.spent_on) - new Date(a.spent_on) || bt - at;
+    });
 
   // "Owed to you" summary: who still owes the current user, per person.
   const owedTo = owedToUserInGroup(g.id);
@@ -283,6 +292,10 @@ export function initGroupsView() {
     state.openGroupId = null;
     $('groups').classList.remove('active');
     $('home').classList.add('active');
+  };
+  // "+" on the group detail page: add an expense pre-tagged to this group.
+  $('groupAddBtn').onclick = () => {
+    if (state.openGroupId) showAddForGroup(state.openGroupId);
   };
   // Group icon editor (any member).
   $('groupIconBtn').onclick = openGroupIconModal;
