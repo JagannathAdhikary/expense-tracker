@@ -242,8 +242,8 @@ function closeGroupsPopover() {
   $('groupsOverlay').classList.remove('open');
 }
 
-// Open a group's full detail page (from the popover).
-function showGroupDetail(id) {
+// Open a group's full detail page (from the popover, or a group txn row).
+export function showGroupDetail(id) {
   state.openGroupId = id;
   closeGroupsPopover();
   ['home', 'catview', 'add'].forEach((sid) => $(sid).classList.remove('active'));

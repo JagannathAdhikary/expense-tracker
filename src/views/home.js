@@ -7,6 +7,7 @@ import { $ } from '../dom.js';
 import { renderDateGroups, attachListHandler } from './list.js';
 import { showCategoryView, renderCategoryView } from './category.js';
 import { showEdit, openEditGroup, openEditMySplit } from './addEdit.js';
+import { showGroupDetail } from './groups.js';
 import { sharedRowsForMonth, sharedMonthTotal, expenseHasPayment } from '../cloudrows.js';
 import { markShareDone, deleteGroupExpense } from '../features/groups.js';
 import { toastError } from '../toast.js';
@@ -108,6 +109,7 @@ export function initHome() {
     },
     onEditGroup: (gid) => openEditGroup(gid),
     onEditMySplit: (sid) => openEditMySplit(sid),
+    onOpenGroup: (gid) => showGroupDetail(gid),
     onDeleteGroup: async (gid) => {
       if (expenseHasPayment(gid)) {
         toastError('This expense already has a settled share, so it can no longer be deleted.');

@@ -3,9 +3,8 @@
 // to the user's effective group spend (matching netForUser in split.js).
 //
 // Row rules for the current user U:
-//  - Expense U paid: one positive row for U's own share, plus, for each unsettled
-//    other member's share, a positive row (U is still fronting that money). When
-//    everyone settles, only U's own share remains — the ₹300→₹100 rebalance.
+//  - Expense U paid: one positive row for U's own share only (not the money U
+//    fronted for others — that lives in the group's "Owed to you" view).
 //  - Expense U did NOT pay, U's split pending: a negative "-share" borrowed row,
 //    excluded from the total until settled.
 //  - Expense U did NOT pay, U's split done: a positive row (U's real, settled cost).
@@ -90,17 +89,19 @@ export function sharedRows() {
       // Sortable timestamp: when the expense was recorded (falls back to the date).
       ts: exp.created_at ? new Date(exp.created_at).getTime() : new Date(exp.spent_on).getTime(),
       id: exp.id,
+      groupId: exp.group_id, // group this expense belongs to (for navigation)
       groupExpId: exp.id, // stable id of the group_expenses row (for edit)
       canEdit: iPaid, // only the payer may edit
       canDelete: iPaid && !anySettled, // payer, and only before anyone settles
     };
     if (iPaid) {
-      // Own share (always counts) + any not-yet-settled others' shares (still fronted).
+      // The payer sees only THEIR own share from the start — not the money they
+      // fronted for others. Others' shares surface separately in the group's
+      // "Owed to you" view and settle back to the payer directly.
       const myShare = rowsFor.find((s) => s.debtor_id === uid);
       const others = rowsFor.filter((s) => s.debtor_id !== uid);
       const othersPending = others.filter((s) => s.status !== 'done');
-      const fronted = othersPending.reduce((sum, s) => sum + Number(s.share_amount), 0);
-      const amt = (myShare ? Number(myShare.share_amount) : 0) + fronted;
+      const amt = myShare ? Number(myShare.share_amount) : 0;
       // Payer is owed money until everyone settles: show "awaiting N" then "settled".
       const badge =
         othersPending.length > 0

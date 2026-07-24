@@ -39,7 +39,7 @@ export function renderDateGroups(rows, container) {
           const amtDisplay = fmt(Math.abs(r.amt));
           return `<div class="txn shared-txn">
         <div class="txn-ico" style="background:${cat.c}20">${cat.e}</div>
-        <div class="txn-info">
+        <div class="txn-info group-open" data-group-id="${r.groupId}" role="button" tabindex="0" title="Open group">
           <div class="txn-desc">${r.desc || cat.n}</div>
           <div class="txn-meta">${r.meta || cat.n}${payBadge(r.pay)}</div>
         </div>
@@ -87,8 +87,13 @@ export function renderDateGroups(rows, container) {
 // Attach the shared delete / edit / collapse click handling to a list container.
 // The render callbacks are passed in to avoid circular imports between views.
 // onSettle (optional) handles the "mark my share done" ✓ button on shared rows.
-export function attachListHandler(container, { onEdit, rerender, onSettle, onEditGroup, onDeleteGroup, onEditMySplit }) {
+export function attachListHandler(container, { onEdit, rerender, onSettle, onEditGroup, onDeleteGroup, onEditMySplit, onOpenGroup }) {
   container.addEventListener('click', async (e) => {
+    const groupOpen = e.target.closest('.group-open');
+    if (groupOpen) {
+      if (onOpenGroup) onOpenGroup(groupOpen.dataset.groupId);
+      return;
+    }
     const myedit = e.target.closest('.myedit');
     if (myedit) {
       if (onEditMySplit) onEditMySplit(myedit.dataset.mysplit);
