@@ -26,6 +26,7 @@ export const state = {
   groups: [], // groups the user belongs to: {id,name,invite_code,members:[{id,name,avatar}]}
   groupExpenses: [], // group_expenses rows visible to the user
   mySplits: [], // expense_splits rows involving the user (for borrowed rows + settle)
+  settlements: [], // settlements rows for the user's groups (auto-netting + manual settle-ups)
   openGroupId: null, // group currently open in the Groups detail view
   // add/edit form group tagging:
   selGroup: null, // group id tagged on the expense being added, or null

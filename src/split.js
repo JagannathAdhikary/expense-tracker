@@ -120,3 +120,60 @@ export function pendingOwedByUser(expenses, splits, userId) {
   }
   return toRupees(paise);
 }
+
+// ---------------------------------------------------------------------------
+// Pairwise netting between two members. Debts run in both directions (each member
+// can pay expenses the other owes a share of); the app nets them into a single
+// figure per pair. Because splits stay 'pending' and we net the two directions at
+// read time, opposing debts cancel automatically — no stored auto-settlement is
+// needed, and deleting/editing an expense reverts the net for free.
+//
+// A `settlements` row records a REAL payment ("Settle up"): { from_user (payer of
+// the debt), to_user (creditor), amount }. It reduces the net in that direction.
+// All math is in integer paise; only display converts back to rupees.
+// ---------------------------------------------------------------------------
+
+// Raw pending debt `debtor` owes `creditor`: sum of debtor's still-pending shares
+// on expenses that `creditor` paid. (In paise, before netting/settlements.)
+function rawPendingPaise(expenses, splits, debtor, creditor) {
+  const paidByCreditor = new Set(expenses.filter((e) => e.payer_id === creditor).map((e) => e.id));
+  let paise = 0;
+  for (const s of splits) {
+    if (s.debtor_id === debtor && s.status === 'pending' && paidByCreditor.has(s.expense_id)) {
+      paise += toPaise(s.share_amount);
+    }
+  }
+  return paise;
+}
+
+// Total settlement amount recorded in the `from`->`to` direction. (In paise.)
+function settledPaise(settlements, from, to) {
+  let paise = 0;
+  for (const st of settlements) {
+    if (st.from_user === from && st.to_user === to) paise += toPaise(st.amount);
+  }
+  return paise;
+}
+
+/**
+ * Signed net between users U and M, in PAISE:
+ *   > 0  => U owes M that much
+ *   < 0  => M owes U that much
+ *   = 0  => settled
+ * Opposing raw debts net directly; settlements discharge their own direction.
+ */
+export function netBetweenPaise(expenses, splits, settlements, U, M) {
+  const rawUM = rawPendingPaise(expenses, splits, U, M);
+  const rawMU = rawPendingPaise(expenses, splits, M, U);
+  const setUM = settledPaise(settlements, U, M);
+  const setMU = settledPaise(settlements, M, U);
+  return rawUM - setUM - (rawMU - setMU);
+}
+
+/**
+ * Signed net between users U and M, in rupees:
+ *   > 0  => U owes M; < 0  => M owes U; = 0 => settled.
+ */
+export function netBetween(expenses, splits, settlements, U, M) {
+  return toRupees(netBetweenPaise(expenses, splits, settlements, U, M));
+}
