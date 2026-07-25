@@ -7,6 +7,9 @@ dev-dist/
 .env
 .env.local
 
+# Supabase CLI local link state (project ref, versions) — machine-local, not for git.
+supabase/.temp/
+
 # IDE
 .idea/
 .vscode/
