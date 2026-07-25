@@ -71,6 +71,24 @@ alter table public.expense_splits add column if not exists cat text;
 alter table public.expense_splits add column if not exists pay text;
 alter table public.expense_splits add column if not exists note text;
 
+-- Settlement log: records a real "Settle up" payment that discharges the net debt
+-- between two members. Debts themselves are NOT stored here — they are computed
+-- live by netting pending expense_splits in both directions (see netBetween in
+-- src/split.js), so opposing expenses cancel automatically and deleting an expense
+-- reverts the net for free. A settlement only records money actually paid back.
+-- Direction: `from_user` (who owed) paid `to_user` (who was owed).
+create table if not exists public.settlements (
+  id         uuid primary key default gen_random_uuid(),
+  group_id   uuid not null references public.groups(id) on delete cascade,
+  from_user  uuid not null references public.profiles(id) on delete cascade,
+  to_user    uuid not null references public.profiles(id) on delete cascade,
+  amount     numeric(12,2) not null check (amount > 0),
+  kind       text not null default 'manual' check (kind in ('manual')),
+  created_by uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_settlements_group on public.settlements(group_id);
+
 create index if not exists idx_group_members_user on public.group_members(user_id);
 create index if not exists idx_group_expenses_group on public.group_expenses(group_id);
 create index if not exists idx_expense_splits_debtor on public.expense_splits(debtor_id);
@@ -127,6 +145,7 @@ alter table public.groups         enable row level security;
 alter table public.group_members  enable row level security;
 alter table public.group_expenses enable row level security;
 alter table public.expense_splits enable row level security;
+alter table public.settlements    enable row level security;
 
 -- profiles ------------------------------------------------------------------
 drop policy if exists profiles_select on public.profiles;
@@ -250,11 +269,37 @@ create policy splits_delete on public.expense_splits
     )
   );
 
+-- settlements ---------------------------------------------------------------
+drop policy if exists settlements_select on public.settlements;
+create policy settlements_select on public.settlements
+  for select using (public.is_group_member(group_id));
+
+-- The settling member records their own payment.
+drop policy if exists settlements_insert on public.settlements;
+create policy settlements_insert on public.settlements
+  for insert with check (created_by = auth.uid() and public.is_group_member(group_id));
+
+-- A settlement is deletable only by whoever recorded it (to undo a mistaken settle-up).
+drop policy if exists settlements_delete on public.settlements;
+create policy settlements_delete on public.settlements
+  for delete using (created_by = auth.uid());
+
 -- ---------------------------------------------------------------------------
--- Realtime: broadcast changes so members see settlements live
+-- Realtime: broadcast changes so members see settlements live.
+-- Guarded so re-applying the schema doesn't error on already-published tables.
 -- ---------------------------------------------------------------------------
-alter publication supabase_realtime add table public.group_expenses;
-alter publication supabase_realtime add table public.expense_splits;
+do $$
+declare t text;
+begin
+  foreach t in array array['group_expenses','expense_splits','settlements'] loop
+    if not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t
+    ) then
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    end if;
+  end loop;
+end $$;
 
 -- ============================================================================
 -- Personal expense cloud sync (optional, per-user).

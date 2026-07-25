@@ -26,13 +26,16 @@ export const state = {
   groups: [], // groups the user belongs to: {id,name,invite_code,members:[{id,name,avatar}]}
   groupExpenses: [], // group_expenses rows visible to the user
   mySplits: [], // expense_splits rows involving the user (for borrowed rows + settle)
+  settlements: [], // settlements rows for the user's groups (auto-netting + manual settle-ups)
   openGroupId: null, // group currently open in the Groups detail view
+  focusGroupExpId: null, // expense to scroll to + flash when the detail view opens
   // add/edit form group tagging:
   selGroup: null, // group id tagged on the expense being added, or null
   selSplitMode: 'equal', // 'equal' | 'amount' | 'percent'
   splitWeights: {}, // per-member weights for amount/percent modes (keyed by user id)
   editGroupExpId: null, // when set, the add form is editing this cloud group expense
   groupEditLocked: false, // when editing a group expense that already has a payment: lock amount/group/split
+  groupPickLocked: false, // when adding from a group's detail page: lock the expense to that group (no "Just me"/others)
   editMySplitId: null, // when set, editing only my personal cat/pay/note on a settled group split
 };
 

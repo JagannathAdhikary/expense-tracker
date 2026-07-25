@@ -6,6 +6,7 @@ import { supabase, cloudEnabled } from '../supabase.js';
 import { state } from '../state.js';
 import { $ } from '../dom.js';
 import { toastError, toastSuccess, toastInfo } from '../toast.js';
+import { netBetween } from '../split.js';
 
 // Callbacks fired after cloud data (groups/expenses/splits) is (re)loaded.
 const dataListeners = [];
@@ -34,6 +35,7 @@ export async function loadCloudData() {
     state.groups = [];
     state.groupExpenses = [];
     state.mySplits = [];
+    state.settlements = [];
     notifyData();
     return;
   }
@@ -82,9 +84,12 @@ export async function loadCloudData() {
     } else {
       state.mySplits = [];
     }
+    const { data: setts } = await supabase.from('settlements').select('*').in('group_id', groupIds);
+    state.settlements = setts || [];
   } else {
     state.groupExpenses = [];
     state.mySplits = [];
+    state.settlements = [];
   }
 
   notifyData();
@@ -163,7 +168,8 @@ export async function saveGroupExpense({ groupId, amount, description, category,
     return false;
   }
   // Refresh in the background so the form can close immediately; onGroupData
-  // re-renders the list once the reload lands.
+  // re-renders the list once the reload lands. Opposing debts net automatically
+  // at read time (see netBetween in split.js) — no auto-settlement row needed.
   loadCloudData();
   return true;
 }
@@ -205,7 +211,10 @@ export async function editGroupExpense({ expenseId, amount, description, categor
   return true;
 }
 
-// Delete a group expense (payer only). Cascade removes its splits.
+// Delete a group expense (payer only). Cascade removes its splits. Netting is
+// computed live from pending shares, so removing the expense reverts the net
+// automatically — no settlement rows to unwind. Manual settle-up rows are
+// independent of any expense and are left intact.
 export async function deleteGroupExpense(expenseId) {
   if (!cloudEnabled() || !state.user) return false;
   const { error } = await supabase.from('group_expenses').delete().eq('id', expenseId).eq('payer_id', state.user.id);
@@ -269,22 +278,48 @@ export async function markShareDone(splitId, pay = null) {
   await loadCloudData();
 }
 
-// Settle ALL of the current user's pending shares owed to one payer within a group,
-// in a single update (e.g. B clears the ₹20 + ₹30 owed to A at once).
-export async function settleWithPayer(groupId, payerId, pay = null) {
+// Settle up with another member across BOTH directions in one action: flip every
+// pending share between the two of us (mine owed to them, and theirs owed to me on
+// expenses I paid) to 'done', and record a manual settlement row for history.
+// The net between us becomes 0. Idempotent (only touches 'pending' rows).
+export async function settleUpWithMember(groupId, otherId, pay = null) {
   if (!cloudEnabled() || !state.user) return;
-  // Expenses in this group paid by that person.
-  const expIds = state.groupExpenses.filter((e) => e.group_id === groupId && e.payer_id === payerId).map((e) => e.id);
-  if (!expIds.length) return;
-  // My pending split ids across those expenses.
-  const splitIds = state.mySplits.filter((s) => s.debtor_id === state.user.id && s.status === 'pending' && expIds.includes(s.expense_id)).map((s) => s.id);
-  if (!splitIds.length) return;
-  const patch = { status: 'done', settled_at: new Date().toISOString() };
-  if (pay) patch.pay = pay;
-  const { error } = await supabase.from('expense_splits').update(patch).in('id', splitIds).eq('debtor_id', state.user.id);
-  if (error) {
-    toastError('Could not settle: ' + error.message);
-    return;
+  const uid = state.user.id;
+  const expInGroup = state.groupExpenses.filter((e) => e.group_id === groupId);
+  const theyPaid = new Set(expInGroup.filter((e) => e.payer_id === otherId).map((e) => e.id));
+  const iPaid = new Set(expInGroup.filter((e) => e.payer_id === uid).map((e) => e.id));
+
+  // My pending shares owed to them (their expenses) + their pending shares owed
+  // to me (my expenses). I'm allowed to update both: mine as debtor, theirs as payer.
+  const myShares = state.mySplits.filter((s) => s.debtor_id === uid && s.status === 'pending' && theyPaid.has(s.expense_id));
+  const theirShares = state.mySplits.filter((s) => s.debtor_id === otherId && s.status === 'pending' && iPaid.has(s.expense_id));
+
+  const now = new Date().toISOString();
+  // My own shares may carry my payment method; their shares must not (private).
+  if (myShares.length) {
+    const patch = { status: 'done', settled_at: now };
+    if (pay) patch.pay = pay;
+    const { error } = await supabase.from('expense_splits').update(patch).in('id', myShares.map((s) => s.id)).eq('debtor_id', uid);
+    if (error) {
+      toastError('Could not settle: ' + error.message);
+      return;
+    }
+  }
+  if (theirShares.length) {
+    const { error } = await supabase.from('expense_splits').update({ status: 'done', settled_at: now }).in('id', theirShares.map((s) => s.id));
+    if (error) {
+      toastError('Could not settle: ' + error.message);
+      return;
+    }
+  }
+
+  // Record a manual settlement for history in whichever direction had a net debt.
+  const net = netBetween(expInGroup, state.mySplits, uid, otherId); // >0 I owe them
+  const absAmt = Math.abs(net);
+  if (absAmt > 0) {
+    const from_user = net > 0 ? uid : otherId;
+    const to_user = net > 0 ? otherId : uid;
+    await supabase.from('settlements').insert({ group_id: groupId, from_user, to_user, amount: absAmt, kind: 'manual', created_by: uid });
   }
   await loadCloudData();
 }
@@ -306,6 +341,7 @@ export function subscribeRealtime() {
     .channel('group-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'group_expenses' }, scheduleReload)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'expense_splits' }, scheduleReload)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'settlements' }, scheduleReload)
     .subscribe();
 }
 

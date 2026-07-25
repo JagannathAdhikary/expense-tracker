@@ -120,3 +120,50 @@ export function pendingOwedByUser(expenses, splits, userId) {
   }
   return toRupees(paise);
 }
+
+// ---------------------------------------------------------------------------
+// Pairwise netting between two members. Debts run in both directions (each member
+// can pay expenses the other owes a share of); the app nets them into a single
+// figure per pair. Because splits stay 'pending' and we net the two directions at
+// read time, opposing debts cancel automatically — no stored settlement is needed,
+// and deleting/editing an expense reverts the net for free.
+//
+// Settlement is expressed ENTIRELY by flipping shares to 'done': a per-row settle
+// marks one share done; "Settle up" marks every pending share between the pair
+// done in both directions. A `settlements` row is written only as a HISTORY log of
+// a real payment and is deliberately NOT part of this calculation (doing so would
+// double-count against the already-'done' shares). All math is in integer paise.
+// ---------------------------------------------------------------------------
+
+// Raw pending debt `debtor` owes `creditor`: sum of debtor's still-pending shares
+// on expenses that `creditor` paid. (In paise.)
+function rawPendingPaise(expenses, splits, debtor, creditor) {
+  const paidByCreditor = new Set(expenses.filter((e) => e.payer_id === creditor).map((e) => e.id));
+  let paise = 0;
+  for (const s of splits) {
+    if (s.debtor_id === debtor && s.status === 'pending' && paidByCreditor.has(s.expense_id)) {
+      paise += toPaise(s.share_amount);
+    }
+  }
+  return paise;
+}
+
+/**
+ * Signed net between users U and M, in PAISE:
+ *   > 0  => U owes M that much
+ *   < 0  => M owes U that much
+ *   = 0  => settled
+ * Purely the difference of the two directions' still-pending shares; 'done' shares
+ * (settled per-row or via Settle up) simply drop out.
+ */
+export function netBetweenPaise(expenses, splits, U, M) {
+  return rawPendingPaise(expenses, splits, U, M) - rawPendingPaise(expenses, splits, M, U);
+}
+
+/**
+ * Signed net between users U and M, in rupees:
+ *   > 0  => U owes M; < 0  => M owes U; = 0 => settled.
+ */
+export function netBetween(expenses, splits, U, M) {
+  return toRupees(netBetweenPaise(expenses, splits, U, M));
+}
