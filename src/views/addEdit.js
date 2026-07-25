@@ -145,7 +145,9 @@ export function showAdd() {
   $('idate').value = isoDay(new Date());
   $('home').classList.remove('active');
   $('catview').classList.remove('active');
+  $('groups').classList.remove('active'); // also leave the group detail page (opened via its + button)
   $('add').classList.add('active');
+  window.scrollTo(0, 0); // start the add form at the top, not wherever the prior screen was scrolled
   setTimeout(() => $('iamt').focus(), 100);
 }
 
