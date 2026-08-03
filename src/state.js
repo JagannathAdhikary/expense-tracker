@@ -41,3 +41,7 @@ export const state = {
 
 // Set of date strings whose groups are collapsed; default all expanded.
 export const collapsed = new Set();
+
+// Same, but for the group-detail expense list (kept separate so collapsing a
+// date there doesn't also collapse it on the home list, which shares dates).
+export const groupCollapsed = new Set();
