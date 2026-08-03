@@ -238,9 +238,13 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .ge-settle-btn:active{transform:scale(.98)}
 .status-btn{border:none;cursor:pointer;font-size:10px}
 
+/* Your total-in-group card (headline figure at the top of group detail) */
+.group-total-card{display:flex;align-items:center;justify-content:space-between;background:var(--grad-accent);border-radius:var(--radius);padding:14px 18px;margin:12px 0 4px;box-shadow:var(--sh-accent)}
+.group-total-card .gt-label{font-size:13px;font-weight:600;color:rgba(255,255,255,.8)}
+.group-total-card .gt-amt{font-size:22px;font-weight:800;color:#fff;letter-spacing:-.4px}
+
 /* "You owe" summary card in group detail */
-.owe-card{background:linear-gradient(135deg,#fff 0%,#fff8f3 100%);border:1px solid #f4dccb;border-radius:var(--radius);padding:14px 16px;margin:12px 0 4px;box-shadow:var(--sh-md)}
-.owe-head{display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:700;color:var(--warn);margin-bottom:8px}
+.owe-card{background:linear-gradient(135deg,#fff 0%,#fff8f3 100%);border:1px solid #f4dccb;border-radius:var(--radius);padding:14px 16px;margin:12px 0 4px;box-shadow:var(--sh-md)}.owe-head{display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:700;color:var(--warn);margin-bottom:8px}
 .owe-total{font-size:17px;font-weight:800}
 .owe-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid #f6e8dd}
 .owe-name{flex:1;font-size:14px;font-weight:500;color:var(--ink)}
