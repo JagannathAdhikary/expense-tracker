@@ -215,7 +215,11 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 
 /* Group detail lists: give the tiles breathing room */
 #groupExpenseList{display:flex;flex-direction:column;gap:10px}
-#groupExpenseList .txn{padding:.9rem 1rem;align-items:flex-start}
+#groupExpenseList .txn{padding:.9rem 1rem;align-items:flex-start;flex-direction:column;gap:10px}
+/* Top part of the tile (icon + info + status/edit) sits in a row; the settle
+   button (if any) drops to a full-width footer below it. */
+.ge-main{display:flex;align-items:flex-start;gap:12px;width:100%}
+.ge-main .txn-info{flex:1;min-width:0}
 /* 3-line group expense row */
 .ge-row .txn-desc{font-size:14.5px;font-weight:700}
 .ge-payer{font-weight:600;color:var(--ink);margin-top:3px}
@@ -228,6 +232,9 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .ge-btns .gedit:hover{background:#dbe6f4}
 .ge-btns .gdel{color:var(--neg);background:#fdeeeb}
 .ge-btns .gdel:hover{background:#fbddd7}
+/* Full-width "Mark done" footer on an owed expense row. */
+.ge-settle-btn{width:100%;padding:11px;border:none;border-radius:var(--radius-sm);background:var(--grad-accent);color:#fff;font-size:13.5px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(30,58,95,.2);transition:transform .1s}
+.ge-settle-btn:active{transform:scale(.98)}
 .status-btn{border:none;cursor:pointer;font-size:10px}
 
 /* "You owe" summary card in group detail */
@@ -252,6 +259,21 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 /* Flash a group expense row when opened from the main list (focus target). */
 @keyframes ge-flash{0%{box-shadow:0 0 0 2px var(--accent)}60%{box-shadow:0 0 0 2px var(--accent)}100%{box-shadow:0 0 0 0 transparent}}
 .ge-flash{animation:ge-flash 1.6s ease-out}
+
+/* Group expense detail modal: basics block + action footer */
+.exp-detail-meta{display:flex;flex-direction:column;gap:2px;margin-bottom:14px}
+.edm-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}
+.edm-row:last-child{border-bottom:none}
+.edm-label{font-size:13px;color:var(--ink-mute);font-weight:500}
+.edm-value{font-size:14px;font-weight:700;color:var(--ink);text-align:right;display:flex;align-items:center;gap:6px}
+.exp-detail-section{margin-bottom:14px}
+.exp-detail-label{font-size:12px;font-weight:700;color:var(--ink-mute);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
+/* Split breakdown: cap at ~4 member rows, scroll the rest. Row ≈ 39px + 8px gap;
+   197px shows 4 fully and peeks the 5th as a scroll cue. */
+#expDetailBreakdownWrap .cat-manage-list{max-height:197px;overflow-y:auto;margin-bottom:0;padding-right:2px;-webkit-overflow-scrolling:touch}
+.exp-detail-settle{width:100%;padding:13px;border:none;border-radius:var(--radius-sm);background:var(--grad-accent);color:#fff;font-size:14.5px;font-weight:700;cursor:pointer;box-shadow:0 3px 10px rgba(30,58,95,.25);transition:transform .1s}
+.exp-detail-settle:active{transform:scale(.98)}
+.exp-detail-done{text-align:center;padding:12px;border-radius:var(--radius-sm);background:#e9f7ef;color:#1a6b3a;font-size:14px;font-weight:700}
 
 /* locked (uneditable) form controls when a group payment is already made */
 .chip.locked,.pay-chip.locked{opacity:.5;pointer-events:none}
