@@ -2,7 +2,7 @@
 // per-group detail view showing expenses, each member's effective balance, and
 // the current user's pending shares with "Mark my share done" buttons.
 
-import { state } from '../state.js';
+import { state, groupCollapsed } from '../state.js';
 import { cloudEnabled } from '../supabase.js';
 import { fmt } from '../format.js';
 import { friendlyDate, payBadge } from '../format.js';
@@ -153,6 +153,50 @@ function openGroupIconModal() {
   $('groupIconModal').classList.add('open');
 }
 
+// Build one group-expense tile (icon/info + status/edit + optional settle
+// footer). `g` is the owning group. Every tile is tappable to open its detail.
+function renderExpenseTile(e, g) {
+  const mine = splitsFor(e.id).find((s) => s.debtor_id === state.user?.id);
+  const iPaid = e.payer_id === state.user?.id;
+  // Status pill (compact, top-right). For a pending share you owe, the full
+  // "Settle" footer button below carries the amount, so no pill.
+  let status = '';
+  if (mine && !iPaid) {
+    if (mine.status !== 'pending') status = `<span class="pay-badge shared-done">settled ✓</span>`;
+  } else if (iPaid) {
+    const pend = splitsFor(e.id).filter((s) => s.debtor_id !== state.user?.id && s.status === 'pending').length;
+    status = pend > 0 ? `<span class="pay-badge shared-pending">${pend} pending</span>` : `<span class="pay-badge shared-done">all settled</span>`;
+  }
+  // Full-width footer action: a pending share you owe gets its own settle
+  // button here (never truncated); everything else opens details on tap.
+  const footer =
+    mine && !iPaid && mine.status === 'pending'
+      ? `<button class="ge-settle-btn" data-settle="${mine.id}">Settle your share ${fmt(mine.share_amount)}</button>`
+      : '';
+  const editBtn = iPaid ? `<button class="icon-btn gedit" data-gid="${e.id}" title="Edit" aria-label="Edit">${icon.edit({ size: 17 })}</button>` : '';
+  const delBtn = iPaid && !expenseHasPayment(e.id) ? `<button class="icon-btn gdel" data-gid="${e.id}" title="Delete" aria-label="Delete">${icon.trash({ size: 17 })}</button>` : '';
+  // Line 1: note/title. Line 2: "<Person> paid <amount>". Line 3: date · time.
+  const who = iPaid ? 'You' : memberName(g, e.payer_id);
+  const when = dateTimeLabel(e.spent_on, e.created_at);
+  // Payment method: payer sees how they paid (e.pay); a debtor sees only
+  // their own settlement method (mine.pay), never the payer's.
+  const payMethod = iPaid ? e.pay : mine && mine.pay;
+  // Every row is tappable to open its detail popup.
+  const rowClass = iPaid ? 'txn ge-row ge-paid ge-open' : mine && mine.status === 'pending' ? 'txn ge-row ge-owe ge-open' : 'txn ge-row ge-open';
+  return `<div class="${rowClass}" data-exp-id="${e.id}" data-detail="${e.id}" role="button" tabindex="0" title="View details">
+    <div class="ge-main">
+      <div class="txn-ico" style="background:#eef1f620">🧾</div>
+      <div class="txn-info">
+        <div class="txn-desc">${e.description || 'Expense'}</div>
+        <div class="txn-meta ge-payer">${who} paid ${fmt(e.amount)}${payBadge(payMethod)}</div>
+        <div class="txn-meta ge-when">${when}</div>
+      </div>
+      <div class="ge-actions">${status}<div class="ge-btns">${editBtn}${delBtn}</div></div>
+    </div>
+    ${footer}
+  </div>`;
+}
+
 function renderGroupDetail() {
   const g = state.groups.find((x) => x.id === state.openGroupId);
   if (!g) {
@@ -225,53 +269,44 @@ function renderGroupDetail() {
     $('groupOwedTo').innerHTML = '';
   }
 
-  // Expense list with the current user's split status / settle action.
+  // Expense list, grouped by day with collapsible date headers (like the home
+  // list). `exps` is already newest-first, so iterating preserves date order.
   if (!exps.length) {
     $('groupExpenseList').innerHTML = '<div class="empty"><span>🧾</span>No group expenses yet.</div>';
   } else {
-    $('groupExpenseList').innerHTML = exps
-      .map((e) => {
-        const mine = splitsFor(e.id).find((s) => s.debtor_id === state.user?.id);
-        const iPaid = e.payer_id === state.user?.id;
-        // Status pill (compact, top-right). For a pending share you owe, the
-        // full "Mark done" footer button below carries the amount, so no pill.
-        let status = '';
-        if (mine && !iPaid) {
-          if (mine.status !== 'pending') status = `<span class="pay-badge shared-done">settled ✓</span>`;
-        } else if (iPaid) {
-          const pend = splitsFor(e.id).filter((s) => s.debtor_id !== state.user?.id && s.status === 'pending').length;
-          status =
-            pend > 0
-              ? `<span class="pay-badge shared-pending">${pend} pending</span>`
-              : `<span class="pay-badge shared-done">all settled</span>`;
-        }
-        // Full-width footer action: a pending share you owe gets its own settle
-        // button here (never truncated); everything else opens details on tap.
-        const footer =
-          mine && !iPaid && mine.status === 'pending'
-            ? `<button class="ge-settle-btn" data-settle="${mine.id}">Settle your share ${fmt(mine.share_amount)}</button>`
-            : '';
-        const editBtn = iPaid ? `<button class="icon-btn gedit" data-gid="${e.id}" title="Edit" aria-label="Edit">${icon.edit({ size: 17 })}</button>` : '';
-        const delBtn = iPaid && !expenseHasPayment(e.id) ? `<button class="icon-btn gdel" data-gid="${e.id}" title="Delete" aria-label="Delete">${icon.trash({ size: 17 })}</button>` : '';
-        // Line 1: note/title. Line 2: "<Person> paid <amount>". Line 3: date · time.
-        const who = iPaid ? 'You' : memberName(g, e.payer_id);
-        const when = dateTimeLabel(e.spent_on, e.created_at);
-        // Payment method: payer sees how they paid (e.pay); a debtor sees only
-        // their own settlement method (mine.pay), never the payer's.
-        const payMethod = iPaid ? e.pay : mine && mine.pay;
-        // Every row is tappable to open its detail popup.
-        const rowClass = iPaid ? 'txn ge-row ge-paid ge-open' : mine && mine.status === 'pending' ? 'txn ge-row ge-owe ge-open' : 'txn ge-row ge-open';
-        return `<div class="${rowClass}" data-exp-id="${e.id}" data-detail="${e.id}" role="button" tabindex="0" title="View details">
-          <div class="ge-main">
-            <div class="txn-ico" style="background:#eef1f620">🧾</div>
-            <div class="txn-info">
-              <div class="txn-desc">${e.description || 'Expense'}</div>
-              <div class="txn-meta ge-payer">${who} paid ${fmt(e.amount)}${payBadge(payMethod)}</div>
-              <div class="txn-meta ge-when">${when}</div>
+    const byDate = [];
+    const seen = {};
+    exps.forEach((e) => {
+      if (!seen[e.spent_on]) {
+        seen[e.spent_on] = [];
+        byDate.push({ date: e.spent_on, items: seen[e.spent_on] });
+      }
+      seen[e.spent_on].push(e);
+    });
+    $('groupExpenseList').innerHTML = byDate
+      .map((grp) => {
+        const isCollapsed = groupCollapsed.has(grp.date);
+        // Day total = the current user's own share of that day's expenses, matching
+        // the home list: a share you paid or already settled counts; a share you
+        // still owe (pending) is excluded until settled. Never the full expense.
+        const dayTotal = grp.items.reduce((s, e) => {
+          const mine = splitsFor(e.id).find((sp) => sp.debtor_id === state.user?.id);
+          if (!mine) return s;
+          const iPaid = e.payer_id === state.user?.id;
+          if (!iPaid && mine.status === 'pending') return s; // owed but not yet settled
+          return s + Number(mine.share_amount);
+        }, 0);
+        const tiles = grp.items.map((e) => renderExpenseTile(e, g)).join('');
+        return `<div class="date-group" data-date="${grp.date}">
+          <div class="date-header">
+            <div class="date-header-left">
+              <span class="chevron${isCollapsed ? '' : ' open'}">▼</span>
+              <span class="date-label">${friendlyDate(grp.date)}</span>
+              <span class="date-count">${grp.items.length}</span>
             </div>
-            <div class="ge-actions">${status}<div class="ge-btns">${editBtn}${delBtn}</div></div>
+            <span class="date-total">${fmt(dayTotal)}</span>
           </div>
-          ${footer}
+          <div class="date-entries ge-entries${isCollapsed ? ' collapsed' : ''}">${tiles}</div>
         </div>`;
       })
       .join('');
@@ -283,6 +318,13 @@ function renderGroupDetail() {
     const target = $('groupExpenseList').querySelector(`[data-exp-id="${state.focusGroupExpId}"]`);
     state.focusGroupExpId = null;
     if (target) {
+      // Expand its date group if collapsed, else it can't scroll into view.
+      const grp = target.closest('.date-group');
+      if (grp && groupCollapsed.has(grp.dataset.date)) {
+        groupCollapsed.delete(grp.dataset.date);
+        grp.querySelector('.date-entries').classList.remove('collapsed');
+        grp.querySelector('.chevron').classList.add('open');
+      }
       target.scrollIntoView({ behavior: 'smooth', block: 'center' });
       target.classList.add('ge-flash');
       setTimeout(() => target.classList.remove('ge-flash'), 1600);
@@ -454,6 +496,24 @@ export function initGroupsView() {
       if (!confirmed) return;
       await markShareDone(settleBtn.dataset.settle, pay);
       renderGroupDetail();
+      return;
+    }
+    // Collapse / expand a date group when its header is tapped.
+    const hdr = e.target.closest('.date-header');
+    if (hdr) {
+      const grp = hdr.closest('.date-group');
+      const date = grp.dataset.date;
+      const entries = grp.querySelector('.date-entries');
+      const chevron = grp.querySelector('.chevron');
+      if (groupCollapsed.has(date)) {
+        groupCollapsed.delete(date);
+        entries.classList.remove('collapsed');
+        chevron.classList.add('open');
+      } else {
+        groupCollapsed.add(date);
+        entries.classList.add('collapsed');
+        chevron.classList.remove('open');
+      }
       return;
     }
     // Fall through: tapping the row (anywhere else) opens the detail popup.

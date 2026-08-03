@@ -213,8 +213,9 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .grp-action-row input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,58,95,.12)}
 .grp-action-row .hdr-btn{white-space:nowrap}
 
-/* Group detail lists: give the tiles breathing room */
-#groupExpenseList{display:flex;flex-direction:column;gap:10px}
+/* Group detail lists: give the tiles breathing room. Rows are grouped under
+   collapsible date headers, so the list itself just stacks the date groups. */
+#groupExpenseList{display:flex;flex-direction:column}
 #groupExpenseList .txn{padding:.9rem 1rem;align-items:flex-start;flex-direction:column;gap:10px}
 /* Top part of the tile (icon + info + status/edit) sits in a row; the settle
    button (if any) drops to a full-width footer below it. */
