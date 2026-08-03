@@ -63,28 +63,71 @@ function renderGroupList() {
     .join('');
 }
 
-// Show the per-member paid/pending breakdown for a group expense in a modal.
-function showBreakdown(expId) {
+// Show a group expense's full details in a modal. Works for every expense:
+//  - one you paid: basics + the per-member "who's settled / still pending" list.
+//  - one you owe: basics + your share, plus a "Mark done" button while pending.
+function showExpenseDetail(expId) {
   const g = state.groups.find((x) => x.id === state.openGroupId);
   const exp = state.groupExpenses.find((e) => e.id === expId);
   if (!g || !exp) return;
-  $('breakdownTitle').textContent = exp.description || 'Who’s paid';
-  const rows = splitsFor(expId)
-    .slice()
-    .sort((a, b) => (a.debtor_id === exp.payer_id ? -1 : b.debtor_id === exp.payer_id ? 1 : 0))
-    .map((s) => {
-      const isPayer = s.debtor_id === exp.payer_id;
-      const name = memberName(g, s.debtor_id) + (s.debtor_id === state.user?.id ? ' (you)' : '');
-      // The payer fronted the whole expense; everyone else is either settled or pending.
-      const badge = isPayer
-        ? '<span class="pay-badge pay-custom">paid in full</span>'
-        : s.status === 'done'
-          ? '<span class="pay-badge shared-done">settled ✓</span>'
-          : '<span class="pay-badge shared-pending">not yet</span>';
-      return `<div class="cat-manage-row"><div class="cm-name">${name}</div><span class="cm-count">${fmt(s.share_amount)}</span>${badge}</div>`;
-    })
+
+  const iPaid = exp.payer_id === state.user?.id;
+  const mine = splitsFor(expId).find((s) => s.debtor_id === state.user?.id);
+  const who = iPaid ? 'You' : memberName(g, exp.payer_id);
+  const when = dateTimeLabel(exp.spent_on, exp.created_at);
+  // Payer sees how they paid; a debtor sees only their own settlement method.
+  const payMethod = iPaid ? exp.pay : mine && mine.pay;
+
+  $('breakdownTitle').textContent = exp.description || 'Expense details';
+
+  // Basic details block — shown for every expense.
+  const metaRows = [
+    { label: 'Date', value: when },
+    { label: iPaid ? 'You paid' : `${who} paid`, value: fmt(exp.amount) + payBadge(payMethod) },
+  ];
+  if (mine) metaRows.push({ label: 'Your share', value: fmt(mine.share_amount) });
+  $('expDetailMeta').innerHTML = metaRows
+    .map((r) => `<div class="edm-row"><span class="edm-label">${r.label}</span><span class="edm-value">${r.value}</span></div>`)
     .join('');
-  $('breakdownList').innerHTML = rows || '<div style="color:#888;font-size:13px">No splits.</div>';
+
+  // Per-member breakdown — only meaningful for the payer (who's paid them back).
+  const wrap = $('expDetailBreakdownWrap');
+  if (iPaid) {
+    wrap.style.display = '';
+    $('expDetailListLabel').textContent = 'Split breakdown';
+    const rows = splitsFor(expId)
+      .slice()
+      .sort((a, b) => (a.debtor_id === exp.payer_id ? -1 : b.debtor_id === exp.payer_id ? 1 : 0))
+      .map((s) => {
+        const isPayer = s.debtor_id === exp.payer_id;
+        const name = memberName(g, s.debtor_id) + (s.debtor_id === state.user?.id ? ' (you)' : '');
+        // The payer fronted the whole expense; everyone else is settled or pending.
+        const badge = isPayer
+          ? '<span class="pay-badge pay-custom">paid in full</span>'
+          : s.status === 'done'
+            ? '<span class="pay-badge shared-done">settled ✓</span>'
+            : '<span class="pay-badge shared-pending">pending</span>';
+        return `<div class="cat-manage-row"><div class="cm-name">${name}</div><span class="cm-count">${fmt(s.share_amount)}</span>${badge}</div>`;
+      })
+      .join('');
+    $('breakdownList').innerHTML = rows || '<div style="color:#888;font-size:13px">No splits.</div>';
+  } else {
+    wrap.style.display = 'none';
+    $('breakdownList').innerHTML = '';
+  }
+
+  // Action footer — a full-width "Mark done" for a pending share you owe, or a
+  // status badge once it's settled.
+  const action = $('expDetailAction');
+  if (mine && !iPaid) {
+    action.innerHTML =
+      mine.status === 'pending'
+        ? `<button class="exp-detail-settle" data-settle="${mine.id}">Settle your share ${fmt(mine.share_amount)}</button>`
+        : `<div class="exp-detail-done">Settled ${fmt(mine.share_amount)} ✓</div>`;
+  } else {
+    action.innerHTML = '';
+  }
+
   $('breakdownModal').classList.add('open');
 }
 
@@ -190,24 +233,24 @@ function renderGroupDetail() {
       .map((e) => {
         const mine = splitsFor(e.id).find((s) => s.debtor_id === state.user?.id);
         const iPaid = e.payer_id === state.user?.id;
-        let action = '';
+        // Status pill (compact, top-right). For a pending share you owe, the
+        // full "Mark done" footer button below carries the amount, so no pill.
+        let status = '';
         if (mine && !iPaid) {
-          // A share I owe always keeps its own settle button: paying a single row
-          // is allowed and simply recomputes the net (e.g. paying the full 250 row
-          // flips the net from "you owe 50" to "they owe you 200").
-          action =
-            mine.status === 'pending'
-              ? `<button class="chip" data-settle="${mine.id}" style="border-color:#C0392B;color:#C0392B">Owe ${fmt(mine.share_amount)} · Mark done</button>`
-              : `<span class="pay-badge" style="background:#e9f7ef;color:#1a6b3a">settled ${fmt(mine.share_amount)}</span>`;
+          if (mine.status !== 'pending') status = `<span class="pay-badge shared-done">settled ✓</span>`;
         } else if (iPaid) {
-          // The whole tile opens the who-paid breakdown (see data-breakdown on the
-          // row); this badge is just the at-a-glance status indicator.
           const pend = splitsFor(e.id).filter((s) => s.debtor_id !== state.user?.id && s.status === 'pending').length;
-          action =
+          status =
             pend > 0
               ? `<span class="pay-badge shared-pending">${pend} pending</span>`
               : `<span class="pay-badge shared-done">all settled</span>`;
         }
+        // Full-width footer action: a pending share you owe gets its own settle
+        // button here (never truncated); everything else opens details on tap.
+        const footer =
+          mine && !iPaid && mine.status === 'pending'
+            ? `<button class="ge-settle-btn" data-settle="${mine.id}">Settle your share ${fmt(mine.share_amount)}</button>`
+            : '';
         const editBtn = iPaid ? `<button class="icon-btn gedit" data-gid="${e.id}" title="Edit" aria-label="Edit">${icon.edit({ size: 17 })}</button>` : '';
         const delBtn = iPaid && !expenseHasPayment(e.id) ? `<button class="icon-btn gdel" data-gid="${e.id}" title="Delete" aria-label="Delete">${icon.trash({ size: 17 })}</button>` : '';
         // Line 1: note/title. Line 2: "<Person> paid <amount>". Line 3: date · time.
@@ -216,17 +259,19 @@ function renderGroupDetail() {
         // Payment method: payer sees how they paid (e.pay); a debtor sees only
         // their own settlement method (mine.pay), never the payer's.
         const payMethod = iPaid ? e.pay : mine && mine.pay;
-        // The payer's tile is tappable to open the who-paid breakdown.
-        const rowClass = (iPaid ? 'txn ge-row ge-paid ge-open' : mine && mine.status === 'pending' ? 'txn ge-row ge-owe' : 'txn ge-row');
-        const breakdownAttr = iPaid ? ` data-breakdown="${e.id}"` : '';
-        return `<div class="${rowClass}" data-exp-id="${e.id}"${breakdownAttr}${iPaid ? ' role="button" tabindex="0" title="Who’s paid"' : ''}>
-          <div class="txn-ico" style="background:#eef1f620">🧾</div>
-          <div class="txn-info">
-            <div class="txn-desc">${e.description || 'Expense'}</div>
-            <div class="txn-meta ge-payer">${who} paid ${fmt(e.amount)}${payBadge(payMethod)}</div>
-            <div class="txn-meta ge-when">${when}</div>
+        // Every row is tappable to open its detail popup.
+        const rowClass = iPaid ? 'txn ge-row ge-paid ge-open' : mine && mine.status === 'pending' ? 'txn ge-row ge-owe ge-open' : 'txn ge-row ge-open';
+        return `<div class="${rowClass}" data-exp-id="${e.id}" data-detail="${e.id}" role="button" tabindex="0" title="View details">
+          <div class="ge-main">
+            <div class="txn-ico" style="background:#eef1f620">🧾</div>
+            <div class="txn-info">
+              <div class="txn-desc">${e.description || 'Expense'}</div>
+              <div class="txn-meta ge-payer">${who} paid ${fmt(e.amount)}${payBadge(payMethod)}</div>
+              <div class="txn-meta ge-when">${when}</div>
+            </div>
+            <div class="ge-actions">${status}<div class="ge-btns">${editBtn}${delBtn}</div></div>
           </div>
-          <div class="ge-actions">${action}<div class="ge-btns">${editBtn}${delBtn}</div></div>
+          ${footer}
         </div>`;
       })
       .join('');
@@ -402,6 +447,7 @@ export function initGroupsView() {
       renderGroupDetail();
       return;
     }
+    // Footer "Mark done" button on the row itself.
     const settleBtn = e.target.closest('[data-settle]');
     if (settleBtn) {
       const { confirmed, pay } = await pickSettlePayment();
@@ -410,13 +456,25 @@ export function initGroupsView() {
       renderGroupDetail();
       return;
     }
-    // Fall through: tapping a payer's tile (or its status badge) opens the
-    // who-paid breakdown. Checked last so the action buttons above win.
-    const breakdown = e.target.closest('[data-breakdown]');
-    if (breakdown) showBreakdown(breakdown.dataset.breakdown);
+    // Fall through: tapping the row (anywhere else) opens the detail popup.
+    // Checked last so the action buttons above win.
+    const detail = e.target.closest('[data-detail]');
+    if (detail) showExpenseDetail(detail.dataset.detail);
   });
 
-  // Breakdown modal close.
+  // Detail modal: "Mark done" button settles the current user's share, then
+  // closes the modal and re-renders.
+  $('expDetailAction').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-settle]');
+    if (!btn) return;
+    const { confirmed, pay } = await pickSettlePayment();
+    if (!confirmed) return;
+    await markShareDone(btn.dataset.settle, pay);
+    $('breakdownModal').classList.remove('open');
+    renderGroupDetail();
+  });
+
+  // Detail modal close.
   $('breakdownClose').innerHTML = icon.close({ size: 20 });
   $('breakdownClose').onclick = () => $('breakdownModal').classList.remove('open');
   $('breakdownModal').onclick = (e) => {

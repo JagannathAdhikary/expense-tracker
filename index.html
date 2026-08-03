@@ -278,14 +278,19 @@
   </div>
 </div>
 
-<!-- GROUP EXPENSE BREAKDOWN MODAL (who paid / who hasn't) -->
+<!-- GROUP EXPENSE DETAIL MODAL (basics + who paid / who hasn't + settle) -->
 <div class="modal" id="breakdownModal">
   <div class="modal-box">
     <div class="sheet-head">
-      <h3 id="breakdownTitle">Who's paid</h3>
+      <h3 id="breakdownTitle">Expense details</h3>
       <button class="sheet-close" id="breakdownClose" aria-label="Close"></button>
     </div>
-    <div class="cat-manage-list" id="breakdownList"></div>
+    <div id="expDetailMeta" class="exp-detail-meta"></div>
+    <div class="exp-detail-section" id="expDetailBreakdownWrap">
+      <div class="exp-detail-label" id="expDetailListLabel"></div>
+      <div class="cat-manage-list" id="breakdownList"></div>
+    </div>
+    <div id="expDetailAction"></div>
   </div>
 </div>
 
