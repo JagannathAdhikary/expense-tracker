@@ -77,6 +77,19 @@ export function netWithMember(groupId, otherId) {
   return netBetween(exps, state.mySplits, state.user.id, otherId);
 }
 
+// The current user's total share of a group: the sum of every split of theirs
+// across the group's expenses, regardless of settle status — their part of what
+// they spent (shares on expenses they paid) plus everything they owe/have settled
+// on others' expenses. This is the true cost of participating in the group.
+export function totalShareInGroup(groupId) {
+  if (!state.user) return 0;
+  const uid = state.user.id;
+  const expIds = new Set(state.groupExpenses.filter((e) => e.group_id === groupId).map((e) => e.id));
+  return state.mySplits
+    .filter((s) => s.debtor_id === uid && expIds.has(s.expense_id))
+    .reduce((sum, s) => sum + Number(s.share_amount), 0);
+}
+
 // All shared rows for the user, unfiltered by month.
 export function sharedRows() {
   if (!state.user) return [];

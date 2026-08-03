@@ -9,7 +9,7 @@ import { friendlyDate, payBadge } from '../format.js';
 import { $ } from '../dom.js';
 import { loadCloudData, markShareDone, deleteGroupExpense, settleUpWithMember, deleteGroup } from '../features/groups.js';
 import { openEditGroup, showAddForGroup } from './addEdit.js';
-import { expenseHasPayment, owedByUserInGroup, owedToUserInGroup } from '../cloudrows.js';
+import { expenseHasPayment, owedByUserInGroup, owedToUserInGroup, totalShareInGroup } from '../cloudrows.js';
 import { toastError, toastSuccess } from '../toast.js';
 import { icon } from '../icons.js';
 import { confirmModal, pickSettlePayment } from '../confirm.js';
@@ -31,6 +31,19 @@ function memberName(group, userId) {
 
 // Splits belonging to a given expense.
 const splitsFor = (expId) => state.mySplits.filter((s) => s.expense_id === expId);
+
+// Settle a single expense share: confirm first (so a tap can't commit money
+// by accident), then pick a payment method, then mark done. Returns true if it
+// actually settled, so callers can close a modal / re-render only on success.
+async function confirmAndSettleShare(splitId) {
+  const split = state.mySplits.find((s) => s.id === splitId);
+  const amt = split ? fmt(split.share_amount) : 'your share';
+  if (!(await confirmModal(`Mark your share of ${amt} as settled? Do this once you've actually paid it back.`, { title: 'Settle share', confirmLabel: 'Continue' }))) return false;
+  const { confirmed, pay } = await pickSettlePayment();
+  if (!confirmed) return false;
+  await markShareDone(splitId, pay);
+  return true;
+}
 
 // "Wed, 5 Feb · 3:42 PM" — friendly spent-on date plus the recorded time.
 function dateTimeLabel(spentOn, createdAt) {
@@ -220,6 +233,19 @@ function renderGroupDetail() {
   delGroupBtn.innerHTML = icon.trash({ size: 18 });
   delGroupBtn.style.display = '';
   delGroupBtn.style.visibility = g.role === 'owner' ? 'visible' : 'hidden';
+
+  // Your total share of this group: every split of yours, settled or not —
+  // your part of what you spent plus everything you owe. Hidden when zero.
+  const myTotal = totalShareInGroup(g.id);
+  if (myTotal > 0) {
+    $('groupTotal').innerHTML = `
+      <div class="group-total-card">
+        <span class="gt-label">Your total in this group</span>
+        <span class="gt-amt">${fmt(myTotal)}</span>
+      </div>`;
+  } else {
+    $('groupTotal').innerHTML = '';
+  }
 
   // "You owe" summary: per-creditor totals with a one-tap settle-all button.
   const owe = owedByUserInGroup(g.id);
@@ -489,13 +515,10 @@ export function initGroupsView() {
       renderGroupDetail();
       return;
     }
-    // Footer "Mark done" button on the row itself.
+    // Footer "Settle your share" button on the row itself.
     const settleBtn = e.target.closest('[data-settle]');
     if (settleBtn) {
-      const { confirmed, pay } = await pickSettlePayment();
-      if (!confirmed) return;
-      await markShareDone(settleBtn.dataset.settle, pay);
-      renderGroupDetail();
+      if (await confirmAndSettleShare(settleBtn.dataset.settle)) renderGroupDetail();
       return;
     }
     // Collapse / expand a date group when its header is tapped.
@@ -522,16 +545,15 @@ export function initGroupsView() {
     if (detail) showExpenseDetail(detail.dataset.detail);
   });
 
-  // Detail modal: "Mark done" button settles the current user's share, then
-  // closes the modal and re-renders.
+  // Detail modal: "Settle your share" button confirms, settles the current
+  // user's share, then closes the modal and re-renders.
   $('expDetailAction').addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-settle]');
     if (!btn) return;
-    const { confirmed, pay } = await pickSettlePayment();
-    if (!confirmed) return;
-    await markShareDone(btn.dataset.settle, pay);
-    $('breakdownModal').classList.remove('open');
-    renderGroupDetail();
+    if (await confirmAndSettleShare(btn.dataset.settle)) {
+      $('breakdownModal').classList.remove('open');
+      renderGroupDetail();
+    }
   });
 
   // Detail modal close.
