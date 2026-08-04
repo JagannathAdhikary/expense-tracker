@@ -46,7 +46,7 @@ function renderAuthUI() {
   const box = $('authBox');
   if (!box) return;
   if (!cloudEnabled()) {
-    box.innerHTML = '<div class="auth-note">Cloud sync not configured — group features are unavailable.</div>';
+    box.innerHTML = '<div class="auth-note">Cloud backend not configured — group features are unavailable.</div>';
     return;
   }
   if (state.user) {

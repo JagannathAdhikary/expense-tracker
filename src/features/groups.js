@@ -221,6 +221,24 @@ export async function editGroupExpense({ expenseId, amount, description, categor
   return true;
 }
 
+// Label-only edit of a group expense (payer): updates category / payment / note
+// (description) WITHOUT touching amount or splits. Used when the group is retired
+// (read-only balances) but the payer still wants to re-categorize their expense.
+export async function updateGroupExpenseMeta({ expenseId, description, category, pay }) {
+  if (!cloudEnabled() || !state.user) return false;
+  const { error } = await supabase
+    .from('group_expenses')
+    .update({ description, category, pay })
+    .eq('id', expenseId)
+    .eq('payer_id', state.user.id);
+  if (error) {
+    toastError('Could not save your changes: ' + error.message);
+    return false;
+  }
+  await loadCloudData();
+  return true;
+}
+
 // Delete a group expense (payer only). Cascade removes its splits. Netting is
 // computed live from pending shares, so removing the expense reverts the net
 // automatically — no settlement rows to unwind. Manual settle-up rows are
@@ -283,6 +301,9 @@ export async function setGroupRetired(groupId, retired) {
 
 // True when the given group is retired (read-only). Used to block mutations.
 const groupIsRetired = (groupId) => state.groups.some((g) => g.id === groupId && g.retired);
+
+// Public predicate for views (e.g. to route to a label-only edit when retired).
+export const isGroupRetired = (groupId) => groupIsRetired(groupId);
 
 // Update the current user's personal labels (category / payment / note) on their
 // own split of a group expense. Does not affect other members or the shared row.

@@ -11,7 +11,7 @@ import { openCatModal } from '../features/categories.js';
 import { openPayModal } from '../features/payments.js';
 import { cloudEnabled } from '../supabase.js';
 import { computeSplits } from '../split.js';
-import { saveGroupExpense, editGroupExpense, updateMySplitMeta } from '../features/groups.js';
+import { saveGroupExpense, editGroupExpense, updateMySplitMeta, updateGroupExpenseMeta, isGroupRetired } from '../features/groups.js';
 import { pushRecord, syncOn } from '../features/sync.js';
 import { expenseHasPayment } from '../cloudrows.js';
 import { toastError, toastSuccess } from '../toast.js';
@@ -217,7 +217,9 @@ export function openEditGroup(gid) {
   state.editGroupExpId = gid;
   state.editMySplitId = null;
   restoreFormFields();
-  state.groupEditLocked = expenseHasPayment(gid);
+  // Lock the money-affecting fields when someone's already settled OR the group
+  // is retired (read-only balances). Category / payment / note stay editable.
+  state.groupEditLocked = expenseHasPayment(gid) || isGroupRetired(exp.group_id);
   state.selCat = exp.category || initialCat();
   state.selPay = exp.pay || initialPay();
   state.selGroup = exp.group_id;
@@ -298,7 +300,11 @@ function applyGroupLock() {
       note.className = 'lock-note';
       $('groupField').appendChild(note);
     }
-    note.textContent = 'Someone has already settled — amount, group and split type are locked. You can still edit the note, category and date.';
+    // Distinguish the two lock reasons for a clearer message.
+    const retired = state.selGroup && isGroupRetired(state.selGroup);
+    note.textContent = retired
+      ? 'This group is retired — amount and split are locked. You can still edit the note, category, payment and date.'
+      : 'Someone has already settled — amount, group and split type are locked. You can still edit the note, category and date.';
     note.style.display = 'block';
   } else if (note) {
     note.style.display = 'none';
@@ -411,6 +417,23 @@ export function initAddEdit() {
     // Group expense: creating new, editing an existing group expense, or MOVING
     // a personal expense into a group. (Not when plain-editing a personal record.)
     if (state.selGroup && !state.editMySplitId) {
+      // Retired group + editing an existing expense: labels only (amount/split are
+      // frozen). Skip the split recompute entirely and update just the meta fields.
+      if (state.editGroupExpId && isGroupRetired(state.selGroup)) {
+        const ok = await updateGroupExpenseMeta({
+          expenseId: state.editGroupExpId,
+          description: desc,
+          category: state.selCat,
+          pay: state.selPay,
+        });
+        if (ok) {
+          state.editGroupExpId = null;
+          state.groupEditLocked = false;
+          toastSuccess('Updated');
+          showHome();
+        }
+        return;
+      }
       const members = taggedGroupMembers().map((m) => m.id);
       let shares;
       try {

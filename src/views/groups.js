@@ -435,7 +435,7 @@ export function showGroups() {
   if (!cloudEnabled()) {
     $('groupsAuthGate').style.display = 'block';
     $('groupsContent').style.display = 'none';
-    $('groupsAuthGate').textContent = 'Cloud sync is not configured, so group features are unavailable.';
+    $('groupsAuthGate').textContent = 'Cloud backend is not configured for this app, so group features are unavailable.';
   } else if (!state.user) {
     $('groupsAuthGate').style.display = 'block';
     $('groupsContent').style.display = 'none';

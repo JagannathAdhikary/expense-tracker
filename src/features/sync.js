@@ -14,8 +14,36 @@ import { state } from '../state.js';
 import { persist, persistPrefs } from '../storage.js';
 import { $ } from '../dom.js';
 import { toastError } from '../toast.js';
+import { confirmModal } from '../confirm.js';
 
 export const syncOn = () => cloudEnabled() && !!state.user && !!state.PREFS.cloudSync;
+
+// --- Server-authoritative sync flag (profiles.sync_enabled) ---------------
+// The sync preference lives on the user's profile row so every device honors the
+// same choice: turning it off on one device turns it off everywhere. Local
+// PREFS.cloudSync is a per-device cache of this, refreshed on login.
+
+// Read the user's server-side sync flag. Defaults to false on error/missing.
+async function fetchSyncFlag() {
+  if (!cloudEnabled() || !state.user) return false;
+  const { data, error } = await supabase.from('profiles').select('sync_enabled').eq('id', state.user.id).maybeSingle();
+  if (error) {
+    console.error('read sync flag failed', error);
+    return false;
+  }
+  return !!data?.sync_enabled;
+}
+
+// Write the user's server-side sync flag. Returns true on success.
+async function setSyncFlag(enabled) {
+  if (!cloudEnabled() || !state.user) return false;
+  const { error } = await supabase.from('profiles').update({ sync_enabled: enabled }).eq('id', state.user.id);
+  if (error) {
+    console.error('write sync flag failed', error);
+    return false;
+  }
+  return true;
+}
 
 // Map a local record to a cloud row.
 const toRow = (r) => ({
@@ -134,26 +162,47 @@ export function renderSyncUI() {
   box.innerHTML = `
     <label class="sync-toggle">
       <div class="sync-text">
-        <div class="sync-title">Cloud sync</div>
-        <div class="sync-sub">Back up personal expenses & sync across devices</div>
+        <div class="sync-title">Sync personal expenses</div>
       </div>
       <input type="checkbox" id="syncToggle" ${state.PREFS.cloudSync ? 'checked' : ''}/>
       <span class="switch"></span>
     </label>`;
   $('syncToggle').onchange = async (e) => {
-    if (e.target.checked) {
+    const turningOn = e.target.checked;
+    const ok = await confirmModal(
+      turningOn
+        ? 'Back up your personal expenses to the cloud and sync them across your devices? Groups always sync while you’re signed in — this only affects your personal expenses.'
+        : 'Turn off sync and remove your personal expenses from the cloud? They’ll stay on this device only, and sync turns off on all your devices. Your groups keep syncing.',
+      {
+        title: turningOn ? 'Turn on personal sync' : 'Turn off personal sync',
+        confirmLabel: turningOn ? 'Turn on' : 'Turn off & remove',
+        danger: !turningOn,
+      }
+    );
+    if (!ok) {
+      // Cancelled — snap the checkbox back to its actual state.
+      e.target.checked = state.PREFS.cloudSync;
+      return;
+    }
+    if (turningOn) {
       await enableSync();
     } else {
-      state.PREFS.cloudSync = false;
-      persistPrefs();
+      // Wipe the cloud copy; if that fails, sync stays ON (disableSyncAndWipe
+      // leaves the flag untouched), and renderSyncUI restores the checkbox.
+      await disableSyncAndWipe();
     }
     renderSyncUI();
   };
 }
 
-// Turn sync on: upload current local records, then pull+merge. Re-renders the
-// sync toggle so its state reflects the newly-enabled sync everywhere.
+// Turn sync on: flip the server flag first (source of truth), then upload
+// current local records and pull+merge. Aborts (returns false) if the server
+// flag can't be set, so we never sync while the shared preference says off.
 async function enableSync() {
+  if (!(await setSyncFlag(true))) {
+    toastError('Could not turn on sync. Please try again.');
+    return false;
+  }
   const ok = await uploadAll();
   if (!ok) return false;
   state.PREFS.cloudSync = true;
@@ -161,6 +210,36 @@ async function enableSync() {
   await pullAndMerge();
   renderSyncUI();
   notifySynced();
+  return true;
+}
+
+// Turn sync off everywhere AND remove the user's personal expenses from the
+// cloud, leaving only the local copy. Flips the server flag off first (so other
+// devices stop syncing on their next login), then hard-deletes the cloud rows.
+// Returns false (leaving sync ON) if either the flag write or the delete fails,
+// so we never report "off" while the server still says on or data remains.
+// Local state.recs is never touched.
+async function disableSyncAndWipe() {
+  if (!cloudEnabled() || !state.user) {
+    // No cloud/user: nothing server-side to change, just flip the local flag.
+    state.PREFS.cloudSync = false;
+    persistPrefs();
+    return true;
+  }
+  if (!(await setSyncFlag(false))) {
+    toastError('Could not turn off sync, so it is still on. Please try again.');
+    return false; // abort — keep sync ON
+  }
+  const { error } = await supabase.from('personal_expenses').delete().eq('user_id', state.user.id);
+  if (error) {
+    console.error('sync wipe failed', error);
+    // Roll the flag back on so the state stays consistent (still syncing).
+    await setSyncFlag(true);
+    toastError('Could not remove your expenses from the cloud, so sync is still on. Please try again.');
+    return false; // abort — keep sync ON
+  }
+  state.PREFS.cloudSync = false;
+  persistPrefs();
   return true;
 }
 
@@ -185,15 +264,35 @@ function askUploadModal(count) {
   });
 }
 
-// Called once after login. If sync isn't already on and there are local records,
-// offer a one-time upload. If sync is already on, just pull+merge.
+// Called once after login. The user's server-side flag is the source of truth:
+//   - flag ON  -> mirror locally + pull/merge (sync stays on across devices).
+//   - flag OFF -> mirror locally; do NOT upload. If the user has never decided,
+//     offer the one-time upload prompt; a deliberate prior "off" is respected
+//     silently (no prompt), which is what makes "off everywhere" stick.
 export async function onLoginSync() {
   if (!cloudEnabled() || !state.user) return;
-  if (state.PREFS.cloudSync) {
+  const remote = await fetchSyncFlag();
+
+  if (remote) {
+    // Sync is on (possibly enabled on another device) — adopt it and merge.
+    state.PREFS.cloudSync = true;
+    persistPrefs();
     await pullAndMerge();
     notifySynced();
+    renderSyncUI();
     return;
   }
+
+  // Server says off. Ensure the local cache agrees (e.g. another device turned
+  // it off) — this device must not push.
+  if (state.PREFS.cloudSync) {
+    state.PREFS.cloudSync = false;
+    persistPrefs();
+    renderSyncUI();
+  }
+
+  // First-ever decision: offer to upload local records. If the user was already
+  // prompted before (or explicitly turned sync off), respect that and stay off.
   if (state.recs.length && !state.PREFS.syncPrompted) {
     state.PREFS.syncPrompted = true;
     persistPrefs();

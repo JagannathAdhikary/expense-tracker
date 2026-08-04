@@ -14,8 +14,11 @@ create table if not exists public.profiles (
   email        text,
   display_name text,
   avatar_url   text,
+  sync_enabled boolean not null default false,   -- server-authoritative personal-sync switch
   created_at   timestamptz not null default now()
 );
+-- For projects created before server-authoritative personal sync was added:
+alter table public.profiles add column if not exists sync_enabled boolean not null default false;
 
 create table if not exists public.groups (
   id          uuid primary key default gen_random_uuid(),
