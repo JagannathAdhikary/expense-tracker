@@ -1,6 +1,7 @@
 node_modules/
 dist/
 dev-dist/
+.vite/
 .DS_Store
 
 # Local Supabase credentials — never commit. Use .env.example as the template.

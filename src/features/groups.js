@@ -43,7 +43,7 @@ export async function loadCloudData() {
   // Groups I'm a member of. Filter to MY membership rows: RLS lets co-members see
   // each other, so an unfiltered select returns one row per member of each group
   // (which would make a group appear multiple times in the list).
-  const { data: memberships, error: mErr } = await supabase.from('group_members').select('group_id, role, groups(id, name, invite_code, icon, color)').eq('user_id', state.user.id);
+  const { data: memberships, error: mErr } = await supabase.from('group_members').select('group_id, role, groups(id, name, invite_code, icon, color, retired_at)').eq('user_id', state.user.id);
   if (mErr) {
     console.error('load groups failed', mErr);
     return;
@@ -69,6 +69,7 @@ export async function loadCloudData() {
     invite_code: m.groups.invite_code,
     icon: m.groups.icon || null,
     color: m.groups.color || null,
+    retired: !!m.groups.retired_at, // read-only when retired (no add / no settle)
     role: m.role,
     members: membersByGroup[m.group_id] || [],
   }));
@@ -146,6 +147,10 @@ export async function joinGroupByCode(code) {
 // `shares` is [{userId, share}] from computeSplits and sums exactly to `amount`.
 export async function saveGroupExpense({ groupId, amount, description, category, pay, spentOn, splitMode, shares }) {
   if (!cloudEnabled() || !state.user) return false;
+  if (groupIsRetired(groupId)) {
+    toastError('This group is retired — reactivate it to make changes.');
+    return false;
+  }
   const { data: exp, error } = await supabase
     .from('group_expenses')
     .insert({ group_id: groupId, payer_id: state.user.id, amount, description, category, pay, spent_on: spentOn, split_mode: splitMode })
@@ -179,6 +184,11 @@ export async function saveGroupExpense({ groupId, amount, description, category,
 // (except the payer's own, which stays 'done'), so re-splitting re-collects.
 export async function editGroupExpense({ expenseId, amount, description, category, pay, spentOn, splitMode, shares }) {
   if (!cloudEnabled() || !state.user) return false;
+  const existing = state.groupExpenses.find((e) => e.id === expenseId);
+  if (existing && groupIsRetired(existing.group_id)) {
+    toastError('This group is retired — reactivate it to make changes.');
+    return false;
+  }
   const { error: uErr } = await supabase
     .from('group_expenses')
     .update({ amount, description, category, pay, spent_on: spentOn, split_mode: splitMode })
@@ -217,6 +227,11 @@ export async function editGroupExpense({ expenseId, amount, description, categor
 // independent of any expense and are left intact.
 export async function deleteGroupExpense(expenseId) {
   if (!cloudEnabled() || !state.user) return false;
+  const existing = state.groupExpenses.find((e) => e.id === expenseId);
+  if (existing && groupIsRetired(existing.group_id)) {
+    toastError('This group is retired — reactivate it to make changes.');
+    return false;
+  }
   const { error } = await supabase.from('group_expenses').delete().eq('id', expenseId).eq('payer_id', state.user.id);
   if (error) {
     toastError('Could not delete: ' + error.message);
@@ -251,6 +266,24 @@ export async function deleteGroup(groupId) {
   return true;
 }
 
+// Retire (archive) or reactivate a group — owner only. A retired group is
+// read-only: no new expenses and no settling until it's reactivated. Sets
+// retired_at to now() / null. Scoped to the creator to enforce owner-only.
+export async function setGroupRetired(groupId, retired) {
+  if (!cloudEnabled() || !state.user) return false;
+  const retired_at = retired ? new Date().toISOString() : null;
+  const { error } = await supabase.from('groups').update({ retired_at }).eq('id', groupId).eq('created_by', state.user.id);
+  if (error) {
+    toastError(`Could not ${retired ? 'retire' : 'reactivate'} group: ` + error.message);
+    return false;
+  }
+  await loadCloudData();
+  return true;
+}
+
+// True when the given group is retired (read-only). Used to block mutations.
+const groupIsRetired = (groupId) => state.groups.some((g) => g.id === groupId && g.retired);
+
 // Update the current user's personal labels (category / payment / note) on their
 // own split of a group expense. Does not affect other members or the shared row.
 export async function updateMySplitMeta(splitId, { cat, pay, note }) {
@@ -268,6 +301,14 @@ export async function updateMySplitMeta(splitId, { cat, pay, note }) {
 // payment method they used to pay it back (their own, private to them).
 export async function markShareDone(splitId, pay = null) {
   if (!cloudEnabled() || !state.user) return;
+  // Block settling in a retired (read-only) group. Resolve the group via the
+  // split's expense: split → group_expenses.group_id.
+  const split = state.mySplits.find((s) => s.id === splitId);
+  const exp = split && state.groupExpenses.find((e) => e.id === split.expense_id);
+  if (exp && groupIsRetired(exp.group_id)) {
+    toastError('This group is retired — reactivate it to make changes.');
+    return;
+  }
   const patch = { status: 'done', settled_at: new Date().toISOString() };
   if (pay) patch.pay = pay;
   const { error } = await supabase.from('expense_splits').update(patch).eq('id', splitId).eq('debtor_id', state.user.id);
@@ -284,6 +325,10 @@ export async function markShareDone(splitId, pay = null) {
 // The net between us becomes 0. Idempotent (only touches 'pending' rows).
 export async function settleUpWithMember(groupId, otherId, pay = null) {
   if (!cloudEnabled() || !state.user) return;
+  if (groupIsRetired(groupId)) {
+    toastError('This group is retired — reactivate it to make changes.');
+    return;
+  }
   const uid = state.user.id;
   const expInGroup = state.groupExpenses.filter((e) => e.group_id === groupId);
   const theyPaid = new Set(expInGroup.filter((e) => e.payer_id === otherId).map((e) => e.id));
