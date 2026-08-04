@@ -63,7 +63,7 @@ export function renderGroupChips() {
   }
   $('igroupchips').innerHTML =
     `<div class="chip${state.selGroup === null ? ' on' : ''}" data-group="">Just me</div>` +
-    state.groups.map((g) => `<div class="chip${g.id === state.selGroup ? ' on' : ''}" data-group="${g.id}">👥 ${g.name}</div>`).join('');
+    state.groups.filter((g) => !g.retired).map((g) => `<div class="chip${g.id === state.selGroup ? ' on' : ''}" data-group="${g.id}">👥 ${g.name}</div>`).join('');
   renderSplitConfig();
 }
 
@@ -155,7 +155,13 @@ export function showAdd() {
 // "Just me" or other groups) — used by the + button on the group detail page.
 export function showAddForGroup(groupId) {
   showAdd();
-  if (!state.groups.some((g) => g.id === groupId)) return; // not a real group; leave as normal add
+  const g = state.groups.find((x) => x.id === groupId);
+  if (!g) return; // not a real group; leave as normal add
+  if (g.retired) {
+    // Retired groups are read-only; fall back to a normal (Just me) add.
+    toastError('This group is retired — reactivate it to add expenses.');
+    return;
+  }
   state.selGroup = groupId;
   state.groupPickLocked = true;
   renderGroupChips();

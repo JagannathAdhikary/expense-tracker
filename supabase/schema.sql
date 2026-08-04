@@ -23,12 +23,15 @@ create table if not exists public.groups (
   invite_code text not null unique,           -- short shareable code to join
   icon        text,                            -- emoji shown as the group's icon
   color       text,                            -- hex tile background for the icon
+  retired_at  timestamptz,                     -- when the group was retired (null = active)
   created_by  uuid not null references public.profiles(id) on delete cascade,
   created_at  timestamptz not null default now()
 );
 -- For projects created before group icon/color were added:
 alter table public.groups add column if not exists icon text;
 alter table public.groups add column if not exists color text;
+-- For projects created before group retiring (archive) was added:
+alter table public.groups add column if not exists retired_at timestamptz;
 
 create table if not exists public.group_members (
   group_id  uuid not null references public.groups(id) on delete cascade,
