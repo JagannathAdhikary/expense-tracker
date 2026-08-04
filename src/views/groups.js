@@ -7,7 +7,7 @@ import { cloudEnabled } from '../supabase.js';
 import { fmt } from '../format.js';
 import { friendlyDate, payBadge } from '../format.js';
 import { $ } from '../dom.js';
-import { loadCloudData, markShareDone, deleteGroupExpense, settleUpWithMember, deleteGroup } from '../features/groups.js';
+import { loadCloudData, markShareDone, deleteGroupExpense, settleUpWithMember, deleteGroup, setGroupRetired } from '../features/groups.js';
 import { openEditGroup, showAddForGroup } from './addEdit.js';
 import { expenseHasPayment, owedByUserInGroup, owedToUserInGroup, totalShareInGroup } from '../cloudrows.js';
 import { toastError, toastSuccess } from '../toast.js';
@@ -27,6 +27,26 @@ const groupColor = (g) => g.color || DEFAULT_GROUP_COLOR;
 function memberName(group, userId) {
   const m = group.members.find((x) => x.id === userId);
   return m ? m.name : 'Member';
+}
+
+// Colored initial-circle palette for avatar fallbacks (no photo). Deterministic
+// per user id so a person keeps the same color across expenses.
+const AVATAR_COLORS = ['#1E3A5F', '#1A6B3A', '#7D3C98', '#C0392B', '#D35400', '#0E6655', '#2874A6', '#B7950B', '#CA6F1E', '#5B2C6F'];
+function avatarColor(userId) {
+  const s = String(userId);
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length];
+}
+
+// Render a member's avatar (photo if available, else a colored initial circle).
+// `extraClass` lets callers size it (e.g. the expense-tile icon slot).
+function memberAvatar(group, userId, extraClass = '') {
+  const m = group.members.find((x) => x.id === userId);
+  const name = m ? m.name : 'Member';
+  const cls = `member-avatar${extraClass ? ' ' + extraClass : ''}`;
+  if (m && m.avatar) return `<span class="${cls}"><img src="${m.avatar}" alt="" referrerpolicy="no-referrer"/></span>`;
+  return `<span class="${cls}" style="background:${avatarColor(userId)}">${(name || '?').charAt(0).toUpperCase()}</span>`;
 }
 
 // Splits belonging to a given expense.
@@ -55,25 +75,46 @@ function dateTimeLabel(spentOn, createdAt) {
   return `${label} · ${time}`;
 }
 
+// Which group tab is showing in the popover: 'active' | 'retired'.
+let groupTab = 'active';
+
 function renderGroupList() {
   const wrap = $('groupList');
+  const active = state.groups.filter((g) => !g.retired);
+  const retired = state.groups.filter((g) => g.retired);
+
+  // Show the Retired tab only when some exist; if the retired tab is selected
+  // but nothing's left retired, fall back to active.
+  const retiredTab = $('grpTabs').querySelector('[data-tab="retired"]');
+  retiredTab.style.display = retired.length ? '' : 'none';
+  if (groupTab === 'retired' && !retired.length) groupTab = 'active';
+  $('grpTabs').querySelectorAll('.grp-tab').forEach((t) => t.classList.toggle('on', t.dataset.tab === groupTab));
+
   if (state.groups.length === 0) {
     wrap.innerHTML = '<div class="empty"><span>👥</span>No groups yet.<br>Create one or join with a code.</div>';
     return;
   }
-  wrap.innerHTML = state.groups
-    .map((g) => {
-      const expCount = state.groupExpenses.filter((e) => e.group_id === g.id).length;
-      return `<div class="txn group-row" data-group="${g.id}">
-        <div class="txn-ico" style="background:${groupColor(g)}20">${groupIcon(g)}</div>
-        <div class="txn-info">
-          <div class="txn-desc">${g.name}</div>
-          <div class="txn-meta">${g.members.length} member${g.members.length === 1 ? '' : 's'} · ${expCount} expense${expCount === 1 ? '' : 's'}</div>
-        </div>
-        <span class="chevron">›</span>
-      </div>`;
-    })
-    .join('');
+
+  const shown = groupTab === 'retired' ? retired : active;
+  if (!shown.length) {
+    wrap.innerHTML = '<div class="empty"><span>👥</span>No groups here.</div>';
+    return;
+  }
+
+  wrap.innerHTML = `<div class="group-tiles">` + shown.map(groupTile).join('') + `</div>`;
+}
+
+// A compact group tile: just the icon + truncated name, with a small label badge
+// on the icon showing whether MY balance in the group is clear or outstanding.
+function groupTile(g) {
+  const settled = owedByUserInGroup(g.id).total === 0 && owedToUserInGroup(g.id).total === 0;
+  return `<button class="group-tile${g.retired ? ' retired' : ''}" data-group="${g.id}">
+      <span class="gt-ico-wrap">
+        <span class="gt-ico txn-ico" style="background:${groupColor(g)}20">${groupIcon(g)}</span>
+        <span class="gt-flag ${settled ? 'is-settled' : 'is-owed'}">${settled ? 'Settled' : 'Due'}</span>
+      </span>
+      <span class="gt-name">${g.name}</span>
+    </button>`;
 }
 
 // Show a group expense's full details in a modal. Works for every expense:
@@ -129,14 +170,18 @@ function showExpenseDetail(expId) {
     $('breakdownList').innerHTML = '';
   }
 
-  // Action footer — a full-width "Mark done" for a pending share you owe, or a
-  // status badge once it's settled.
+  // Action footer — a full-width "Settle your share" for a pending share you
+  // owe, or a status badge once it's settled. In a retired (read-only) group the
+  // settle button is replaced by a plain "you owe" badge so no settle can start.
   const action = $('expDetailAction');
   if (mine && !iPaid) {
-    action.innerHTML =
-      mine.status === 'pending'
-        ? `<button class="exp-detail-settle" data-settle="${mine.id}">Settle your share ${fmt(mine.share_amount)}</button>`
-        : `<div class="exp-detail-done">Settled ${fmt(mine.share_amount)} ✓</div>`;
+    if (mine.status !== 'pending') {
+      action.innerHTML = `<div class="exp-detail-done">Settled ${fmt(mine.share_amount)} ✓</div>`;
+    } else if (g.retired) {
+      action.innerHTML = `<div class="exp-detail-owe">You owe ${fmt(mine.share_amount)}</div>`;
+    } else {
+      action.innerHTML = `<button class="exp-detail-settle" data-settle="${mine.id}">Settle your share ${fmt(mine.share_amount)}</button>`;
+    }
   } else {
     action.innerHTML = '';
   }
@@ -171,23 +216,28 @@ function openGroupIconModal() {
 function renderExpenseTile(e, g) {
   const mine = splitsFor(e.id).find((s) => s.debtor_id === state.user?.id);
   const iPaid = e.payer_id === state.user?.id;
+  // A retired group is read-only: no settle button and no edit/delete. A pending
+  // owed share still shows its "you owe" pill (below) so the balance is visible.
+  const readOnly = !!g.retired;
   // Status pill (compact, top-right). For a pending share you owe, the full
-  // "Settle" footer button below carries the amount, so no pill.
+  // "Settle" footer button below carries the amount, so no pill — unless the
+  // group is retired (no footer button), where we surface the owed pill instead.
   let status = '';
   if (mine && !iPaid) {
     if (mine.status !== 'pending') status = `<span class="pay-badge shared-done">settled ✓</span>`;
+    else if (readOnly) status = `<span class="pay-badge shared-pending">you owe ${fmt(mine.share_amount)}</span>`;
   } else if (iPaid) {
     const pend = splitsFor(e.id).filter((s) => s.debtor_id !== state.user?.id && s.status === 'pending').length;
     status = pend > 0 ? `<span class="pay-badge shared-pending">${pend} pending</span>` : `<span class="pay-badge shared-done">all settled</span>`;
   }
   // Full-width footer action: a pending share you owe gets its own settle
-  // button here (never truncated); everything else opens details on tap.
+  // button here (never truncated) — suppressed in a retired (read-only) group.
   const footer =
-    mine && !iPaid && mine.status === 'pending'
+    !readOnly && mine && !iPaid && mine.status === 'pending'
       ? `<button class="ge-settle-btn" data-settle="${mine.id}">Settle your share ${fmt(mine.share_amount)}</button>`
       : '';
-  const editBtn = iPaid ? `<button class="icon-btn gedit" data-gid="${e.id}" title="Edit" aria-label="Edit">${icon.edit({ size: 17 })}</button>` : '';
-  const delBtn = iPaid && !expenseHasPayment(e.id) ? `<button class="icon-btn gdel" data-gid="${e.id}" title="Delete" aria-label="Delete">${icon.trash({ size: 17 })}</button>` : '';
+  const editBtn = !readOnly && iPaid ? `<button class="icon-btn gedit" data-gid="${e.id}" title="Edit" aria-label="Edit">${icon.edit({ size: 17 })}</button>` : '';
+  const delBtn = !readOnly && iPaid && !expenseHasPayment(e.id) ? `<button class="icon-btn gdel" data-gid="${e.id}" title="Delete" aria-label="Delete">${icon.trash({ size: 17 })}</button>` : '';
   // Line 1: note/title. Line 2: "<Person> paid <amount>". Line 3: date · time.
   const who = iPaid ? 'You' : memberName(g, e.payer_id);
   const when = dateTimeLabel(e.spent_on, e.created_at);
@@ -198,7 +248,7 @@ function renderExpenseTile(e, g) {
   const rowClass = iPaid ? 'txn ge-row ge-paid ge-open' : mine && mine.status === 'pending' ? 'txn ge-row ge-owe ge-open' : 'txn ge-row ge-open';
   return `<div class="${rowClass}" data-exp-id="${e.id}" data-detail="${e.id}" role="button" tabindex="0" title="View details">
     <div class="ge-main">
-      <div class="txn-ico" style="background:#eef1f620">🧾</div>
+      ${memberAvatar(g, e.payer_id, 'ge-avatar')}
       <div class="txn-info">
         <div class="txn-desc">${e.description || 'Expense'}</div>
         <div class="txn-meta ge-payer">${who} paid ${fmt(e.amount)}${payBadge(payMethod)}</div>
@@ -219,20 +269,38 @@ function renderGroupDetail() {
     $('home').classList.add('active');
     return;
   }
-  $('groupDetailTitle').textContent = g.name;
+  // Cap the displayed name to 30 chars (ellipsis) — it may wrap to a 2nd line.
+  $('groupDetailTitle').textContent = g.name.length > 30 ? g.name.slice(0, 30).trimEnd() + '…' : g.name;
+  $('groupDetailTitle').title = g.name; // full name on hover
   $('groupInviteCode').textContent = g.invite_code;
-  $('copyCodeBtn').innerHTML = icon.copy({ size: 15 });
+  $('copyCodeBtn').innerHTML = icon.copy({ size: 14 });
+  const memCount = g.members.length;
+  $('groupMemberCount').innerHTML = `${icon.users({ size: 12 })} ${memCount} member${memCount === 1 ? '' : 's'}`;
   // Big group icon (tap to edit — any member).
   const bigIco = $('groupIconBig');
   bigIco.textContent = groupIcon(g);
   bigIco.style.background = groupColor(g) + '20';
   $('groupIconEditBadge').innerHTML = icon.edit({ size: 13 });
-  // Owner-only delete-group action in the header. Keep it in layout (hidden) for
+  // Owner-only header actions (retire + delete). Keep them in layout (hidden) for
   // non-owners so the title stays centered.
+  const retireBtn = $('retireGroupBtn');
+  retireBtn.innerHTML = icon.archive({ size: 18 });
+  retireBtn.title = g.retired ? 'Reactivate group' : 'Retire group';
+  retireBtn.setAttribute('aria-label', retireBtn.title);
+  retireBtn.style.display = '';
+  retireBtn.style.visibility = g.role === 'owner' ? 'visible' : 'hidden';
   const delGroupBtn = $('deleteGroupBtn');
   delGroupBtn.innerHTML = icon.trash({ size: 18 });
   delGroupBtn.style.display = '';
   delGroupBtn.style.visibility = g.role === 'owner' ? 'visible' : 'hidden';
+
+  // Retired (read-only) group: show a banner and hide the add-expense FAB.
+  if (g.retired) {
+    $('groupRetiredBanner').innerHTML = `<div class="retired-banner">${icon.archive({ size: 16 })}<span>This group is retired — read-only. Reactivate it to add expenses or settle.</span></div>`;
+  } else {
+    $('groupRetiredBanner').innerHTML = '';
+  }
+  $('groupAddBtn').closest('.fab').style.display = g.retired ? 'none' : '';
 
   // Your total share of this group: every split of yours, settled or not —
   // your part of what you spent plus everything you owe. Hidden when zero.
@@ -248,15 +316,17 @@ function renderGroupDetail() {
   }
 
   // "You owe" summary: per-creditor totals with a one-tap settle-all button.
+  // A retired group shows the amounts but no Settle button (read-only).
   const owe = owedByUserInGroup(g.id);
   if (owe.total > 0) {
     const rows = owe.byPayer
       .map((o) => {
         const name = memberName(g, o.payerId);
+        const settleBtn = g.retired ? '' : `<button class="owe-settle" data-payer="${o.payerId}">Settle</button>`;
         return `<div class="owe-row">
           <span class="owe-name">${name}</span>
           <span class="owe-amt">${fmt(o.amount)}</span>
-          <button class="owe-settle" data-payer="${o.payerId}">Settle</button>
+          ${settleBtn}
         </div>`;
       })
       .join('');
@@ -448,6 +518,21 @@ export function initGroupsView() {
     }
   };
 
+  // Owner retires / reactivates the group (read-only archive).
+  $('retireGroupBtn').onclick = async () => {
+    const g = state.groups.find((x) => x.id === state.openGroupId);
+    if (!g) return;
+    const msg = g.retired
+      ? `Reactivate "${g.name}"? Members will be able to add expenses and settle balances again.`
+      : `Retire "${g.name}"? It becomes read-only — no new expenses and no settling — but stays viewable, and you can reactivate it anytime.`;
+    if (!(await confirmModal(msg, { title: g.retired ? 'Reactivate group' : 'Retire group', confirmLabel: g.retired ? 'Reactivate' : 'Retire' }))) return;
+    const ok = await setGroupRetired(g.id, !g.retired);
+    if (ok) {
+      renderGroupDetail();
+      toastSuccess(g.retired ? 'Group reactivated' : 'Group retired');
+    }
+  };
+
   // Owner deletes the whole group.
   $('deleteGroupBtn').onclick = async () => {
     const g = state.groups.find((x) => x.id === state.openGroupId);
@@ -469,8 +554,16 @@ export function initGroupsView() {
   };
 
   $('groupList').addEventListener('click', (e) => {
-    const row = e.target.closest('.group-row');
-    if (row) showGroupDetail(row.dataset.group);
+    const tile = e.target.closest('.group-tile');
+    if (tile) showGroupDetail(tile.dataset.group);
+  });
+
+  // Tab switch between Active and Retired groups.
+  $('grpTabs').addEventListener('click', (e) => {
+    const tab = e.target.closest('.grp-tab');
+    if (!tab) return;
+    groupTab = tab.dataset.tab;
+    renderGroupList();
   });
 
   // Copy the invite code to the clipboard.

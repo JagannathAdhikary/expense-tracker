@@ -73,15 +73,24 @@
 <div id="groups" class="screen">
   <header>
     <button class="back-btn" id="groupsBackBtn" aria-label="Back"></button>
-    <h1 id="groupDetailTitle">Group</h1>
-    <button class="back-btn danger-icon" id="deleteGroupBtn" aria-label="Delete group" style="display:none"></button>
+    <div class="group-head">
+      <button class="group-icon-btn" id="groupIconBtn" aria-label="Change group icon">
+        <span class="txn-ico" id="groupIconBig">👥</span>
+        <span class="group-icon-edit" id="groupIconEditBadge"></span>
+      </button>
+      <div class="group-head-info">
+        <h1 class="group-head-name" id="groupDetailTitle">Group</h1>
+        <div class="group-head-meta" id="groupMemberCount"></div>
+        <div class="group-head-code">Code: <span id="groupInviteCode"></span><button class="copy-btn" id="copyCodeBtn" aria-label="Copy code"></button></div>
+      </div>
+    </div>
+    <div class="group-head-actions">
+      <button class="back-btn" id="retireGroupBtn" aria-label="Retire group" style="display:none"></button>
+      <button class="back-btn danger-icon" id="deleteGroupBtn" aria-label="Delete group" style="display:none"></button>
+    </div>
   </header>
   <div id="groupDetail">
-    <button class="group-icon-btn" id="groupIconBtn" aria-label="Change group icon">
-      <span class="txn-ico" id="groupIconBig">👥</span>
-      <span class="group-icon-edit" id="groupIconEditBadge"></span>
-    </button>
-    <p class="section-title" style="text-align:center;margin-top:6px">Invite code: <span id="groupInviteCode" style="text-transform:none;color:#1E3A5F;font-weight:600"></span><button class="copy-btn" id="copyCodeBtn" aria-label="Copy code"></button></p>
+    <div id="groupRetiredBanner"></div>
     <div id="groupTotal"></div>
     <div id="groupOwe"></div>
     <div id="groupOwedTo"></div>
@@ -100,7 +109,10 @@
     </div>
     <p id="groupsAuthGate" class="auth-note" style="display:none"></p>
     <div id="groupsContent" style="display:none">
-      <p class="section-title">Your groups</p>
+      <div class="grp-tabs" id="grpTabs">
+        <button class="grp-tab on" data-tab="active">Active</button>
+        <button class="grp-tab" data-tab="retired" style="display:none">Retired</button>
+      </div>
       <div id="groupList" style="margin-bottom:14px"></div>
       <div class="grp-actions">
         <div class="grp-action-row">
