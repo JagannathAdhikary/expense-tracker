@@ -210,10 +210,13 @@ drop policy if exists members_select on public.group_members;
 create policy members_select on public.group_members
   for select using (public.is_group_member(group_id));
 
--- A user may add THEMSELVES to a group (join by code); owner adds self on create.
+-- A user may add THEMSELVES (join by code), and any existing member may add
+-- others to a group they belong to (add-by-friend). The added user_id must be a
+-- real profile (FK enforces that); the search UI only surfaces the adder's friends.
 drop policy if exists members_insert_self on public.group_members;
-create policy members_insert_self on public.group_members
-  for insert with check (user_id = auth.uid());
+drop policy if exists members_insert on public.group_members;
+create policy members_insert on public.group_members
+  for insert with check (user_id = auth.uid() or public.is_group_member(group_id));
 
 drop policy if exists members_delete_self on public.group_members;
 create policy members_delete_self on public.group_members

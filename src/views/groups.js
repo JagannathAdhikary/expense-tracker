@@ -7,11 +7,12 @@ import { cloudEnabled } from '../supabase.js';
 import { fmt } from '../format.js';
 import { friendlyDate, payBadge } from '../format.js';
 import { $ } from '../dom.js';
-import { loadCloudData, markShareDone, deleteGroupExpense, settleUpWithMember, deleteGroup, setGroupRetired } from '../features/groups.js';
+import { loadCloudData, markShareDone, deleteGroupExpense, settleUpWithMember, deleteGroup, setGroupRetired, myFriends, addMemberToGroup } from '../features/groups.js';
 import { openEditGroup, showAddForGroup } from './addEdit.js';
 import { expenseHasPayment, owedByUserInGroup, owedToUserInGroup, totalShareInGroup } from '../cloudrows.js';
 import { toastError, toastSuccess } from '../toast.js';
 import { icon } from '../icons.js';
+import { matchFriends } from '../friends.js';
 import { confirmModal, pickSettlePayment } from '../confirm.js';
 import { setGroupIcon, renameGroup } from '../features/groups.js';
 import { navTo, navBack } from '../nav.js';
@@ -424,6 +425,17 @@ function renderGroupDetail() {
     $('groupOwedTo').innerHTML = '';
   }
 
+  // Members list + count. The "Add member" button lives in the section header
+  // (hidden on retired groups). Any member may add friends.
+  $('groupMembersCount').textContent = g.members.length ? `· ${g.members.length}` : '';
+  $('groupMembersList').innerHTML = g.members
+    .map((m) => {
+      const you = m.id === state.user?.id ? ' (you)' : '';
+      return `<div class="member-row">${memberAvatar(g, m.id, 'member-row-av')}<span class="member-row-name">${m.name}${you}</span></div>`;
+    })
+    .join('');
+  $('addMemberBtn').style.display = g.retired ? 'none' : '';
+
   // Expense list, grouped by day with collapsible date headers (like the home
   // list). `exps` is already newest-first, so iterating preserves date order.
   if (!exps.length) {
@@ -525,6 +537,32 @@ export function showGroupDetail(id, focusExpId = null) {
 export function refreshGroupsView() {
   if ($('groupsOverlay').classList.contains('open') && state.user) renderGroupList();
   if ($('groups').classList.contains('active') && state.openGroupId) renderGroupDetail();
+}
+
+// ---- Member picker (add friends by name / number) --------------------------
+
+// Render the search results into the picker for the currently-open group.
+function renderMemberResults() {
+  const q = $('memberSearch').value;
+  const friends = myFriends(state.openGroupId); // excludes self + current members
+  const results = matchFriends(friends, q);
+  if (!q.trim()) {
+    // No query: show all addable friends (or a hint if none).
+    $('memberResults').innerHTML = friends.length
+      ? friends.map(memberResultRow).join('')
+      : '<div class="member-empty">No friends to add yet. Share the invite link below.</div>';
+    return;
+  }
+  $('memberResults').innerHTML = results.length
+    ? results.map(memberResultRow).join('')
+    : '<div class="member-empty">No match among your friends. They may not be on the app yet — share the invite link.</div>';
+}
+
+function memberResultRow(f) {
+  const av = f.avatar
+    ? `<span class="member-row-av member-avatar"><img src="${f.avatar}" alt="" referrerpolicy="no-referrer"/></span>`
+    : `<span class="member-row-av member-avatar" style="background:${avatarColor(f.id)}">${(f.name || '?').charAt(0).toUpperCase()}</span>`;
+  return `<button class="member-result" data-add="${f.id}">${av}<span class="member-row-name">${f.name}</span><span class="member-add-plus">+</span></button>`;
 }
 
 export function initGroupsView() {
@@ -669,6 +707,39 @@ export function initGroupsView() {
       }
     }
   };
+
+  // --- Add-member picker ---
+  $('addMemberBtn').onclick = () => {
+    $('memberSearch').value = '';
+    renderMemberResults();
+    $('memberModal').classList.add('open');
+    setTimeout(() => $('memberSearch').focus(), 60);
+  };
+  $('memberSearch').addEventListener('input', renderMemberResults);
+  $('memberResults').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-add]');
+    if (!btn) return;
+    const ok = await addMemberToGroup(state.openGroupId, btn.dataset.add);
+    if (ok) {
+      renderGroupDetail();
+      renderMemberResults(); // refresh so the added person drops out of results
+      toastSuccess('Member added');
+    }
+  });
+  $('memberInviteBtn').onclick = () => $('shareGroupBtn').click(); // reuse the invite-share flow
+  $('memberClose').onclick = () => $('memberModal').classList.remove('open');
+  $('memberModal').onclick = (e) => {
+    if (e.target === $('memberModal')) $('memberModal').classList.remove('open');
+  };
+
+  // Just created a group -> open it and pop the Add-member picker so you can add
+  // friends right away (falls back to the invite link for people not on the app).
+  document.addEventListener('group-created', (e) => {
+    const id = e.detail?.id;
+    if (!id) return;
+    showGroupDetail(id);
+    setTimeout(() => $('addMemberBtn')?.click(), 250);
+  });
 
   $('groupOwe').addEventListener('click', async (e) => {
     const btn = e.target.closest('.owe-settle');

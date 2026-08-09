@@ -79,6 +79,23 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 /* The "Show" scope chips use data-scope (not data-pay), so the data-pay color rules
    don't apply — give the selected one an explicit accent highlight. */
 #fltScope .pay-chip.on{background:var(--grad-accent);color:#fff;border-color:transparent;box-shadow:0 3px 10px rgba(30,58,95,.25)}
+/* Group members section + add-member picker. */
+.group-members-head{display:flex;align-items:center;justify-content:space-between;margin-top:14px;margin-bottom:.6rem}
+.group-members-head .hdr-btn{height:32px;padding:0 12px;font-size:12.5px}
+.section-sub{text-transform:none;color:var(--ink-mute);font-weight:500}
+#groupMembersList{display:flex;flex-direction:column;gap:2px;margin-bottom:6px}
+.member-row{display:flex;align-items:center;gap:10px;padding:6px 2px}
+.member-row-av{width:28px;height:28px;font-size:12px}
+.member-row-name{font-size:14px;color:var(--ink)}
+.member-results{max-height:min(46vh,320px);overflow-y:auto;display:flex;flex-direction:column;gap:4px;margin:4px 0}
+.member-result{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:none;background:var(--bg-2);border-radius:var(--radius-sm);padding:9px 12px;cursor:pointer}
+.member-result:active{opacity:.7}
+.member-result .member-row-av{width:32px;height:32px}
+.member-result .member-row-name{flex:1}
+.member-add-plus{font-size:20px;font-weight:700;color:var(--accent)}
+.member-empty{font-size:13px;color:var(--ink-soft);padding:12px 4px;text-align:center}
+#memberSearch{width:100%;padding:12px 14px;font-size:15px;border:1.5px solid var(--line);border-radius:var(--radius-sm);background:var(--surface)}
+#memberSearch:focus{outline:none;border-color:var(--accent)}
 /* Add/Edit form: chip rows (category, payment, group, split-mode) scroll
    horizontally on one line instead of wrapping. Keeps the form compact. */
 .form .chips,

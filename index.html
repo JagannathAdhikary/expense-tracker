@@ -180,6 +180,11 @@
     <div id="groupTotal"></div>
     <div id="groupOwe"></div>
     <div id="groupOwedTo"></div>
+    <div class="group-members-head">
+      <p class="section-title" style="margin:0">Members <span id="groupMembersCount" class="section-sub"></span></p>
+      <button class="hdr-btn" id="addMemberBtn">+ Add member</button>
+    </div>
+    <div id="groupMembersList"></div>
     <p class="section-title" style="margin-top:14px">Expenses</p>
     <div id="groupExpenseList"></div>
   </div>
@@ -472,6 +477,22 @@
 </div>
 
 <!-- GROUP ICON EDITOR MODAL -->
+<!-- MEMBER PICKER (add friends by name / number) -->
+<div class="modal" id="memberModal">
+  <div class="modal-box">
+    <h3>Add members</h3>
+    <p class="modal-note">Search friends by name, or type their 10-digit mobile number. Not on the app yet? Share the invite link.</p>
+    <div class="field">
+      <input type="text" id="memberSearch" placeholder="Name or mobile number" autocomplete="off"/>
+    </div>
+    <div id="memberResults" class="member-results"></div>
+    <button class="sheet-btn" id="memberInviteBtn" style="width:100%;justify-content:center;border:1.5px dashed var(--line);border-radius:var(--radius-sm);margin-top:4px"><span class="sb-ico" data-icon="share"></span> Share invite link instead</button>
+    <div class="modal-actions">
+      <button id="memberClose">Done</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="profileModal">
   <div class="modal-box">
     <h3 id="profileModalTitle">Complete your profile</h3>
