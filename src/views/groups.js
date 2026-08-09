@@ -7,7 +7,7 @@ import { cloudEnabled } from '../supabase.js';
 import { fmt } from '../format.js';
 import { friendlyDate, payBadge } from '../format.js';
 import { $ } from '../dom.js';
-import { loadCloudData, markShareDone, deleteGroupExpense, settleUpWithMember, deleteGroup, setGroupRetired, myFriends, addMemberToGroup } from '../features/groups.js';
+import { loadCloudData, markShareDone, deleteGroupExpense, settleUpWithMember, deleteGroup, setGroupRetired, myFriends, addMemberToGroup, findUserByPhone } from '../features/groups.js';
 import { openEditGroup, showAddForGroup } from './addEdit.js';
 import { expenseHasPayment, owedByUserInGroup, owedToUserInGroup, totalShareInGroup } from '../cloudrows.js';
 import { toastError, toastSuccess } from '../toast.js';
@@ -28,6 +28,13 @@ const DEFAULT_GROUP_COLOR = '#1E3A5F';
 
 const groupIcon = (g) => g.icon || DEFAULT_GROUP_ICON;
 const groupColor = (g) => g.color || DEFAULT_GROUP_COLOR;
+
+// Inner content for a group's icon slot: the uploaded photo if present, else the
+// emoji on its color tile. `cls` lets callers size the slot.
+function groupIconInner(g) {
+  if (g.photo) return `<img class="gt-photo" src="${g.photo}" alt="" referrerpolicy="no-referrer"/>`;
+  return groupIcon(g);
+}
 
 function memberName(group, userId) {
   const m = group.members.find((x) => x.id === userId);
@@ -158,7 +165,7 @@ function groupTile(g) {
   const flag = !hasExpenses ? '' : `<span class="gt-flag ${settled ? 'is-settled' : 'is-owed'}">${settled ? 'Settled' : 'Due'}</span>`;
   return `<button class="group-tile${g.retired ? ' retired' : ''}" data-group="${g.id}">
       <span class="gt-ico-wrap">
-        <span class="gt-ico txn-ico" style="background:${groupColor(g)}20">${groupIcon(g)}</span>
+        <span class="gt-ico txn-ico${g.photo ? ' has-photo' : ''}" style="background:${groupColor(g)}20">${groupIconInner(g)}</span>
         ${flag}
       </span>
       <span class="gt-name">${g.name}</span>
@@ -326,10 +333,15 @@ function renderGroupDetail() {
   $('shareGroupBtn').innerHTML = icon.share({ size: 14 });
   const memCount = g.members.length;
   $('groupMemberCount').innerHTML = `${icon.users({ size: 12 })} ${memCount} member${memCount === 1 ? '' : 's'}`;
-  // Big group icon (tap to edit — any member).
+  // Big group icon (tap to edit — any member). Photo if set, else emoji tile.
   const bigIco = $('groupIconBig');
-  bigIco.textContent = groupIcon(g);
-  bigIco.style.background = groupColor(g) + '20';
+  if (g.photo) {
+    bigIco.innerHTML = `<img class="gt-photo" src="${g.photo}" alt="" referrerpolicy="no-referrer"/>`;
+    bigIco.style.background = 'transparent';
+  } else {
+    bigIco.textContent = groupIcon(g);
+    bigIco.style.background = groupColor(g) + '20';
+  }
   $('groupIconEditBadge').innerHTML = icon.edit({ size: 13 });
   // Owner-only header actions (retire + delete). Keep them in layout (hidden) for
   // non-owners so the title stays centered.
@@ -541,21 +553,33 @@ export function refreshGroupsView() {
 
 // ---- Member picker (add friends by name / number) --------------------------
 
-// Render the search results into the picker for the currently-open group.
-function renderMemberResults() {
+let memberSearchSeq = 0;
+
+// Render search results for the picker. Friends match by name or number locally;
+// a full 10-digit number with no friend match falls back to the exact-user RPC so
+// you can add anyone registered (not just existing friends).
+async function renderMemberResults() {
+  const seq = ++memberSearchSeq;
   const q = $('memberSearch').value;
   const friends = myFriends(state.openGroupId); // excludes self + current members
-  const results = matchFriends(friends, q);
   if (!q.trim()) {
-    // No query: show all addable friends (or a hint if none).
     $('memberResults').innerHTML = friends.length
       ? friends.map(memberResultRow).join('')
-      : '<div class="member-empty">No friends to add yet. Share the invite link below.</div>';
+      : '<div class="member-empty">No friends to add yet. Search by mobile number, or share the invite link below.</div>';
     return;
   }
+  let results = matchFriends(friends, q);
+  if (!results.length && q.replace(/\D/g, '').length >= 10) {
+    const u = await findUserByPhone(q);
+    // Skip if this result is already a member of the open group.
+    const g = state.groups.find((x) => x.id === state.openGroupId);
+    const already = u && g && g.members.some((m) => m.id === u.id);
+    if (u && !already) results = [{ id: u.id, name: u.name, avatar: u.avatar, phone: null }];
+  }
+  if (seq !== memberSearchSeq) return; // a newer keystroke superseded this one
   $('memberResults').innerHTML = results.length
     ? results.map(memberResultRow).join('')
-    : '<div class="member-empty">No match among your friends. They may not be on the app yet — share the invite link.</div>';
+    : '<div class="member-empty">No match. They may not be on the app yet — share the invite link.</div>';
 }
 
 function memberResultRow(f) {
@@ -732,14 +756,6 @@ export function initGroupsView() {
     if (e.target === $('memberModal')) $('memberModal').classList.remove('open');
   };
 
-  // Just created a group -> open it and pop the Add-member picker so you can add
-  // friends right away (falls back to the invite link for people not on the app).
-  document.addEventListener('group-created', (e) => {
-    const id = e.detail?.id;
-    if (!id) return;
-    showGroupDetail(id);
-    setTimeout(() => $('addMemberBtn')?.click(), 250);
-  });
 
   $('groupOwe').addEventListener('click', async (e) => {
     const btn = e.target.closest('.owe-settle');

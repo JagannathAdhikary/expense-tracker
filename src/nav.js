@@ -9,7 +9,7 @@
 
 import { $ } from './dom.js';
 
-const SCREENS = ['home', 'catview', 'analytics', 'groups', 'add'];
+const SCREENS = ['home', 'catview', 'analytics', 'groups', 'add', 'newGroup'];
 const stack = []; // screen ids visited, oldest first; last = current
 
 // The screen currently marked active in the DOM (source of truth on first use).

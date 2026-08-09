@@ -106,6 +106,38 @@
   <div class="an-trend" id="anTrend"></div>
 </div>
 
+<!-- NEW GROUP (full-screen create) -->
+<div id="newGroup" class="screen">
+  <header>
+    <button class="back-btn" id="ngBackBtn" aria-label="Back"></button>
+    <h1>New group</h1>
+    <span style="width:40px"></span>
+  </header>
+  <div class="ng-body">
+    <div class="ng-icon-row">
+      <button type="button" class="ng-icon" id="ngIcon" aria-label="Group icon"><span id="ngIconInner">👥</span></button>
+      <button type="button" class="ng-photo-btn" id="ngPhotoBtn">Add photo</button>
+      <input type="file" id="ngPhotoInput" accept="image/*" style="display:none"/>
+    </div>
+    <div class="field">
+      <label>Group name</label>
+      <input type="text" id="ngName" placeholder="e.g. Trip to Goa" maxlength="40"/>
+      <div class="field-err" id="ngNameErr" style="display:none"></div>
+    </div>
+    <div class="field">
+      <label>Icon color</label>
+      <div class="color-swatches" id="ngSwatches"></div>
+    </div>
+    <div class="field">
+      <label>Add members <span style="font-size:11px;opacity:.5">(optional)</span></label>
+      <input type="text" id="ngMemberSearch" placeholder="Friend's name or mobile number" autocomplete="off"/>
+      <div id="ngMemberResults" class="member-results"></div>
+      <div id="ngSelected" class="ng-selected"></div>
+    </div>
+    <button class="save-btn" id="ngCreateBtn">Create group</button>
+  </div>
+</div>
+
 <!-- ONBOARDING (full-screen profile journey) -->
 <div id="onboarding" class="screen ob-screen">
   <div class="ob-progress"><div class="ob-progress-fill" id="obProgress"></div></div>
@@ -205,16 +237,7 @@
         <button class="grp-tab" data-tab="retired" style="display:none">Retired</button>
       </div>
       <div id="groupList" style="margin-bottom:14px"></div>
-      <div class="grp-actions">
-        <div class="grp-action-row">
-          <input type="text" id="grpNameInput" placeholder="New group name" maxlength="40"/>
-          <button class="hdr-btn primary" id="grpCreateBtn">Create</button>
-        </div>
-        <div class="grp-action-row">
-          <input type="text" id="grpCodeInput" placeholder="Join with code" maxlength="6" style="text-transform:uppercase"/>
-          <button class="hdr-btn" id="grpJoinBtn">Join</button>
-        </div>
-      </div>
+      <button class="hdr-btn primary grp-create-full" id="grpCreateBtn">+ Create group</button>
     </div>
   </div>
 </div>

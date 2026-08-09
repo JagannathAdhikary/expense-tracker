@@ -20,6 +20,7 @@ import { initBackup } from './features/backup.js';
 import { initFilter } from './features/filter.js';
 import { initProfile, loadMyProfile, refreshUpiButton } from './features/profile.js';
 import { initOnboarding, onboardingIfNeeded } from './features/onboarding.js';
+import { initNewGroup } from './views/newGroup.js';
 import { autoEnablePush, enablePush, disablePush, isSubscribed, pushStatus, pushSupported } from './features/push.js';
 import { initAuth, onAuthChange } from './features/auth.js';
 import { initGroupsFeature, loadCloudData, onGroupData, subscribeRealtime, unsubscribeRealtime, joinGroupByCode } from './features/groups.js';
@@ -80,6 +81,7 @@ initOnboarding();
 initAuth();
 initGroupsFeature();
 initGroupsView();
+initNewGroup();
 
 // React to sign in / out: load or clear cloud data, (un)subscribe to realtime,
 // update the header actions, and run personal-expense sync.

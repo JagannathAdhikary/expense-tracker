@@ -533,44 +533,8 @@ export function initGroupsFeature() {
   const createBtn = $('grpCreateBtn');
   if (!createBtn) return; // markup not present
 
-  // Run an async button action with a busy state (disabled + label) to prevent
-  // accidental double-submits during the network round-trip.
-  const withBusy = async (btn, busyLabel, fn) => {
-    if (btn.disabled) return;
-    const orig = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = busyLabel;
-    try {
-      await fn();
-    } finally {
-      btn.disabled = false;
-      btn.textContent = orig;
-    }
+  // "Create group" opens the full-screen New Group page (handled by the view).
+  $('grpCreateBtn').onclick = () => {
+    document.dispatchEvent(new CustomEvent('open-new-group'));
   };
-
-  $('grpCreateBtn').onclick = () =>
-    withBusy($('grpCreateBtn'), 'Creating…', async () => {
-      const name = $('grpNameInput').value.trim();
-      if (!name) {
-        $('grpNameInput').focus();
-        return;
-      }
-      const grp = await createGroup(name);
-      if (grp) {
-        $('grpNameInput').value = '';
-        // Jump into the new group and prompt to add members (handled by the view).
-        document.dispatchEvent(new CustomEvent('group-created', { detail: { id: grp.id } }));
-      }
-    });
-
-  $('grpJoinBtn').onclick = () =>
-    withBusy($('grpJoinBtn'), 'Joining…', async () => {
-      const code = $('grpCodeInput').value.trim();
-      if (!code) {
-        $('grpCodeInput').focus();
-        return;
-      }
-      const grp = await joinGroupByCode(code);
-      if (grp) $('grpCodeInput').value = '';
-    });
 }
