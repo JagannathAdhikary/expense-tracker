@@ -19,6 +19,13 @@ export const state = {
   editId: null,
   cur: startOfMonth(), // current month being viewed (day pinned to 1)
   filterCat: null, // when set, category-detail view is active
+  // Home transaction-list filter (via the Filter button). Empty = show everything.
+  filter: {
+    scope: 'all', // 'all' | 'group' | 'personal'
+    cats: [], // category names to include (empty = all)
+    groupId: null, // a specific group id to restrict to (null = any)
+    pays: [], // payment-method names to include (empty = all)
+  },
   newCatColor: null, // pending color while adding a category
 
   // --- Collaboration (cloud) ---

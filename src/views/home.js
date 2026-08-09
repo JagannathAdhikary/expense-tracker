@@ -1,15 +1,20 @@
-// Home screen: month summary, category bars, and the recent transaction list.
+// Home screen: month summary, the recent transaction list, and the filter bar.
+// (Category breakdown lives on the Analytics page now.)
 
 import { state } from '../state.js';
 import { MN } from '../constants.js';
-import { fmt, filtered, catByName } from '../format.js';
+import { fmt, filtered, applyFilter, filterActive } from '../format.js';
 import { $ } from '../dom.js';
 import { renderDateGroups, attachListHandler } from './list.js';
-import { showCategoryView, renderCategoryView } from './category.js';
+import { renderCategoryView } from './category.js';
+import { showAnalytics } from './analytics.js';
+import { openFilterSheet, filterSummary, clearFilter } from '../features/filter.js';
 import { showEdit, openEditGroup, openEditMySplit } from './addEdit.js';
 import { showGroupDetail } from './groups.js';
-import { sharedRowsForMonth, sharedMonthTotal, expenseHasPayment } from '../cloudrows.js';
+import { navReset } from '../nav.js';
+import { sharedRowsForMonth, expenseHasPayment } from '../cloudrows.js';
 import { markShareDone, deleteGroupExpense } from '../features/groups.js';
+import { icon } from '../icons.js';
 import { toastError } from '../toast.js';
 import { confirmModal, pickSettlePayment } from '../confirm.js';
 
@@ -20,17 +25,20 @@ export function render() {
   // Sort by day (newest first), then by actual timestamp within the day so group
   // and personal txns interleave by when they happened — not group-always-on-top.
   const rowTs = (r) => (r.shared ? r.ts : r.updated || r.id || new Date(r.date).getTime());
-  const rows = [...personal, ...shared].sort((a, b) => new Date(b.date) - new Date(a.date) || rowTs(b) - rowTs(a));
+  const allRows = [...personal, ...shared].sort((a, b) => new Date(b.date) - new Date(a.date) || rowTs(b) - rowTs(a));
+  // Apply the active filter (category / group / scope / payment) to what's shown.
+  const rows = applyFilter(allRows);
 
-  // Spent total: personal + settled/paid shared (pending owed rows excluded).
-  const total = personal.reduce((s, r) => s + r.amt, 0) + sharedMonthTotal(state.cur);
+  // Spent total + transaction counts, computed from the FILTERED rows so they match
+  // what's on screen. Pending "you owe" rows (negative) are excluded from the total.
+  const total = rows.filter((r) => !r.pending).reduce((s, r) => s + r.amt, 0);
   $('tot').textContent = fmt(total);
 
-  // Transactions box: when group expenses are in view, show a Settled | Pending
-  // split (color-coded) instead of a plain total count.
-  // Unsettled = a share you still owe, or one you paid that others haven't settled.
-  const unsettled = shared.filter((r) => r.pending || r.badge?.cls === 'shared-pending').length;
-  if (shared.length) {
+  // Transactions box: when group rows are in view, show Settled | Pending instead
+  // of a plain count. Unsettled = a share you owe, or one you paid others haven't.
+  const sharedShown = rows.filter((r) => r.shared);
+  const unsettled = sharedShown.filter((r) => r.pending || r.badge?.cls === 'shared-pending').length;
+  if (sharedShown.length) {
     $('cnt').style.display = 'none';
     $('splitCounts').style.display = 'flex';
     $('scSettled').textContent = rows.length - unsettled;
@@ -41,48 +49,31 @@ export function render() {
     $('splitCounts').style.display = 'none';
   }
 
-  // Category bars — from personal + non-pending shared rows (owed rows don't count yet).
-  const byc = {};
-  personal.forEach((r) => {
-    byc[r.cat] = (byc[r.cat] || 0) + r.amt;
-  });
-  shared.forEach((r) => {
-    if (!r.pending) byc[r.cat] = (byc[r.cat] || 0) + r.amt;
-  });
-  const catSec = $('cat-section');
-  const catNames = Object.keys(byc);
-  catSec.style.display = catNames.length ? 'block' : 'none';
-  const mx = Math.max(...Object.values(byc), 1);
-  const cbars = $('cbars');
-  cbars.innerHTML = '';
-  // Ordered: CATS list first (as configured), then any leftover names from records.
-  const ordered = state.CATS.map((c) => c.n).filter((n) => byc[n] != null);
-  catNames.forEach((n) => {
-    if (!ordered.includes(n)) ordered.push(n);
-  });
-  ordered.forEach((name) => {
-    const c = catByName(name);
-    const pct = Math.round((byc[name] / mx) * 100);
-    const d = document.createElement('div');
-    d.className = 'cat-row';
-    d.dataset.cat = name;
-    d.innerHTML = `<div class="cname">${c.e} ${c.n}</div><div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${c.c}"></div></div><div class="camt">${fmt(byc[name])}</div>`;
-    cbars.appendChild(d);
-  });
+  // Filter bar: shown only when a filter is active, with a summary + clear button.
+  const bar = $('filterBar');
+  if (filterActive()) {
+    bar.style.display = 'flex';
+    bar.innerHTML = `<span class="fb-summary">${filterSummary()}</span><button class="fb-clear" id="clearFilterBtn">Clear</button>`;
+  } else {
+    bar.style.display = 'none';
+    bar.innerHTML = '';
+  }
+  // Reflect active state on the filter button.
+  $('filterBtn').classList.toggle('has-filter', filterActive());
 
   const tlist = $('tlist');
   if (!rows.length) {
-    tlist.innerHTML = '<div class="empty"><span>🧾</span>No expenses this month.<br>Tap + to add one.</div>';
+    tlist.innerHTML = filterActive()
+      ? '<div class="empty"><span>🔍</span>No transactions match this filter.</div>'
+      : '<div class="empty"><span>🧾</span>No expenses this month.<br>Tap + to add one.</div>';
     return;
   }
   renderDateGroups(rows, tlist);
 }
 
 export function showHome() {
-  $('add').classList.remove('active');
-  $('catview').classList.remove('active');
   state.filterCat = null;
-  $('home').classList.add('active');
+  navReset('home'); // home is the root of the nav stack
   render();
 }
 
@@ -93,10 +84,18 @@ function rerender() {
 }
 
 export function initHome() {
-  // Home category-bar clicks -> filtered category view.
-  $('cbars').addEventListener('click', (e) => {
-    const row = e.target.closest('.cat-row');
-    if (row) showCategoryView(row.dataset.cat);
+  // Tappable Total card -> Analytics page (chart icon in the corner as the cue).
+  $('analyticsIco').innerHTML = icon.chart({ size: 18 });
+  $('analyticsCard').onclick = showAnalytics;
+  // Filter button opens the filter sheet; onApply re-renders the list.
+  $('filterBtn').innerHTML = icon.filter({ size: 18 });
+  $('filterBtn').onclick = () => openFilterSheet(render);
+  // Clear-filter chip (delegated — the bar is re-rendered each time).
+  $('filterBar').addEventListener('click', (e) => {
+    if (e.target.closest('#clearFilterBtn')) {
+      clearFilter();
+      render();
+    }
   });
   attachListHandler($('tlist'), {
     onEdit: showEdit,

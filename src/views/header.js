@@ -40,7 +40,7 @@ export function initHeader() {
   const addBtn = $('addbtn');
   if (addBtn) addBtn.innerHTML = icon.plus({ size: 28 });
   // Circular icon back buttons across screens.
-  ['catbackbtn', 'groupsBackBtn', 'backbtn'].forEach((id) => {
+  ['catbackbtn', 'groupsBackBtn', 'backbtn', 'anBackBtn'].forEach((id) => {
     const el = $(id);
     if (el) el.innerHTML = icon.back({ size: 20 });
   });

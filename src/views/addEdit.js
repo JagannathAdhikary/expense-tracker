@@ -2,11 +2,9 @@
 
 import { state } from '../state.js';
 import { BUILTIN_PAYS } from '../constants.js';
-import { isoDay, initialCat, initialPay, fmt } from '../format.js';
+import { isoDay, initialCat, initialPay, fmt, friendlyDate } from '../format.js';
 import { persist } from '../storage.js';
 import { $ } from '../dom.js';
-import { render, showHome } from './home.js';
-import { renderCategoryView } from './category.js';
 import { openCatModal } from '../features/categories.js';
 import { openPayModal } from '../features/payments.js';
 import { cloudEnabled } from '../supabase.js';
@@ -15,6 +13,8 @@ import { saveGroupExpense, editGroupExpense, updateMySplitMeta, updateGroupExpen
 import { pushRecord, syncOn } from '../features/sync.js';
 import { expenseHasPayment } from '../cloudrows.js';
 import { toastError, toastSuccess } from '../toast.js';
+import { navTo, navBack } from '../nav.js';
+import { renderForScreen } from './nav-render.js';
 
 export function renderCatChips() {
   const html =
@@ -143,11 +143,8 @@ export function showAdd() {
   $('iamt').value = '';
   $('idesc').value = '';
   $('idate').value = isoDay(new Date());
-  $('home').classList.remove('active');
-  $('catview').classList.remove('active');
-  $('groups').classList.remove('active'); // also leave the group detail page (opened via its + button)
-  $('add').classList.add('active');
-  window.scrollTo(0, 0); // start the add form at the top, not wherever the prior screen was scrolled
+  syncDateLabel();
+  navTo('add'); // records the previous screen so Back/Save can return to it
   setTimeout(() => $('iamt').focus(), 100);
 }
 
@@ -197,9 +194,8 @@ export function showEdit(id) {
   $('iamt').value = r.amt;
   $('idesc').value = r.desc || '';
   $('idate').value = r.date;
-  $('home').classList.remove('active');
-  $('catview').classList.remove('active');
-  $('add').classList.add('active');
+  syncDateLabel();
+  navTo('add');
   setTimeout(() => $('iamt').focus(), 100);
 }
 
@@ -243,12 +239,10 @@ export function openEditGroup(gid) {
   $('iamt').value = exp.amount;
   $('idesc').value = exp.description || '';
   $('idate').value = exp.spent_on;
+  syncDateLabel();
   // When a payment has already been made, lock the money-affecting fields.
   applyGroupLock();
-  $('home').classList.remove('active');
-  $('catview').classList.remove('active');
-  $('groups').classList.remove('active');
-  $('add').classList.add('active');
+  navTo('add');
   setTimeout(() => $('iamt').focus(), 100);
 }
 
@@ -278,10 +272,7 @@ export function openEditMySplit(splitId) {
   renderCatChips();
   renderPayChips();
   $('idesc').value = split.note || exp?.description || '';
-  $('home').classList.remove('active');
-  $('catview').classList.remove('active');
-  $('groups').classList.remove('active');
-  $('add').classList.add('active');
+  navTo('add');
 }
 
 // Enable/disable amount, group picker, and split-mode based on state.groupEditLocked.
@@ -311,17 +302,80 @@ function applyGroupLock() {
   }
 }
 
+// ---- Date stepper ---------------------------------------------------------
+// The native <input type="date" id="idate"> stays the source of truth (all
+// value reads/writes elsewhere keep working); the stepper just drives it.
+
+// Refresh the friendly label ("Today" / "Yesterday" / "Wed, 5 Feb") from idate.
+export function syncDateLabel() {
+  const v = $('idate').value || isoDay(new Date());
+  $('dsLabel').textContent = friendlyDate(v);
+}
+
+// Move the selected date by `delta` days and update the label.
+function stepDate(delta) {
+  const cur = $('idate').value ? new Date($('idate').value + 'T00:00:00') : new Date();
+  cur.setDate(cur.getDate() + delta);
+  $('idate').value = isoDay(cur);
+  syncDateLabel();
+}
+
+function initDateStepper() {
+  $('dsPrev').onclick = () => stepDate(-1);
+  $('dsNext').onclick = () => stepDate(1);
+  // Tap the label to open the native calendar for far-off dates.
+  $('dsLabel').onclick = () => {
+    const inp = $('idate');
+    if (typeof inp.showPicker === 'function') {
+      try {
+        inp.showPicker();
+        return;
+      } catch {
+        /* fall through to focus */
+      }
+    }
+    inp.focus();
+    inp.click();
+  };
+  // Keep the label in sync if the native picker changes the value.
+  $('idate').addEventListener('change', syncDateLabel);
+
+  // Swipe left = previous day, right = next day (matches the ‹ / › arrows).
+  let startX = null;
+  let startY = null;
+  const stepper = $('dateStepper');
+  stepper.addEventListener(
+    'touchstart',
+    (e) => {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+    },
+    { passive: true },
+  );
+  stepper.addEventListener(
+    'touchend',
+    (e) => {
+      if (startX == null) return;
+      const dx = e.changedTouches[0].clientX - startX;
+      const dy = e.changedTouches[0].clientY - startY;
+      startX = startY = null;
+      // Horizontal swipe past the threshold, and clearly more horizontal than vertical.
+      if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        stepDate(dx < 0 ? -1 : 1); // swipe left -> past, right -> future
+      }
+    },
+    { passive: true },
+  );
+}
+
 export function initAddEdit() {
   $('addbtn').onclick = showAdd;
+  initDateStepper();
 
   $('backbtn').onclick = () => {
-    // If we came from a category view (still set), return there; else home.
-    if (state.filterCat) {
-      $('add').classList.remove('active');
-      $('catview').classList.add('active');
-      render();
-      renderCategoryView();
-    } else showHome();
+    // Return to whichever screen opened the form (home, category, group detail…).
+    const to = navBack();
+    renderForScreen(to);
   };
 
   $('ichips').addEventListener('click', (e) => {
@@ -401,7 +455,7 @@ export function initAddEdit() {
       });
       if (ok) {
         state.editMySplitId = null;
-        showHome();
+        renderForScreen(navBack());
       }
       return;
     }
@@ -430,7 +484,7 @@ export function initAddEdit() {
           state.editGroupExpId = null;
           state.groupEditLocked = false;
           toastSuccess('Updated');
-          showHome();
+          renderForScreen(navBack());
         }
         return;
       }
@@ -473,17 +527,11 @@ export function initAddEdit() {
           persist();
           toastSuccess('Moved to group');
         }
-        // Added from a group's detail page → return there; otherwise go home.
-        // Dynamic import avoids a static cycle with groups.js.
-        if (state.groupPickLocked && state.selGroup) {
-          const gid = state.selGroup;
-          state.groupPickLocked = false;
-          const { showGroupDetail } = await import('./groups.js');
-          $('add').classList.remove('active');
-          showGroupDetail(gid);
-        } else {
-          showHome();
-        }
+        // Return to whichever screen opened the form. When added from a group's
+        // detail page that's the group itself; otherwise home/category.
+        state.groupPickLocked = false;
+        const to = navBack();
+        renderForScreen(to);
       }
       return;
     }
@@ -500,12 +548,8 @@ export function initAddEdit() {
       pushRecord(rec);
     }
     persist();
-    if (state.filterCat) {
-      // If user changed the record's category away from filter, stay on filter view anyway.
-      $('add').classList.remove('active');
-      $('catview').classList.add('active');
-      render();
-      renderCategoryView();
-    } else showHome();
+    // Return to the screen that opened the form (home / category detail / …).
+    const to = navBack();
+    renderForScreen(to);
   }
 }

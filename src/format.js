@@ -56,3 +56,45 @@ export function filtered() {
     return d.getMonth() === state.cur.getMonth() && d.getFullYear() === state.cur.getFullYear();
   });
 }
+
+// True when any home filter is active (drives the header button's active dot + the
+// "clear filter" affordance). scope 'all' + empty selections = no filter.
+export function filterActive() {
+  const f = state.filter;
+  return f.scope !== 'all' || f.cats.length > 0 || !!f.groupId || f.pays.length > 0;
+}
+
+// Apply the home filter to a merged rows array (personal + shared). A personal row
+// has no `shared` flag; a group row has `shared:true` and a `groupId`.
+export function applyFilter(rows) {
+  const f = state.filter;
+  return rows.filter((r) => {
+    if (f.scope === 'group' && !r.shared) return false;
+    if (f.scope === 'personal' && r.shared) return false;
+    if (f.groupId && r.groupId !== f.groupId) return false;
+    if (f.cats.length && !f.cats.includes(r.cat)) return false;
+    if (f.pays.length && !f.pays.includes(r.pay)) return false;
+    return true;
+  });
+}
+
+// Category spend breakdown for a month's rows. Sums personal + non-pending shared
+// amounts per category (pending "you owe" rows don't count until settled), ordered
+// by the configured CATS list first, then any leftover names. Used by Analytics.
+export function categoryBreakdown(personal, shared) {
+  const byc = {};
+  personal.forEach((r) => {
+    byc[r.cat] = (byc[r.cat] || 0) + r.amt;
+  });
+  shared.forEach((r) => {
+    if (!r.pending) byc[r.cat] = (byc[r.cat] || 0) + r.amt;
+  });
+  const names = Object.keys(byc);
+  const ordered = state.CATS.map((c) => c.n).filter((n) => byc[n] != null);
+  names.forEach((n) => {
+    if (!ordered.includes(n)) ordered.push(n);
+  });
+  const mx = Math.max(...Object.values(byc), 1);
+  const total = Object.values(byc).reduce((s, v) => s + v, 0);
+  return { byc, ordered, mx, total };
+}

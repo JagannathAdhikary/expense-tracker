@@ -35,7 +35,11 @@
     <div class="header-actions" id="homeActions"></div>
   </header>
   <div class="summary">
-    <div class="card"><div class="lbl">Total spent</div><div class="val" id="tot">₹0</div></div>
+    <button class="card card-link" id="analyticsCard" aria-label="View analytics">
+      <span class="card-chart-ico" id="analyticsIco"></span>
+      <div class="lbl">Total spent</div>
+      <div class="val" id="tot">₹0</div>
+    </button>
     <div class="card" id="txnCard">
       <div class="lbl">Transactions</div>
       <div class="val" id="cnt">0</div>
@@ -45,11 +49,11 @@
       </div>
     </div>
   </div>
-  <div id="cat-section" style="display:none">
-    <p class="section-title">By category <span style="text-transform:none;color:#bbb;font-weight:400">(tap to filter)</span></p>
-    <div class="cat-bars" id="cbars"></div>
+  <div class="list-head">
+    <p class="section-title" style="margin:0">Recent</p>
+    <button class="hdr-btn icon-only" id="filterBtn" aria-label="Filter transactions"></button>
   </div>
-  <p class="section-title">Recent</p>
+  <div id="filterBar" class="filter-bar" style="display:none"></div>
   <div id="tlist"></div>
   <div class="fab"><button id="addbtn">+</button></div>
 </div>
@@ -67,6 +71,39 @@
   </div>
   <p class="section-title" id="cvperiod"></p>
   <div id="cvlist"></div>
+</div>
+
+<!-- ANALYTICS -->
+<div id="analytics" class="screen">
+  <header>
+    <button class="back-btn" id="anBackBtn" aria-label="Back"></button>
+    <h1>Analytics</h1>
+    <span style="width:40px"></span>
+  </header>
+  <p class="section-title" id="anPeriod" style="text-align:center"></p>
+
+  <!-- Hero total + month-over-month delta -->
+  <div class="an-hero">
+    <div class="an-hero-lbl">Total spent</div>
+    <div class="an-hero-val" id="anTot">₹0</div>
+    <div class="an-delta" id="anDelta"></div>
+  </div>
+
+  <!-- KPI stat tiles -->
+  <div class="an-kpis" id="anKpis"></div>
+
+  <!-- Category breakdown: donut + bars -->
+  <p class="section-title">By category</p>
+  <div id="anCatEmpty" class="empty" style="display:none"><span>📊</span>No spending to analyze this month.</div>
+  <div class="an-donut-wrap" id="anDonutWrap">
+    <div class="an-donut" id="anDonut"></div>
+    <div class="an-legend" id="anLegend"></div>
+  </div>
+  <div class="cat-bars" id="anBars"></div>
+
+  <!-- Daily spend trend -->
+  <p class="section-title">Daily spend</p>
+  <div class="an-trend" id="anTrend"></div>
 </div>
 
 <!-- GROUPS -->
@@ -144,6 +181,10 @@
       </div>
     </div>
     <div class="field">
+      <label>Note <span style="font-size:11px;opacity:.5">(optional)</span></label>
+      <input type="text" id="idesc" placeholder="e.g. Swiggy, rent, SIP..."/>
+    </div>
+    <div class="field">
       <label>Category</label>
       <div class="chips" id="ichips"></div>
     </div>
@@ -165,12 +206,13 @@
       </div>
     </div>
     <div class="field">
-      <label>Note <span style="font-size:11px;opacity:.5">(optional)</span></label>
-      <input type="text" id="idesc" placeholder="e.g. Swiggy, rent, SIP..."/>
-    </div>
-    <div class="field">
       <label>Date</label>
-      <input type="date" id="idate"/>
+      <div class="date-stepper" id="dateStepper">
+        <button type="button" class="ds-arrow" id="dsPrev" aria-label="Previous day">&#8249;</button>
+        <button type="button" class="ds-label" id="dsLabel" aria-label="Pick a date">Today</button>
+        <button type="button" class="ds-arrow" id="dsNext" aria-label="Next day">&#8250;</button>
+        <input type="date" id="idate" class="ds-native"/>
+      </div>
     </div>
     <button class="save-btn" id="savebtn">Save</button>
   </div>
@@ -194,6 +236,40 @@
       <button class="sheet-btn" id="exportBtn"><span class="sb-ico" data-icon="upload"></span> Export data (backup)</button>
       <button class="sheet-btn" id="importBtn"><span class="sb-ico" data-icon="download"></span> Import data (restore)</button>
       <input type="file" id="importFile" accept=".json" style="display:none"/>
+    </div>
+  </div>
+</div>
+
+<!-- FILTER SHEET -->
+<div class="overlay" id="filterOverlay">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h3>Filter transactions</h3>
+      <button class="sheet-close" id="closeFilterSheet" aria-label="Close"></button>
+    </div>
+    <div class="field">
+      <label>Show</label>
+      <div class="pay-chips" id="fltScope">
+        <div class="pay-chip" data-scope="all">All</div>
+        <div class="pay-chip" data-scope="group">Group only</div>
+        <div class="pay-chip" data-scope="personal">Personal only</div>
+      </div>
+    </div>
+    <div class="field" id="fltGroupField" style="display:none">
+      <label>Group</label>
+      <div class="chips" id="fltGroups"></div>
+    </div>
+    <div class="field">
+      <label>Categories</label>
+      <div class="chips" id="fltCats"></div>
+    </div>
+    <div class="field">
+      <label>Payment methods</label>
+      <div class="pay-chips" id="fltPays"></div>
+    </div>
+    <div class="modal-actions">
+      <button id="fltClear">Clear all</button>
+      <button class="primary" id="fltApply">Apply</button>
     </div>
   </div>
 </div>
