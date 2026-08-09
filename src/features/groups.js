@@ -43,7 +43,7 @@ export async function loadCloudData() {
   // Groups I'm a member of. Filter to MY membership rows: RLS lets co-members see
   // each other, so an unfiltered select returns one row per member of each group
   // (which would make a group appear multiple times in the list).
-  const { data: memberships, error: mErr } = await supabase.from('group_members').select('group_id, role, groups(id, name, invite_code, icon, color, retired_at)').eq('user_id', state.user.id);
+  const { data: memberships, error: mErr } = await supabase.from('group_members').select('group_id, role, groups(id, name, invite_code, icon, color, retired_at, photo_url)').eq('user_id', state.user.id);
   if (mErr) {
     console.error('load groups failed', mErr);
     return;
@@ -71,6 +71,7 @@ export async function loadCloudData() {
     invite_code: m.groups.invite_code,
     icon: m.groups.icon || null,
     color: m.groups.color || null,
+    photo: m.groups.photo_url || null,
     retired: !!m.groups.retired_at, // read-only when retired (no add / no settle)
     role: m.role,
     members: membersByGroup[m.group_id] || [],
@@ -102,10 +103,14 @@ export async function loadCloudData() {
 // Mutations
 // ---------------------------------------------------------------------------
 
-export async function createGroup(name, memberIds = []) {
+export async function createGroup(name, memberIds = [], opts = {}) {
   if (!cloudEnabled() || !state.user) return null;
   const invite_code = makeInviteCode();
-  const { data: grp, error } = await supabase.from('groups').insert({ name, invite_code, created_by: state.user.id }).select().single();
+  const row = { name, invite_code, created_by: state.user.id };
+  if (opts.icon) row.icon = opts.icon;
+  if (opts.color) row.color = opts.color;
+  if (opts.photoUrl) row.photo_url = opts.photoUrl;
+  const { data: grp, error } = await supabase.from('groups').insert(row).select().single();
   if (error) {
     toastError('Could not create group: ' + error.message);
     return null;
@@ -119,6 +124,46 @@ export async function createGroup(name, memberIds = []) {
   if (mErr) toastError('Group created, but adding some members failed: ' + mErr.message);
   await loadCloudData();
   return grp;
+}
+
+// Look up a registered user by exact mobile number (via the SECURITY DEFINER RPC).
+// Returns { id, name, avatar } or null. Used to add non-friends by number.
+export async function findUserByPhone(phone) {
+  if (!cloudEnabled() || !state.user) return null;
+  const { data, error } = await supabase.rpc('find_user_by_phone', { p_phone: phone });
+  if (error) {
+    console.warn('find_user_by_phone failed', error);
+    return null;
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  return row ? { id: row.id, name: row.display_name || 'Member', avatar: row.avatar_url || null } : null;
+}
+
+// Save a group's photo URL (any member). Clears icon so the photo takes over.
+export async function setGroupPhoto(groupId, photoUrl) {
+  if (!cloudEnabled() || !state.user) return false;
+  const { error } = await supabase.from('groups').update({ photo_url: photoUrl }).eq('id', groupId);
+  if (error) {
+    toastError('Could not save group photo: ' + error.message);
+    return false;
+  }
+  await loadCloudData();
+  return true;
+}
+
+// Upload an image File to the group-icons storage bucket; returns its public URL
+// (or null on failure). `key` is a stable-ish path (group id or a temp uuid).
+export async function uploadGroupImage(file, key) {
+  if (!cloudEnabled() || !state.user || !file) return null;
+  const ext = (file.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+  const path = `${key}-${Date.now()}.${ext}`;
+  const { error } = await supabase.storage.from('group-icons').upload(path, file, { upsert: true, contentType: file.type });
+  if (error) {
+    toastError('Could not upload image: ' + error.message);
+    return null;
+  }
+  const { data } = supabase.storage.from('group-icons').getPublicUrl(path);
+  return data?.publicUrl || null;
 }
 
 // Friends = people you already share any (non-retired or retired) group with.

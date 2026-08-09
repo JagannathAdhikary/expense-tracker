@@ -39,6 +39,8 @@ alter table public.groups add column if not exists icon text;
 alter table public.groups add column if not exists color text;
 -- For projects created before group retiring (archive) was added:
 alter table public.groups add column if not exists retired_at timestamptz;
+-- For projects created before group photos were added (URL of an uploaded image):
+alter table public.groups add column if not exists photo_url text;
 
 create table if not exists public.group_members (
   group_id  uuid not null references public.groups(id) on delete cascade,
@@ -119,6 +121,28 @@ as $$
     where group_id = gid and user_id = auth.uid()
   );
 $$;
+
+-- Find a registered user by EXACT mobile number (last 10 digits), for adding to a
+-- group. SECURITY DEFINER so it can read profiles without exposing the whole table
+-- to the client — it only ever returns a single exact match, so the directory
+-- can't be browsed/enumerated. Returns nothing if no one has that number.
+create or replace function public.find_user_by_phone(p_phone text)
+returns table(id uuid, display_name text, avatar_url text)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select p.id, p.display_name, p.avatar_url
+  from public.profiles p
+  where p.phone is not null
+    and length(regexp_replace(p_phone, '\D', '', 'g')) >= 10
+    and right(regexp_replace(p.phone, '\D', '', 'g'), 10) = right(regexp_replace(p_phone, '\D', '', 'g'), 10)
+    and p.id <> auth.uid()
+  limit 1;
+$$;
+revoke all on function public.find_user_by_phone(text) from public, anon;
+grant execute on function public.find_user_by_phone(text) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Auto-create a profile row when a new auth user signs up
