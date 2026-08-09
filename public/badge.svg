@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
+  <!-- Monochrome status-bar badge: Android masks this to a shape, so it must be a
+       solid white silhouette on transparent. A donut ring + rupee mark. -->
+  <g transform="translate(48,48)">
+    <circle r="30" fill="none" stroke="#ffffff" stroke-width="12"/>
+    <text x="0" y="15" text-anchor="middle" font-family="-apple-system,'Segoe UI',Roboto,Arial,sans-serif" font-size="40" font-weight="700" fill="#ffffff">&#8377;</text>
+  </g>
+</svg>

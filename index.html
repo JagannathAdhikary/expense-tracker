@@ -106,6 +106,54 @@
   <div class="an-trend" id="anTrend"></div>
 </div>
 
+<!-- ONBOARDING (full-screen profile journey) -->
+<div id="onboarding" class="screen ob-screen">
+  <div class="ob-progress"><div class="ob-progress-fill" id="obProgress"></div></div>
+  <div class="ob-body">
+    <!-- Step 0: Welcome -->
+    <div class="ob-step" data-step="0">
+      <div class="ob-ico" data-icon="users"></div>
+      <h1 class="ob-title">Welcome!</h1>
+      <p class="ob-note">Let’s set up your profile so friends can split expenses and settle up with you in groups. Takes just a few seconds.</p>
+    </div>
+    <!-- Step 1: Name -->
+    <div class="ob-step" data-step="1" hidden>
+      <div class="ob-ico" data-icon="user"></div>
+      <h1 class="ob-title">What’s your name?</h1>
+      <p class="ob-note">This is how friends will see you in a group.</p>
+      <input type="text" id="obName" class="ob-input" placeholder="Your name" maxlength="60"/>
+      <div class="field-err" id="obNameErr" style="display:none"></div>
+    </div>
+    <!-- Step 2: Mobile -->
+    <div class="ob-step" data-step="2" hidden>
+      <div class="ob-ico" data-icon="phone"></div>
+      <h1 class="ob-title">Your mobile number</h1>
+      <p class="ob-note">So friends can find you by your number when they add you to a group.</p>
+      <input type="tel" id="obPhone" class="ob-input" placeholder="e.g. +91 98765 43210" autocomplete="tel" inputmode="tel"/>
+      <div class="field-err" id="obPhoneErr" style="display:none"></div>
+    </div>
+    <!-- Step 3: UPI (optional) -->
+    <div class="ob-step" data-step="3" hidden>
+      <div class="ob-ico" data-icon="wallet"></div>
+      <h1 class="ob-title">Add your UPI ID</h1>
+      <p class="ob-note">So group members can pay you back in one tap. Optional — you can add or change it anytime from the menu.</p>
+      <input type="text" id="obUpi" class="ob-input" placeholder="e.g. rahul@okaxis" autocapitalize="off" autocorrect="off" spellcheck="false"/>
+      <div class="field-err" id="obUpiErr" style="display:none"></div>
+    </div>
+    <!-- Step 4: Done -->
+    <div class="ob-step" data-step="4" hidden>
+      <div class="ob-ico" data-icon="sparkle"></div>
+      <h1 class="ob-title">You’re all set!</h1>
+      <p class="ob-note">Your profile’s ready. Start adding expenses and splitting with friends.</p>
+    </div>
+    <div class="ob-actions">
+      <button class="ob-back" id="obBack" style="display:none">Back</button>
+      <button class="ob-skip" id="obSkip" style="display:none">Skip</button>
+      <button class="ob-next primary-btn" id="obNext">Next</button>
+    </div>
+  </div>
+</div>
+
 <!-- GROUPS -->
 <div id="groups" class="screen">
   <header>
@@ -128,6 +176,7 @@
   </header>
   <div id="groupDetail">
     <div id="groupRetiredBanner"></div>
+    <div id="groupPendingBanner"></div>
     <div id="groupTotal"></div>
     <div id="groupOwe"></div>
     <div id="groupOwedTo"></div>
@@ -225,15 +274,27 @@
       <h3>Menu</h3>
       <button class="sheet-close" id="closeSheet" aria-label="Close"></button>
     </div>
+
+    <p class="sheet-section-label">Account</p>
     <div id="authBox"></div>
     <div id="syncBox"></div>
+    <div class="sheet-group" id="accountGroup" style="display:none">
+      <button class="sheet-btn" id="upiBtn"><span class="sb-ico" data-icon="user"></span> <span id="upiBtnLabel">Edit profile</span><span class="pending-pill" id="profilePending" style="display:none">1 pending</span></button>
+    </div>
+
+    <p class="sheet-section-label">Customize</p>
     <div class="sheet-group">
+      <button class="sheet-btn" id="defaultsBtn"><span class="sb-ico" data-icon="star"></span> Set defaults</button>
       <button class="sheet-btn" id="manageCatsBtn"><span class="sb-ico" data-icon="tag"></span> Manage categories</button>
       <button class="sheet-btn" id="managePaysBtn"><span class="sb-ico" data-icon="card"></span> Manage payment methods</button>
-      <button class="sheet-btn" id="defaultsBtn"><span class="sb-ico" data-icon="star"></span> Set defaults</button>
-      <button class="sheet-btn" id="upiBtn" style="display:none"><span class="sb-ico" data-icon="card"></span> <span id="upiBtnLabel">My UPI ID</span></button>
-      <button class="sheet-btn" id="notifyBtn" style="display:none"><span class="sb-ico" data-icon="bell"></span> <span id="notifyBtnLabel">Group notifications</span></button>
     </div>
+
+    <p class="sheet-section-label" id="notifSectionLabel" style="display:none">Notifications</p>
+    <div class="sheet-group" id="notifSection" style="display:none">
+      <button class="sheet-btn sheet-btn-toggle" id="notifyBtn" style="display:none"><span class="sb-ico" data-icon="bell"></span> <span id="notifyBtnLabel">Group notifications</span><span class="switch" id="notifySwitch" aria-hidden="true"></span></button>
+    </div>
+
+    <p class="sheet-section-label">Data</p>
     <div class="sheet-group">
       <button class="sheet-btn" id="exportBtn"><span class="sb-ico" data-icon="upload"></span> Export data (backup)</button>
       <button class="sheet-btn" id="importBtn"><span class="sb-ico" data-icon="download"></span> Import data (restore)</button>
@@ -411,18 +472,29 @@
 </div>
 
 <!-- GROUP ICON EDITOR MODAL -->
-<div class="modal" id="upiModal">
+<div class="modal" id="profileModal">
   <div class="modal-box">
-    <h3>My UPI ID</h3>
-    <p class="modal-note">So group members can pay you back via UPI. Copy it from your UPI app (e.g. Google Pay, PhonePe). Format: <b>name@bank</b>.</p>
+    <h3 id="profileModalTitle">Complete your profile</h3>
+    <p class="modal-note" id="profileModalNote">Tell us a bit about you so friends can find and pay you in groups.</p>
+    <div class="pending-banner" id="profilePendingBanner" style="display:none"></div>
     <div class="field">
-      <label>UPI ID</label>
-      <input type="text" id="upiInput" placeholder="e.g. rahul@okaxis" autocapitalize="off" autocorrect="off" spellcheck="false"/>
-      <div class="field-err" id="upiErr" style="display:none"></div>
+      <label>Name</label>
+      <input type="text" id="profName" placeholder="Your name" maxlength="60"/>
+      <div class="field-err" id="profNameErr" style="display:none"></div>
+    </div>
+    <div class="field">
+      <label>Mobile number</label>
+      <input type="tel" id="profPhone" placeholder="e.g. +91 98765 43210" autocomplete="tel" inputmode="tel"/>
+      <div class="field-err" id="profPhoneErr" style="display:none"></div>
+    </div>
+    <div class="field">
+      <label>UPI ID <span style="font-size:11px;opacity:.5">(optional)</span></label>
+      <input type="text" id="profUpi" placeholder="e.g. rahul@okaxis" autocapitalize="off" autocorrect="off" spellcheck="false"/>
+      <div class="field-err" id="profUpiErr" style="display:none"></div>
     </div>
     <div class="modal-actions">
-      <button id="upiCancel">Cancel</button>
-      <button class="primary" id="upiSave">Save</button>
+      <button id="profCancel">Cancel</button>
+      <button class="primary" id="profSave">Save</button>
     </div>
   </div>
 </div>
