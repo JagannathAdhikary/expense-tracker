@@ -10,13 +10,13 @@ import { renderCategoryView } from './category.js';
 import { showAnalytics } from './analytics.js';
 import { openFilterSheet, filterSummary, clearFilter } from '../features/filter.js';
 import { showEdit, openEditGroup, openEditMySplit } from './addEdit.js';
-import { showGroupDetail } from './groups.js';
+import { showGroupDetail, confirmAndSettleShare } from './groups.js';
 import { navReset } from '../nav.js';
 import { sharedRowsForMonth, expenseHasPayment } from '../cloudrows.js';
-import { markShareDone, deleteGroupExpense } from '../features/groups.js';
+import { deleteGroupExpense } from '../features/groups.js';
 import { icon } from '../icons.js';
 import { toastError } from '../toast.js';
-import { confirmModal, pickSettlePayment } from '../confirm.js';
+import { confirmModal } from '../confirm.js';
 
 export function render() {
   $('mlbl').textContent = MN[state.cur.getMonth()] + ' ' + state.cur.getFullYear();
@@ -101,10 +101,8 @@ export function initHome() {
     onEdit: showEdit,
     rerender,
     onSettle: async (splitId) => {
-      const { confirmed, pay } = await pickSettlePayment();
-      if (!confirmed) return;
-      await markShareDone(splitId, pay);
-      rerender();
+      // Same rich flow as the group view: UPI pay offer + confirm + mark done.
+      if (await confirmAndSettleShare(splitId)) rerender();
     },
     onEditGroup: (gid) => openEditGroup(gid),
     onEditMySplit: (sid) => openEditMySplit(sid),

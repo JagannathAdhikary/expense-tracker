@@ -22,13 +22,18 @@ export function isValidUpi(id) {
 
 // Build a `upi://pay` deep link. amount is in rupees (number/string); tn = note.
 // Returns null if the payee VPA is invalid (caller shows a fallback then).
+//
+// NOTE: we build the query string by hand rather than with URLSearchParams,
+// because URLSearchParams percent-encodes '@' in the VPA to %40. Most UPI apps
+// decode that, but BHIM does NOT — it reads "name%40bank" literally and fails.
+// The payee address (pa) is passed with its '@' intact; other values are encoded
+// but with '@' preserved for safety.
 export function buildUpiLink({ pa, pn, amount, note }) {
   if (!isValidUpi(pa)) return null;
-  const params = new URLSearchParams();
-  params.set('pa', normalizeUpi(pa));
-  if (pn) params.set('pn', pn);
-  if (amount != null && Number(amount) > 0) params.set('am', Number(amount).toFixed(2));
-  params.set('cu', 'INR');
-  if (note) params.set('tn', note);
-  return 'upi://pay?' + params.toString();
+  const enc = (v) => encodeURIComponent(String(v)).replace(/%40/g, '@');
+  const parts = [`pa=${enc(normalizeUpi(pa))}`, 'cu=INR'];
+  if (pn) parts.push(`pn=${enc(pn)}`);
+  if (amount != null && Number(amount) > 0) parts.push(`am=${Number(amount).toFixed(2)}`);
+  if (note) parts.push(`tn=${enc(note)}`);
+  return 'upi://pay?' + parts.join('&');
 }
