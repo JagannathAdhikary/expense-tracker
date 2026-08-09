@@ -271,6 +271,24 @@ export async function setGroupIcon(groupId, { icon, color }) {
   return true;
 }
 
+// Rename a group (any member — RLS groups_update allows members). Trims + caps
+// length; no-ops on an empty name.
+export async function renameGroup(groupId, name) {
+  if (!cloudEnabled() || !state.user) return false;
+  const clean = (name || '').trim().slice(0, 40);
+  if (!clean) {
+    toastError('Group name can’t be empty.');
+    return false;
+  }
+  const { error } = await supabase.from('groups').update({ name: clean }).eq('id', groupId);
+  if (error) {
+    toastError('Could not rename group: ' + error.message);
+    return false;
+  }
+  await loadCloudData();
+  return true;
+}
+
 // Delete an entire group (creator/owner only). Cascades to members, expenses,
 // and splits via ON DELETE CASCADE.
 export async function deleteGroup(groupId) {

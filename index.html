@@ -81,7 +81,7 @@
       <div class="group-head-info">
         <h1 class="group-head-name" id="groupDetailTitle">Group</h1>
         <div class="group-head-meta" id="groupMemberCount"></div>
-        <div class="group-head-code">Code: <span id="groupInviteCode"></span><button class="copy-btn" id="copyCodeBtn" aria-label="Copy code"></button></div>
+        <div class="group-head-code">Code: <span id="groupInviteCode"></span><button class="copy-btn" id="copyCodeBtn" aria-label="Copy code"></button><button class="copy-btn" id="shareGroupBtn" aria-label="Share invite"></button></div>
       </div>
     </div>
     <div class="group-head-actions">
@@ -335,7 +335,11 @@
 <!-- GROUP ICON EDITOR MODAL -->
 <div class="modal" id="groupIconModal">
   <div class="modal-box">
-    <h3>Group icon</h3>
+    <h3>Group settings</h3>
+    <div class="field">
+      <label>Name</label>
+      <input type="text" id="gsettName" placeholder="Group name" maxlength="40"/>
+    </div>
     <div class="field">
       <label>Icon</label>
       <div class="chips" id="giconPresets"></div>

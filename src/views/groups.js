@@ -13,7 +13,7 @@ import { expenseHasPayment, owedByUserInGroup, owedToUserInGroup, totalShareInGr
 import { toastError, toastSuccess } from '../toast.js';
 import { icon } from '../icons.js';
 import { confirmModal, pickSettlePayment } from '../confirm.js';
-import { setGroupIcon } from '../features/groups.js';
+import { setGroupIcon, renameGroup } from '../features/groups.js';
 
 // Preset icons + colors for the group icon editor.
 const GROUP_ICONS = ['👥', '🏠', '✈️', '🍽️', '🎉', '🛒', '🏖️', '🏔️', '🎬', '⚽', '🎓', '💼', '🚗', '🏥', '🐾', '💡'];
@@ -51,6 +51,15 @@ function memberAvatar(group, userId, extraClass = '') {
 
 // Splits belonging to a given expense.
 const splitsFor = (expId) => state.mySplits.filter((s) => s.expense_id === expId);
+
+// Build the invite link + friendly share text for a group. The link carries the
+// invite code as ?join=CODE; opening it (when signed in) auto-joins the group.
+function buildInvite(g) {
+  const base = new URL(import.meta.env.BASE_URL, window.location.origin).href.replace(/\/$/, '');
+  const url = `${base}/?join=${encodeURIComponent(g.invite_code)}`;
+  const text = `Join my expense group "${g.name}" on Expense Tracker. Tap the link to join, or use code ${g.invite_code}.`;
+  return { url, text };
+}
 
 // Settle a single expense share: confirm first (so a tap can't commit money
 // by accident), then pick a payment method, then mark done. Returns true if it
@@ -207,6 +216,7 @@ function openGroupIconModal() {
   giSelIcon = groupIcon(g);
   giSelColor = groupColor(g);
   $('giconCustom').value = '';
+  $('gsettName').value = g.name; // prefill for rename
   renderIconModal();
   $('groupIconModal').classList.add('open');
 }
@@ -274,6 +284,7 @@ function renderGroupDetail() {
   $('groupDetailTitle').title = g.name; // full name on hover
   $('groupInviteCode').textContent = g.invite_code;
   $('copyCodeBtn').innerHTML = icon.copy({ size: 14 });
+  $('shareGroupBtn').innerHTML = icon.share({ size: 14 });
   const memCount = g.members.length;
   $('groupMemberCount').innerHTML = `${icon.users({ size: 12 })} ${memCount} member${memCount === 1 ? '' : 's'}`;
   // Big group icon (tap to edit — any member).
@@ -509,10 +520,20 @@ export function initGroupsView() {
     if (e.target === $('groupIconModal')) $('groupIconModal').classList.remove('open');
   };
   $('giconSave').onclick = async () => {
+    const g = state.groups.find((x) => x.id === state.openGroupId);
     const custom = $('giconCustom').value.trim();
     const chosen = custom || giSelIcon;
+    const newName = $('gsettName').value.trim();
+    if (!newName) {
+      $('gsettName').focus();
+      toastError('Group name can’t be empty.');
+      return;
+    }
+    // Save the name only when it actually changed, then icon/color.
+    const nameOk = !g || newName === g.name ? true : await renameGroup(state.openGroupId, newName);
+    if (!nameOk) return;
     const ok = await setGroupIcon(state.openGroupId, { icon: chosen, color: giSelColor });
-    if (ok) {
+    if (ok || nameOk) {
       $('groupIconModal').classList.remove('open');
       renderGroupDetail();
     }
@@ -575,6 +596,30 @@ export function initGroupsView() {
       toastSuccess('Invite code copied');
     } catch (err) {
       toastError('Could not copy — code is ' + code);
+    }
+  };
+
+  // Share the invite: native share sheet (WhatsApp/Messages/etc.) with a tap-to-join
+  // link, falling back to copying the invite text where Web Share isn't available.
+  $('shareGroupBtn').onclick = async () => {
+    const g = state.groups.find((x) => x.id === state.openGroupId);
+    if (!g) return;
+    const { url, text } = buildInvite(g);
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: `Join "${g.name}"`, text, url });
+      } else {
+        await navigator.clipboard.writeText(`${text}\n${url}`);
+        toastSuccess('Invite copied — paste it to your friends');
+      }
+    } catch (err) {
+      if (err && err.name === 'AbortError') return; // user dismissed the share sheet
+      try {
+        await navigator.clipboard.writeText(`${text}\n${url}`);
+        toastSuccess('Invite copied — paste it to your friends');
+      } catch {
+        toastError('Could not share the invite.');
+      }
     }
   };
 
