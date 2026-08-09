@@ -18,6 +18,8 @@ import { initPayments } from './features/payments.js';
 import { initDefaults } from './features/defaults.js';
 import { initBackup } from './features/backup.js';
 import { initFilter } from './features/filter.js';
+import { initProfile, loadMyProfile, refreshUpiButton } from './features/profile.js';
+import { autoEnablePush, enablePush, disablePush, isSubscribed, pushStatus, pushSupported } from './features/push.js';
 import { initAuth, onAuthChange } from './features/auth.js';
 import { initGroupsFeature, loadCloudData, onGroupData, subscribeRealtime, unsubscribeRealtime, joinGroupByCode } from './features/groups.js';
 import { initGroupsView, refreshGroupsView, showGroupDetail } from './views/groups.js';
@@ -65,6 +67,7 @@ initPayments();
 initDefaults();
 initBackup();
 initFilter();
+initProfile();
 initAuth();
 initGroupsFeature();
 initGroupsView();
@@ -74,9 +77,15 @@ initGroupsView();
 onAuthChange((user) => {
   renderHomeActions();
   renderSyncUI();
+  refreshUpiButton();
+  updateNotifyButton();
   if (user) {
     loadCloudData().then(() => maybeJoinFromLink());
     subscribeRealtime();
+    // Load the user's own UPI id, then refresh the menu button + maybe prompt once.
+    loadMyProfile().then(() => refreshUpiButton());
+    // On-by-default group notifications: ask permission once + subscribe on grant.
+    autoEnablePush(user).then(updateNotifyButton);
     // Run the first-login sync prompt, then introduce Groups with a one-time tip.
     onLoginSync().then(maybeShowGroupsTip);
   } else {
@@ -93,6 +102,40 @@ async function maybeJoinFromLink() {
   pendingJoinCode = null; // consume it (only attempt once)
   const grp = await joinGroupByCode(code); // shows its own toast (joined / already in / not found)
   if (grp) showGroupDetail(grp.id);
+}
+
+// "Group notifications" menu toggle: shown when signed in + push supported.
+// Label reflects the real subscription state; tapping toggles on/off.
+async function updateNotifyButton() {
+  const btn = $('notifyBtn');
+  if (!btn) return;
+  const show = !!state.user && pushSupported();
+  btn.style.display = show ? '' : 'none';
+  if (!show) return;
+  const label = $('notifyBtnLabel');
+  const status = pushStatus();
+  if (status === 'denied') {
+    if (label) label.textContent = 'Notifications blocked (browser settings)';
+    btn.disabled = true;
+    return;
+  }
+  btn.disabled = false;
+  const on = await isSubscribed();
+  if (label) label.textContent = on ? 'Group notifications: on · tap to turn off' : 'Enable group notifications';
+}
+const notifyBtn = $('notifyBtn');
+if (notifyBtn) {
+  notifyBtn.onclick = async () => {
+    if (notifyBtn.disabled) return;
+    notifyBtn.disabled = true;
+    try {
+      if (await isSubscribed()) await disablePush();
+      else await enablePush(state.user);
+    } finally {
+      $('overlay').classList.remove('open'); // close the menu sheet
+      await updateNotifyButton();
+    }
+  };
 }
 
 // One-time coach-mark pointing at the Groups icon, shown after the first login.

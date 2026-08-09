@@ -9,6 +9,12 @@ export default defineConfig({
   plugins: [
     VitePWA({
       registerType: 'autoUpdate',
+      // Custom service worker (src/sw.js) to host Web Push handlers alongside
+      // Workbox precaching. devOptions serves the SW in `npm run dev` too.
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
+      devOptions: { enabled: true, type: 'module' },
       includeAssets: ['icon-192.png', 'icon-512.png'],
       manifest: {
         name: 'Expense Tracker',

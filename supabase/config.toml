@@ -1,0 +1,6 @@
+project_id = "expense-tracker"
+
+[functions.notify-expense]
+# Client calls this with the user's bearer token; we verify it here and use the
+# service_role key to read other members' push subscriptions.
+verify_jwt = true
