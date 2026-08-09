@@ -228,6 +228,14 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .sheet-btn:active{opacity:.6}
 .sheet-btn > span:first-child{font-size:22px}
 .sheet-btn.danger{color:var(--neg)}
+/* Toggle-style sheet button: label left, sliding switch pinned right. */
+.sheet-btn-toggle .switch{margin-left:auto;flex:0 0 auto}
+.switch{position:relative;width:40px;height:24px;border-radius:999px;background:var(--line);transition:background .18s}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .18s}
+.switch.on{background:var(--pos)}
+.switch.on::after{transform:translateX(16px)}
+.sheet-btn-toggle.is-disabled{opacity:.55}
+.sheet-btn-toggle .switch{font-size:0}
 /* modal (centered) */
 .modal{display:none;position:fixed;inset:0;background:rgba(18,26,45,.5);backdrop-filter:blur(2px);z-index:30;align-items:center;justify-content:center;padding:1rem}
 .modal.open{display:flex;animation:fade-in .2s ease}
@@ -427,6 +435,18 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .hdr-btn.primary:hover{filter:brightness(1.05)}
 .hdr-btn.icon-only{padding:0;width:38px;justify-content:center;color:var(--ink-soft)}
 .hdr-btn:disabled{opacity:.6;cursor:default}
+/* Header menu button as avatar + pending-action dot. */
+.hdr-menu-btn{position:relative;overflow:visible}
+.hdr-avatar{width:30px;height:30px;border-radius:50%;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;background:var(--accent);color:#fff}
+.hdr-avatar img{width:100%;height:100%;object-fit:cover}
+.hdr-avatar-initial{font-size:14px;font-weight:700}
+.pending-dot{position:absolute;top:-1px;right:-1px;width:11px;height:11px;border-radius:50%;background:#f5b301;border:2px solid var(--bg);box-shadow:0 0 0 1px rgba(0,0,0,.05)}
+/* "1 pending" pill on the Edit-profile menu row. */
+.pending-pill{margin-left:auto;font-size:11px;font-weight:700;color:#8a6200;background:#ffe9a8;border-radius:999px;padding:2px 9px}
+/* Pending-action banner inside the profile modal. */
+.pending-banner{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:#8a6200;background:#fff6df;border:1px solid #ffe1a3;border-radius:var(--radius-sm);padding:9px 12px;margin:-.4rem 0 1rem}
+.pending-banner::before{content:"⚠";font-size:13px}
+.pending-banner-btn{width:100%;text-align:left;cursor:pointer;font:inherit;margin:0 0 12px}
 
 /* ---- Menu sheet refinements ---- */
 .sheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
@@ -434,6 +454,49 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .sheet-close{width:34px;height:34px;border-radius:11px;border:none;background:var(--bg-2);color:var(--ink-soft);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s}
 .sheet-close:hover{background:var(--line)}
 .sheet-group{background:var(--bg-2);border-radius:var(--radius);padding:4px 14px;margin-bottom:12px}
+/* Section heading above each grouped card in the menu sheet. */
+.sheet-section-label{font-size:11px;font-weight:700;color:var(--ink-mute);text-transform:uppercase;letter-spacing:.6px;margin:2px 4px 6px}
+
+/* ---- Onboarding journey (full-screen, one step at a time) ---- */
+.ob-screen{display:none;flex-direction:column;min-height:100vh;padding:0;max-width:480px;margin:0 auto;position:relative;overflow:hidden}
+/* Cool "mesh" background: a deep base gradient with several soft colored light
+   sources layered on top, plus slow-drifting blurred blobs for a lively feel. */
+.ob-screen{
+  background:
+    radial-gradient(120% 90% at 12% 8%, rgba(126,176,255,.55), transparent 55%),
+    radial-gradient(110% 80% at 92% 18%, rgba(163,140,255,.45), transparent 55%),
+    radial-gradient(120% 90% at 80% 100%, rgba(143,227,181,.5), transparent 55%),
+    radial-gradient(100% 80% at 0% 100%, rgba(255,196,120,.35), transparent 55%),
+    linear-gradient(160deg,#eef3fb 0%,#f4f1ff 50%,#eafaf1 100%);
+}
+.ob-screen::before,.ob-screen::after{content:"";position:absolute;border-radius:50%;filter:blur(70px);opacity:.55;pointer-events:none;z-index:0;mix-blend-mode:multiply}
+.ob-screen::before{width:300px;height:300px;background:radial-gradient(circle,#6fa8ff,transparent 70%);top:-70px;right:-80px;animation:ob-float-a 14s ease-in-out infinite}
+.ob-screen::after{width:340px;height:340px;background:radial-gradient(circle,#7fe0ab,transparent 70%);bottom:-110px;left:-100px;animation:ob-float-b 18s ease-in-out infinite}
+@keyframes ob-float-a{0%,100%{transform:translate(0,0)}50%{transform:translate(-26px,34px)}}
+@keyframes ob-float-b{0%,100%{transform:translate(0,0)}50%{transform:translate(30px,-28px)}}
+@media (prefers-reduced-motion:reduce){.ob-screen::before,.ob-screen::after{animation:none}}
+.ob-screen.active{display:flex;animation:screen-in .25s ease}
+.ob-progress{height:4px;background:rgba(0,0,0,.06);width:100%;position:relative;z-index:1}
+.ob-progress-fill{height:100%;background:var(--grad-accent);width:0;border-radius:0 4px 4px 0;transition:width .35s ease}
+/* Content centered as one block; buttons sit directly beneath it (not bottom-pinned). */
+.ob-body{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:2rem 1.6rem;text-align:center;position:relative;z-index:1}
+.ob-emoji{font-size:56px;line-height:1;margin-bottom:1rem;filter:drop-shadow(0 6px 14px rgba(30,58,95,.18))}
+/* Icon badge for each onboarding step — a soft gradient circle with a line icon. */
+.ob-ico{width:76px;height:76px;margin:0 auto 1.2rem;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;background:var(--grad-accent);box-shadow:0 10px 24px rgba(30,58,95,.28)}
+.ob-ico svg{display:block;stroke-width:2}
+.ob-title{font-size:26px;font-weight:800;letter-spacing:-.5px;color:var(--ink);margin-bottom:.6rem}
+.ob-note{font-size:15px;color:var(--ink-soft);line-height:1.5;max-width:320px;margin:0 auto 1.4rem}
+.ob-input{width:100%;max-width:340px;margin:0 auto;padding:14px 16px;font-size:16px;border:1.5px solid rgba(30,58,95,.15);border-radius:var(--radius-sm);background:rgba(255,255,255,.85);backdrop-filter:blur(4px);text-align:center;box-shadow:0 4px 16px rgba(30,58,95,.06)}
+.ob-input:focus{outline:none;border-color:var(--accent);background:#fff}
+.ob-screen .field-err{max-width:340px;margin:6px auto 0;text-align:center}
+/* Actions right under the step content, centered — not pinned to the screen bottom. */
+.ob-actions{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:1.6rem;width:100%;max-width:340px}
+.ob-back{background:none;border:none;color:var(--ink-soft);font-size:15px;font-weight:600;cursor:pointer;padding:12px 4px}
+.ob-skip{background:none;border:none;color:var(--ink-mute);font-size:15px;font-weight:600;cursor:pointer;padding:12px 8px}
+.ob-next{padding:14px 34px;border:none;border-radius:var(--radius-pill);background:var(--grad-accent);color:#fff;font-size:15px;font-weight:700;cursor:pointer;box-shadow:var(--sh-accent);margin-left:auto}
+.ob-next:active{transform:scale(.97)}
+/* Lone Next (Welcome / Done): no auto-margin so justify-center truly centers it. */
+.ob-next--lone{margin-left:0}
 .sheet-group .sheet-btn{border-bottom:1px solid var(--line)}
 .sheet-group .sheet-btn:last-child{border-bottom:none}
 .sb-ico{display:inline-flex;align-items:center;justify-content:center;width:22px;color:var(--accent)}

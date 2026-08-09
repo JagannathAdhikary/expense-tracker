@@ -17,6 +17,7 @@ import { setGroupIcon, renameGroup } from '../features/groups.js';
 import { navTo, navBack } from '../nav.js';
 import { renderForScreen } from './nav-render.js';
 import { buildUpiLink } from '../upi.js';
+import { pendingProfileActions, openProfileEdit } from '../features/profile.js';
 
 // Preset icons + colors for the group icon editor.
 const GROUP_ICONS = ['👥', '🏠', '✈️', '🍽️', '🎉', '🛒', '🏖️', '🏔️', '🎬', '⚽', '🎓', '💼', '🚗', '🏥', '🐾', '💡'];
@@ -343,6 +344,16 @@ function renderGroupDetail() {
     $('groupRetiredBanner').innerHTML = '';
   }
   $('groupAddBtn').closest('.fab').style.display = g.retired ? 'none' : '';
+
+  // Pending-action nudge: if you haven't added a UPI ID, group members can't pay
+  // you back in one tap. Tapping the banner opens your profile.
+  if (pendingProfileActions() > 0) {
+    $('groupPendingBanner').innerHTML = `<button class="pending-banner pending-banner-btn" id="groupPendingBtn">Add your UPI ID so members can pay you back — 1 pending action.</button>`;
+    const b = $('groupPendingBtn');
+    if (b) b.onclick = () => openProfileEdit();
+  } else {
+    $('groupPendingBanner').innerHTML = '';
+  }
 
   // Your total share of this group: every split of yours, settled or not —
   // your part of what you spent plus everything you owe. Hidden when zero.

@@ -43,7 +43,6 @@ export function openCatModal() {
 
 export function initCategories() {
   $('manageCatsBtn').onclick = () => {
-    $('overlay').classList.remove('open');
     renderCatManage();
     $('catOverlay').classList.add('open');
   };

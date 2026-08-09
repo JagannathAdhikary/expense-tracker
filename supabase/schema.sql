@@ -16,11 +16,13 @@ create table if not exists public.profiles (
   avatar_url   text,
   sync_enabled boolean not null default false,   -- server-authoritative personal-sync switch
   upi_id       text,                              -- optional VPA (name@provider) so co-members can pay via UPI
+  phone        text,                              -- mobile number (format-validated only; not OTP-verified)
   created_at   timestamptz not null default now()
 );
 -- For projects created before these columns were added:
 alter table public.profiles add column if not exists sync_enabled boolean not null default false;
 alter table public.profiles add column if not exists upi_id text;
+alter table public.profiles add column if not exists phone text;
 
 create table if not exists public.groups (
   id          uuid primary key default gen_random_uuid(),

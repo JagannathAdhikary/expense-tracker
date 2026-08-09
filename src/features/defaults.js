@@ -18,7 +18,6 @@ function renderDefaultChips() {
 
 export function initDefaults() {
   $('defaultsBtn').onclick = () => {
-    $('overlay').classList.remove('open');
     defCatSel = state.PREFS.defaultCat && state.CATS.find((c) => c.n === state.PREFS.defaultCat) ? state.PREFS.defaultCat : state.CATS[0] ? state.CATS[0].n : null;
     defPaySel = state.PREFS.defaultPay && state.PAYS.find((p) => p.n === state.PREFS.defaultPay) ? state.PREFS.defaultPay : state.PAYS[0] ? state.PAYS[0].n : null;
     renderDefaultChips();

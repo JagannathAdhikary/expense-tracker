@@ -19,6 +19,7 @@ import { initDefaults } from './features/defaults.js';
 import { initBackup } from './features/backup.js';
 import { initFilter } from './features/filter.js';
 import { initProfile, loadMyProfile, refreshUpiButton } from './features/profile.js';
+import { initOnboarding, onboardingIfNeeded } from './features/onboarding.js';
 import { autoEnablePush, enablePush, disablePush, isSubscribed, pushStatus, pushSupported } from './features/push.js';
 import { initAuth, onAuthChange } from './features/auth.js';
 import { initGroupsFeature, loadCloudData, onGroupData, subscribeRealtime, unsubscribeRealtime, joinGroupByCode } from './features/groups.js';
@@ -51,6 +52,13 @@ document.addEventListener('month-change', () => {
   if ($('analytics').classList.contains('active')) renderAnalytics();
 });
 
+// Profile saved (name/upi/phone changed) -> refresh the header avatar + pending
+// dot, and the groups view (its pending indicator).
+document.addEventListener('profile-updated', () => {
+  renderHomeActions();
+  refreshGroupsView();
+});
+
 // Load data, then seed the current selections from user defaults.
 initState();
 state.selCat = initialCat();
@@ -68,6 +76,7 @@ initDefaults();
 initBackup();
 initFilter();
 initProfile();
+initOnboarding();
 initAuth();
 initGroupsFeature();
 initGroupsView();
@@ -82,8 +91,13 @@ onAuthChange((user) => {
   if (user) {
     loadCloudData().then(() => maybeJoinFromLink());
     subscribeRealtime();
-    // Load the user's own UPI id, then refresh the menu button + maybe prompt once.
-    loadMyProfile().then(() => refreshUpiButton());
+    // Load the user's own profile, then: run the full-screen onboarding journey
+    // if it's incomplete (name/phone missing), and refresh the menu button.
+    loadMyProfile().then(() => {
+      refreshUpiButton();
+      renderHomeActions(); // avatar + pending dot now that profile (upi) is known
+      onboardingIfNeeded(() => showHome());
+    });
     // On-by-default group notifications: ask permission once + subscribe on grant.
     autoEnablePush(user).then(updateNotifyButton);
     // Run the first-login sync prompt, then introduce Groups with a one-time tip.
@@ -110,18 +124,27 @@ async function updateNotifyButton() {
   const btn = $('notifyBtn');
   if (!btn) return;
   const show = !!state.user && pushSupported();
+  // Show/hide the whole Notifications section (heading + card), not just the button.
   btn.style.display = show ? '' : 'none';
+  $('notifSection').style.display = show ? '' : 'none';
+  $('notifSectionLabel').style.display = show ? '' : 'none';
   if (!show) return;
   const label = $('notifyBtnLabel');
+  const sw = $('notifySwitch');
   const status = pushStatus();
   if (status === 'denied') {
-    if (label) label.textContent = 'Notifications blocked (browser settings)';
+    // Blocked at the browser level — show it off + disabled (only browser settings can undo).
+    if (label) label.textContent = 'Notifications blocked';
+    sw.classList.remove('on');
+    btn.classList.add('is-disabled');
     btn.disabled = true;
     return;
   }
+  btn.classList.remove('is-disabled');
   btn.disabled = false;
+  if (label) label.textContent = 'Group notifications';
   const on = await isSubscribed();
-  if (label) label.textContent = on ? 'Group notifications: on · tap to turn off' : 'Enable group notifications';
+  sw.classList.toggle('on', on);
 }
 const notifyBtn = $('notifyBtn');
 if (notifyBtn) {
@@ -132,7 +155,7 @@ if (notifyBtn) {
       if (await isSubscribed()) await disablePush();
       else await enablePush(state.user);
     } finally {
-      $('overlay').classList.remove('open'); // close the menu sheet
+      // Keep the menu open so the switch visibly flips in place.
       await updateNotifyButton();
     }
   };

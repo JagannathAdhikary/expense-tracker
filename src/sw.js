@@ -24,7 +24,7 @@ self.addEventListener('push', (event) => {
     self.registration.showNotification(title, {
       body: data.body || '',
       icon: BASE + 'icon-192.png',
-      badge: BASE + 'icon-192.png',
+      badge: BASE + 'badge-96.png',
       tag: data.tag,
       data: { url: data.url || BASE },
     }),

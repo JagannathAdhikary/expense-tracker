@@ -35,7 +35,6 @@ export function openPayModal() {
 
 export function initPayments() {
   $('managePaysBtn').onclick = () => {
-    $('overlay').classList.remove('open');
     renderPayManage();
     $('payOverlay').classList.add('open');
   };
