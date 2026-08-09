@@ -231,6 +231,8 @@
       <button class="sheet-btn" id="manageCatsBtn"><span class="sb-ico" data-icon="tag"></span> Manage categories</button>
       <button class="sheet-btn" id="managePaysBtn"><span class="sb-ico" data-icon="card"></span> Manage payment methods</button>
       <button class="sheet-btn" id="defaultsBtn"><span class="sb-ico" data-icon="star"></span> Set defaults</button>
+      <button class="sheet-btn" id="upiBtn" style="display:none"><span class="sb-ico" data-icon="card"></span> <span id="upiBtnLabel">My UPI ID</span></button>
+      <button class="sheet-btn" id="notifyBtn" style="display:none"><span class="sb-ico" data-icon="bell"></span> <span id="notifyBtnLabel">Group notifications</span></button>
     </div>
     <div class="sheet-group">
       <button class="sheet-btn" id="exportBtn"><span class="sb-ico" data-icon="upload"></span> Export data (backup)</button>
@@ -409,6 +411,22 @@
 </div>
 
 <!-- GROUP ICON EDITOR MODAL -->
+<div class="modal" id="upiModal">
+  <div class="modal-box">
+    <h3>My UPI ID</h3>
+    <p class="modal-note">So group members can pay you back via UPI. Copy it from your UPI app (e.g. Google Pay, PhonePe). Format: <b>name@bank</b>.</p>
+    <div class="field">
+      <label>UPI ID</label>
+      <input type="text" id="upiInput" placeholder="e.g. rahul@okaxis" autocapitalize="off" autocorrect="off" spellcheck="false"/>
+      <div class="field-err" id="upiErr" style="display:none"></div>
+    </div>
+    <div class="modal-actions">
+      <button id="upiCancel">Cancel</button>
+      <button class="primary" id="upiSave">Save</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="groupIconModal">
   <div class="modal-box">
     <h3>Group settings</h3>

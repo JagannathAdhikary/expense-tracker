@@ -53,12 +53,13 @@ export async function loadCloudData() {
   // Members of those groups, joined to profiles for display.
   let membersByGroup = {};
   if (groupIds.length) {
-    const { data: mem } = await supabase.from('group_members').select('group_id, user_id, profiles(id, display_name, avatar_url)').in('group_id', groupIds);
+    const { data: mem } = await supabase.from('group_members').select('group_id, user_id, profiles(id, display_name, avatar_url, upi_id)').in('group_id', groupIds);
     (mem || []).forEach((row) => {
       (membersByGroup[row.group_id] ||= []).push({
         id: row.user_id,
         name: row.profiles?.display_name || 'Member',
         avatar: row.profiles?.avatar_url || null,
+        upi: row.profiles?.upi_id || null,
       });
     });
   }
@@ -172,6 +173,10 @@ export async function saveGroupExpense({ groupId, amount, description, category,
     toastError('Expense saved but splits failed: ' + sErr.message);
     return false;
   }
+  // Notify the group's other members (best-effort push; never blocks the save).
+  supabase.functions
+    .invoke('notify-expense', { body: { expenseId: exp.id, groupId, payerName: state.user.name || 'Someone', amount } })
+    .catch((e) => console.warn('notify-expense invoke failed', e));
   // Refresh in the background so the form can close immediately; onGroupData
   // re-renders the list once the reload lands. Opposing debts net automatically
   // at read time (see netBetween in split.js) — no auto-settlement row needed.

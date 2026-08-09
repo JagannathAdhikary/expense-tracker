@@ -16,6 +16,7 @@ import { confirmModal, pickSettlePayment } from '../confirm.js';
 import { setGroupIcon, renameGroup } from '../features/groups.js';
 import { navTo, navBack } from '../nav.js';
 import { renderForScreen } from './nav-render.js';
+import { buildUpiLink } from '../upi.js';
 
 // Preset icons + colors for the group icon editor.
 const GROUP_ICONS = ['👥', '🏠', '✈️', '🍽️', '🎉', '🛒', '🏖️', '🏔️', '🎬', '⚽', '🎓', '💼', '🚗', '🏥', '🐾', '💡'];
@@ -69,11 +70,39 @@ function buildInvite(g) {
 async function confirmAndSettleShare(splitId) {
   const split = state.mySplits.find((s) => s.id === splitId);
   const amt = split ? fmt(split.share_amount) : 'your share';
+  // Offer to pay the expense's payer via UPI first (if they have a UPI ID).
+  if (split) {
+    const exp = state.groupExpenses.find((e) => e.id === split.expense_id);
+    const g = exp && state.groups.find((x) => x.id === exp.group_id);
+    if (exp && g && exp.payer_id !== state.user?.id) {
+      await offerUpiPay(g, exp.payer_id, Number(split.share_amount), `Settle · ${g.name}`);
+    }
+  }
   if (!(await confirmModal(`Mark your share of ${amt} as settled? Do this once you've actually paid it back.`, { title: 'Settle share', confirmLabel: 'Continue' }))) return false;
   const { confirmed, pay } = await pickSettlePayment();
   if (!confirmed) return false;
   await markShareDone(splitId, pay);
   return true;
+}
+
+// If the payee has a UPI ID, offer to open a UPI app pre-filled to pay them. This
+// only launches the payment — it can't confirm success, so the caller still runs
+// the normal "mark settled" step afterward. No-op (returns silently) when the
+// payee has no UPI ID or we're not on a device that resolves upi:// links.
+async function offerUpiPay(group, payeeId, amount, note) {
+  const payee = group?.members.find((m) => m.id === payeeId);
+  const link = payee && payee.upi ? buildUpiLink({ pa: payee.upi, pn: payee.name, amount, note }) : null;
+  if (!link) return; // no UPI id / invalid -> skip straight to manual settle
+  const name = payee.name;
+  const ok = await confirmModal(`Pay ${fmt(amount)} to ${name} (${payee.upi}) via UPI? This opens your UPI app — come back and confirm once it's done.`, {
+    title: 'Pay via UPI',
+    confirmLabel: 'Open UPI app',
+    cancelLabel: 'Skip',
+  });
+  if (ok) {
+    // Launch the UPI app chooser (Android). Harmless no-op link elsewhere.
+    window.location.href = link;
+  }
 }
 
 // "Wed, 5 Feb · 3:42 PM" — friendly spent-on date plus the recorded time.
@@ -628,11 +657,15 @@ export function initGroupsView() {
     const btn = e.target.closest('.owe-settle');
     if (!btn) return;
     const g = state.groups.find((x) => x.id === state.openGroupId);
-    const name = g ? memberName(g, btn.dataset.payer) : 'this person';
+    const payeeId = btn.dataset.payer;
+    const name = g ? memberName(g, payeeId) : 'this person';
+    // Amount you owe them (net) — for the UPI pre-fill.
+    const owe = owedByUserInGroup(state.openGroupId).byPayer.find((o) => o.payerId === payeeId);
+    if (owe && g) await offerUpiPay(g, payeeId, owe.amount, `Settle · ${g.name}`);
     if (!(await confirmModal(`Settle up with ${name}? This clears everything between you two — what you owe them and what they owe you.`, { title: 'Settle up', confirmLabel: 'Continue' }))) return;
     const { confirmed, pay } = await pickSettlePayment();
     if (!confirmed) return;
-    await settleUpWithMember(state.openGroupId, btn.dataset.payer, pay);
+    await settleUpWithMember(state.openGroupId, payeeId, pay);
     renderGroupDetail();
   });
 
