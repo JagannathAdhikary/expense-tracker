@@ -53,13 +53,14 @@ export async function loadCloudData() {
   // Members of those groups, joined to profiles for display.
   let membersByGroup = {};
   if (groupIds.length) {
-    const { data: mem } = await supabase.from('group_members').select('group_id, user_id, profiles(id, display_name, avatar_url, upi_id)').in('group_id', groupIds);
+    const { data: mem } = await supabase.from('group_members').select('group_id, user_id, profiles(id, display_name, avatar_url, upi_id, phone)').in('group_id', groupIds);
     (mem || []).forEach((row) => {
       (membersByGroup[row.group_id] ||= []).push({
         id: row.user_id,
         name: row.profiles?.display_name || 'Member',
         avatar: row.profiles?.avatar_url || null,
         upi: row.profiles?.upi_id || null,
+        phone: row.profiles?.phone || null,
       });
     });
   }
@@ -101,7 +102,7 @@ export async function loadCloudData() {
 // Mutations
 // ---------------------------------------------------------------------------
 
-export async function createGroup(name) {
+export async function createGroup(name, memberIds = []) {
   if (!cloudEnabled() || !state.user) return null;
   const invite_code = makeInviteCode();
   const { data: grp, error } = await supabase.from('groups').insert({ name, invite_code, created_by: state.user.id }).select().single();
@@ -109,10 +110,48 @@ export async function createGroup(name) {
     toastError('Could not create group: ' + error.message);
     return null;
   }
-  // Add the creator as owner.
-  await supabase.from('group_members').insert({ group_id: grp.id, user_id: state.user.id, role: 'owner' });
+  // Add the creator as owner, plus any friends picked during creation (as members).
+  const rows = [{ group_id: grp.id, user_id: state.user.id, role: 'owner' }];
+  for (const uid of memberIds) {
+    if (uid && uid !== state.user.id) rows.push({ group_id: grp.id, user_id: uid, role: 'member' });
+  }
+  const { error: mErr } = await supabase.from('group_members').insert(rows);
+  if (mErr) toastError('Group created, but adding some members failed: ' + mErr.message);
   await loadCloudData();
   return grp;
+}
+
+// Friends = people you already share any (non-retired or retired) group with.
+// Deduped by id, excluding yourself and anyone already in `excludeGroupId`.
+export function myFriends(excludeGroupId = null) {
+  if (!state.user) return [];
+  const inExcluded = new Set(
+    excludeGroupId ? (state.groups.find((g) => g.id === excludeGroupId)?.members || []).map((m) => m.id) : [],
+  );
+  const byId = new Map();
+  for (const g of state.groups) {
+    for (const m of g.members || []) {
+      if (m.id === state.user.id || inExcluded.has(m.id)) continue;
+      if (!byId.has(m.id)) byId.set(m.id, { id: m.id, name: m.name, phone: m.phone || null, avatar: m.avatar || null });
+    }
+  }
+  return [...byId.values()];
+}
+
+// Add an existing user (a friend) to a group. Allowed by RLS for any member.
+export async function addMemberToGroup(groupId, userId) {
+  if (!cloudEnabled() || !state.user) return false;
+  const { error } = await supabase.from('group_members').insert({ group_id: groupId, user_id: userId, role: 'member' });
+  if (error) {
+    if (error.code === '23505') {
+      toastInfo('Already in the group.');
+    } else {
+      toastError('Could not add member: ' + error.message);
+      return false;
+    }
+  }
+  await loadCloudData();
+  return true;
 }
 
 export async function joinGroupByCode(code) {
@@ -472,7 +511,11 @@ export function initGroupsFeature() {
         return;
       }
       const grp = await createGroup(name);
-      if (grp) $('grpNameInput').value = '';
+      if (grp) {
+        $('grpNameInput').value = '';
+        // Jump into the new group and prompt to add members (handled by the view).
+        document.dispatchEvent(new CustomEvent('group-created', { detail: { id: grp.id } }));
+      }
     });
 
   $('grpJoinBtn').onclick = () =>
