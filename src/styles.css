@@ -46,6 +46,46 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .card:first-child .val{color:#fff}
 .card .lbl{font-size:12px;color:var(--ink-mute);margin-bottom:6px;font-weight:500}
 .card .val{font-size:24px;font-weight:700;color:var(--accent);letter-spacing:-.5px}
+/* Tappable Total card -> Analytics. It's the first card (accent gradient). */
+.card-link{border:none;width:100%;text-align:left;cursor:pointer;font:inherit;display:block;position:relative}
+.card-link:active{transform:scale(.98)}
+/* Chart icon in the card's top-right corner — the "open analytics" cue. */
+.card-chart-ico{position:absolute;top:12px;right:12px;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.18);color:#fff}
+.card-chart-ico svg{display:block}
+/* Recent-list header row with the Filter button on the right. */
+.list-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.7rem}
+/* Filter button active indicator (a small accent dot). */
+.hdr-btn.has-filter{position:relative;color:var(--accent);border-color:var(--accent)}
+.hdr-btn.has-filter::after{content:"";position:absolute;top:6px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--accent)}
+/* Active-filter bar above the list: summary + clear. */
+.filter-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--bg-2,#eef1f6);border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:.7rem;font-size:12.5px}
+.filter-bar .fb-summary{color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.filter-bar .fb-clear{border:none;background:none;color:var(--accent);font-weight:700;font-size:12.5px;cursor:pointer;padding:2px 4px;flex:none}
+/* Filter sheet: each chip row scrolls horizontally on one line instead of wrapping,
+   so long category/payment/group lists stay compact. */
+#filterOverlay .chips,
+#filterOverlay .pay-chips{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px}
+#filterOverlay .chips::-webkit-scrollbar,
+#filterOverlay .pay-chips::-webkit-scrollbar{display:none}
+#filterOverlay .chip,
+#filterOverlay .pay-chip{flex:0 0 auto}
+/* Add/Edit form: chip rows (category, payment, group, split-mode) scroll
+   horizontally on one line instead of wrapping. Keeps the form compact. */
+.form .chips,
+.form .pay-chips{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px}
+.form .chips::-webkit-scrollbar,
+.form .pay-chips::-webkit-scrollbar{display:none}
+.form .chip,
+.form .pay-chip{flex:0 0 auto}
+/* Date stepper: friendly label with prev/next day arrows; swipe to step days on
+   mobile; tap the label to open the native calendar for far jumps. The native
+   <input type=date> stays in the DOM (source of truth) but is visually hidden. */
+.date-stepper{display:flex;align-items:center;gap:8px;position:relative;touch-action:pan-y}
+.ds-arrow{flex:0 0 auto;width:42px;height:46px;border:1px solid var(--line);background:var(--surface);border-radius:var(--radius-sm);font-size:22px;line-height:1;color:var(--accent);cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:var(--sh-sm)}
+.ds-arrow:active{transform:scale(.94)}
+.ds-label{flex:1;height:46px;border:1px solid var(--line);background:var(--surface);border-radius:var(--radius-sm);font-size:15px;font-weight:600;color:var(--ink);cursor:pointer;box-shadow:var(--sh-sm);user-select:none}
+.ds-label:active{transform:scale(.99)}
+.ds-native{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;left:50%;bottom:0}
 /* Settled | Pending 2-column split in the Transactions card */
 .split-counts{display:flex;gap:10px;margin-top:2px}
 .split-counts .sc{flex:1;display:flex;flex-direction:column;line-height:1.1}
@@ -61,6 +101,31 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .bar-wrap{flex:1;background:var(--line);border-radius:var(--radius-pill);height:8px;overflow:hidden}
 .bar-fill{height:100%;border-radius:var(--radius-pill);transition:width .4s ease}
 .cat-row .camt{width:80px;text-align:right;font-size:13px;font-weight:600}
+
+/* ---- Analytics page ---- */
+.an-hero{background:var(--grad-accent);border-radius:var(--radius);padding:1.3rem 1.2rem;box-shadow:var(--sh-accent);margin-bottom:14px;text-align:center;color:#fff}
+.an-hero-lbl{font-size:12px;color:rgba(255,255,255,.78);font-weight:500}
+.an-hero-val{font-size:34px;font-weight:800;letter-spacing:-.6px;margin-top:4px}
+.an-delta{font-size:12.5px;font-weight:600;margin-top:6px;color:rgba(255,255,255,.72)}
+.an-delta.is-up{color:#ffd0c4}   /* spent more — caution */
+.an-delta.is-down{color:#b9f0cd} /* spent less — good */
+.an-delta-arrow{font-size:10px}
+.an-kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1.5rem}
+.an-kpi{background:var(--surface);border-radius:var(--radius-sm);padding:.75rem .85rem;box-shadow:var(--sh-sm)}
+.an-kpi-lbl{font-size:11px;color:var(--ink-mute);font-weight:500}
+.an-kpi-val{font-size:17px;font-weight:700;color:var(--accent);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.an-donut-wrap{display:flex;align-items:center;gap:16px;margin-bottom:1.2rem;flex-wrap:wrap}
+.an-donut{flex:0 0 auto}
+.an-donut-total{font-size:19px;font-weight:800;fill:var(--ink)}
+.an-donut-sub{font-size:9px;fill:var(--ink-mute);text-transform:uppercase;letter-spacing:.5px}
+.an-legend{flex:1;min-width:150px;display:flex;flex-direction:column;gap:6px}
+.an-leg-row{display:flex;align-items:center;gap:8px;font-size:13px}
+.an-leg-dot{width:10px;height:10px;border-radius:3px;flex:0 0 auto}
+.an-leg-name{flex:1;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.an-leg-pct{font-weight:700;font-variant-numeric:tabular-nums}
+.an-trend{--an-trend-bar:#9ec5f4;background:var(--surface);border-radius:var(--radius-sm);padding:.9rem .8rem 1.1rem;box-shadow:var(--sh-sm);margin-bottom:1.4rem}
+.an-trend svg{display:block}
+.an-trend-lbl{font-size:9px;fill:var(--ink-mute)}
 
 /* Date group */
 .date-group{margin-bottom:10px}
@@ -145,6 +210,9 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .pay-chip[data-pay="Gift"].on{background:#f5eafd;color:#6c3483;border-color:#6c3483}
 .pay-chip.add-chip{color:var(--accent);border-style:dashed;font-weight:600}
 .pay-chip.pay-custom.on{background:#eef1f6;color:var(--accent);border-color:var(--accent)}
+/* Split-mode chips (Equal / Amounts / Percent) use data-mode, so they don't match
+   the data-pay color rules above — give the selected one a clear accent highlight. */
+#isplitmode .pay-chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 .pay-badge.pay-custom{background:#eef1f6;color:var(--accent)}
 .default-star{color:#d4a017;font-size:12px;margin-left:4px}
 .save-btn{width:100%;padding:16px;background:var(--grad-accent);color:#fff;border:none;border-radius:var(--radius);font-size:16px;font-weight:700;cursor:pointer;box-shadow:var(--sh-accent);transition:transform .12s}

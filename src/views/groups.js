@@ -14,6 +14,8 @@ import { toastError, toastSuccess } from '../toast.js';
 import { icon } from '../icons.js';
 import { confirmModal, pickSettlePayment } from '../confirm.js';
 import { setGroupIcon, renameGroup } from '../features/groups.js';
+import { navTo, navBack } from '../nav.js';
+import { renderForScreen } from './nav-render.js';
 
 // Preset icons + colors for the group icon editor.
 const GROUP_ICONS = ['👥', '🏠', '✈️', '🍽️', '🎉', '🛒', '🏖️', '🏔️', '🎬', '⚽', '🎓', '💼', '🚗', '🏥', '🐾', '💡'];
@@ -469,8 +471,7 @@ export function showGroupDetail(id, focusExpId = null) {
   state.openGroupId = id;
   state.focusGroupExpId = focusExpId;
   closeGroupsPopover();
-  ['home', 'catview', 'add'].forEach((sid) => $(sid).classList.remove('active'));
-  $('groups').classList.add('active');
+  navTo('groups');
   renderGroupDetail();
 }
 
@@ -481,11 +482,11 @@ export function refreshGroupsView() {
 }
 
 export function initGroupsView() {
-  // Groups screen (detail) back button -> home.
+  // Group detail back -> previous screen (home, category, …).
   $('groupsBackBtn').onclick = () => {
     state.openGroupId = null;
-    $('groups').classList.remove('active');
-    $('home').classList.add('active');
+    const to = navBack();
+    renderForScreen(to);
   };
   // "+" on the group detail page: add an expense pre-tagged to this group.
   // Use the same SVG plus icon as the main FAB (header.js) so they match.

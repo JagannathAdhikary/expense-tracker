@@ -12,6 +12,8 @@ import { sharedRowsForMonth, expenseHasPayment } from '../cloudrows.js';
 import { markShareDone, deleteGroupExpense } from '../features/groups.js';
 import { toastError } from '../toast.js';
 import { confirmModal, pickSettlePayment } from '../confirm.js';
+import { navTo, navBack } from '../nav.js';
+import { renderForScreen } from './nav-render.js';
 
 export function renderCategoryView() {
   const cat = catByName(state.filterCat);
@@ -35,8 +37,7 @@ export function renderCategoryView() {
 
 export function showCategoryView(name) {
   state.filterCat = name;
-  $('home').classList.remove('active');
-  $('catview').classList.add('active');
+  navTo('catview');
   renderCategoryView();
 }
 
@@ -70,11 +71,10 @@ export function initCategory() {
     },
   });
   $('catbackbtn').onclick = () => {
-    // Back from category view returns home.
-    $('add').classList.remove('active');
-    $('catview').classList.remove('active');
-    state.filterCat = null;
-    $('home').classList.add('active');
-    render();
+    // Return to wherever we came from (analytics, home, …). Clear the category
+    // filter only if we're not going back to a screen that still shows it.
+    const to = navBack();
+    if (to !== 'catview') state.filterCat = null;
+    renderForScreen(to);
   };
 }

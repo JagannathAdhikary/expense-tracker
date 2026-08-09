@@ -10,12 +10,14 @@ import { $ } from './dom.js';
 
 import { render, showHome, initHome } from './views/home.js';
 import { renderCategoryView, initCategory } from './views/category.js';
+import { renderAnalytics, initAnalytics } from './views/analytics.js';
 import { initAddEdit, renderGroupChips } from './views/addEdit.js';
 import { initHeader, renderHomeActions } from './views/header.js';
 import { initCategories } from './features/categories.js';
 import { initPayments } from './features/payments.js';
 import { initDefaults } from './features/defaults.js';
 import { initBackup } from './features/backup.js';
+import { initFilter } from './features/filter.js';
 import { initAuth, onAuthChange } from './features/auth.js';
 import { initGroupsFeature, loadCloudData, onGroupData, subscribeRealtime, unsubscribeRealtime, joinGroupByCode } from './features/groups.js';
 import { initGroupsView, refreshGroupsView, showGroupDetail } from './views/groups.js';
@@ -44,6 +46,7 @@ try {
 document.addEventListener('month-change', () => {
   render();
   if (state.filterCat) renderCategoryView();
+  if ($('analytics').classList.contains('active')) renderAnalytics();
 });
 
 // Load data, then seed the current selections from user defaults.
@@ -55,11 +58,13 @@ state.selPay = initialPay();
 initHeader();
 initHome();
 initCategory();
+initAnalytics();
 initAddEdit();
 initCategories();
 initPayments();
 initDefaults();
 initBackup();
+initFilter();
 initAuth();
 initGroupsFeature();
 initGroupsView();
@@ -110,6 +115,7 @@ function maybeShowGroupsTip() {
 onSynced(() => {
   render();
   if (state.filterCat) renderCategoryView();
+  if ($('analytics').classList.contains('active')) renderAnalytics();
 });
 
 // Whenever cloud data (re)loads, refresh the home list and the groups view, and
@@ -117,6 +123,7 @@ onSynced(() => {
 onGroupData(() => {
   render();
   if (state.filterCat) renderCategoryView();
+  if ($('analytics').classList.contains('active')) renderAnalytics();
   refreshGroupsView();
   if ($('add').classList.contains('active')) renderGroupChips();
 });
