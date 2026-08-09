@@ -29,6 +29,11 @@ describe('buildUpiLink', () => {
     expect(q.get('cu')).toBe('INR');
     expect(q.get('tn')).toBe('Trip Goa');
   });
+  it('keeps @ literal in the VPA (not %40) — BHIM needs this', () => {
+    const link = buildUpiLink({ pa: 'rahul@okaxis', amount: 10 });
+    expect(link).toContain('pa=rahul@okaxis');
+    expect(link).not.toContain('%40');
+  });
   it('formats amount to 2 decimals', () => {
     const q = new URLSearchParams(buildUpiLink({ pa: 'ab@ybl', amount: 33.3 }).slice('upi://pay?'.length));
     expect(q.get('am')).toBe('33.30');

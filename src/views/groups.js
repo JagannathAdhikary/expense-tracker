@@ -68,7 +68,8 @@ function buildInvite(g) {
 // Settle a single expense share: confirm first (so a tap can't commit money
 // by accident), then pick a payment method, then mark done. Returns true if it
 // actually settled, so callers can close a modal / re-render only on success.
-async function confirmAndSettleShare(splitId) {
+// Exported so the main transaction list can reuse the same rich flow.
+export async function confirmAndSettleShare(splitId) {
   const split = state.mySplits.find((s) => s.id === splitId);
   const amt = split ? fmt(split.share_amount) : 'your share';
   // Offer to pay the expense's payer via UPI first (if they have a UPI ID).
@@ -76,7 +77,9 @@ async function confirmAndSettleShare(splitId) {
     const exp = state.groupExpenses.find((e) => e.id === split.expense_id);
     const g = exp && state.groups.find((x) => x.id === exp.group_id);
     if (exp && g && exp.payer_id !== state.user?.id) {
-      await offerUpiPay(g, exp.payer_id, Number(split.share_amount), `Settle · ${g.name}`);
+      // Note: "<group>: <expense title>" so the payer sees what it's for.
+      const title = exp.description || 'Group expense';
+      await offerUpiPay(g, exp.payer_id, Number(split.share_amount), `${g.name}: ${title}`);
     }
   }
   if (!(await confirmModal(`Mark your share of ${amt} as settled? Do this once you've actually paid it back.`, { title: 'Settle share', confirmLabel: 'Continue' }))) return false;
@@ -672,7 +675,7 @@ export function initGroupsView() {
     const name = g ? memberName(g, payeeId) : 'this person';
     // Amount you owe them (net) — for the UPI pre-fill.
     const owe = owedByUserInGroup(state.openGroupId).byPayer.find((o) => o.payerId === payeeId);
-    if (owe && g) await offerUpiPay(g, payeeId, owe.amount, `Settle · ${g.name}`);
+    if (owe && g) await offerUpiPay(g, payeeId, owe.amount, `Settle ${g.name}`);
     if (!(await confirmModal(`Settle up with ${name}? This clears everything between you two — what you owe them and what they owe you.`, { title: 'Settle up', confirmLabel: 'Continue' }))) return;
     const { confirmed, pay } = await pickSettlePayment();
     if (!confirmed) return;
