@@ -17,11 +17,28 @@ import { initPayments } from './features/payments.js';
 import { initDefaults } from './features/defaults.js';
 import { initBackup } from './features/backup.js';
 import { initAuth, onAuthChange } from './features/auth.js';
-import { initGroupsFeature, loadCloudData, onGroupData, subscribeRealtime, unsubscribeRealtime } from './features/groups.js';
-import { initGroupsView, refreshGroupsView } from './views/groups.js';
+import { initGroupsFeature, loadCloudData, onGroupData, subscribeRealtime, unsubscribeRealtime, joinGroupByCode } from './features/groups.js';
+import { initGroupsView, refreshGroupsView, showGroupDetail } from './views/groups.js';
 import { renderSyncUI, onLoginSync, onSynced } from './features/sync.js';
 import { showCoachmark } from './coachmark.js';
 import { persistPrefs } from './storage.js';
+
+// Deep-link join: capture ?join=CODE from the invite link, then strip it from the
+// URL so a refresh/re-login doesn't re-trigger. Handled after login + cloud load.
+let pendingJoinCode = null;
+try {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('join');
+  if (code) {
+    pendingJoinCode = code.trim().toUpperCase();
+    params.delete('join');
+    const qs = params.toString();
+    const clean = window.location.pathname + (qs ? '?' + qs : '') + window.location.hash;
+    window.history.replaceState({}, '', clean);
+  }
+} catch {
+  /* no-op: malformed URL */
+}
 
 // Month nav (dispatched from the header) refreshes the active list views.
 document.addEventListener('month-change', () => {
@@ -53,7 +70,7 @@ onAuthChange((user) => {
   renderHomeActions();
   renderSyncUI();
   if (user) {
-    loadCloudData();
+    loadCloudData().then(() => maybeJoinFromLink());
     subscribeRealtime();
     // Run the first-login sync prompt, then introduce Groups with a one-time tip.
     onLoginSync().then(maybeShowGroupsTip);
@@ -62,6 +79,16 @@ onAuthChange((user) => {
     loadCloudData(); // clears cloud state when logged out
   }
 });
+
+// If the app was opened via an invite link (?join=CODE), join that group now that
+// we're signed in and cloud data is loaded, then open it. Runs at most once.
+async function maybeJoinFromLink() {
+  if (!pendingJoinCode || !state.user) return;
+  const code = pendingJoinCode;
+  pendingJoinCode = null; // consume it (only attempt once)
+  const grp = await joinGroupByCode(code); // shows its own toast (joined / already in / not found)
+  if (grp) showGroupDetail(grp.id);
+}
 
 // One-time coach-mark pointing at the Groups icon, shown after the first login.
 function maybeShowGroupsTip() {
