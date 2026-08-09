@@ -35,15 +35,15 @@ function renderSheet() {
   // Scope chips.
   $('fltScope').querySelectorAll('.pay-chip').forEach((c) => c.classList.toggle('on', c.dataset.scope === draft.scope));
 
-  // Group picker: only meaningful when signed in with groups, and not when scope
-  // is "personal" (no groups there). Hide otherwise.
-  const groups = cloudEnabled() && state.user ? state.groups.filter((g) => !g.retired) : [];
+  // Group picker: only when scope is "group" (choosing a specific group makes no
+  // sense for All/Personal). Include retired groups so their history is filterable.
+  const groups = cloudEnabled() && state.user ? state.groups : [];
   const groupField = $('fltGroupField');
-  if (groups.length && draft.scope !== 'personal') {
+  if (groups.length && draft.scope === 'group') {
     groupField.style.display = '';
     $('fltGroups').innerHTML =
       `<div class="chip${!draft.groupId ? ' on' : ''}" data-group="">Any group</div>` +
-      groups.map((g) => `<div class="chip${g.id === draft.groupId ? ' on' : ''}" data-group="${g.id}">👥 ${g.name}</div>`).join('');
+      groups.map((g) => `<div class="chip${g.id === draft.groupId ? ' on' : ''}" data-group="${g.id}">👥 ${g.name}${g.retired ? ' (retired)' : ''}</div>`).join('');
   } else {
     groupField.style.display = 'none';
   }
@@ -75,7 +75,7 @@ export function initFilter() {
     const chip = e.target.closest('.pay-chip');
     if (!chip || !draft) return;
     draft.scope = chip.dataset.scope;
-    if (draft.scope === 'personal') draft.groupId = null; // groups don't apply
+    if (draft.scope !== 'group') draft.groupId = null; // a specific group only applies to "group" scope
     renderSheet();
   });
 

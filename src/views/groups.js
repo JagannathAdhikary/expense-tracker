@@ -151,11 +151,14 @@ function renderGroupList() {
 // A compact group tile: just the icon + truncated name, with a small label badge
 // on the icon showing whether MY balance in the group is clear or outstanding.
 function groupTile(g) {
+  const hasExpenses = state.groupExpenses.some((e) => e.group_id === g.id);
   const settled = owedByUserInGroup(g.id).total === 0 && owedToUserInGroup(g.id).total === 0;
+  // No flag on an empty group — "Settled" would be misleading when there's nothing.
+  const flag = !hasExpenses ? '' : `<span class="gt-flag ${settled ? 'is-settled' : 'is-owed'}">${settled ? 'Settled' : 'Due'}</span>`;
   return `<button class="group-tile${g.retired ? ' retired' : ''}" data-group="${g.id}">
       <span class="gt-ico-wrap">
         <span class="gt-ico txn-ico" style="background:${groupColor(g)}20">${groupIcon(g)}</span>
-        <span class="gt-flag ${settled ? 'is-settled' : 'is-owed'}">${settled ? 'Settled' : 'Due'}</span>
+        ${flag}
       </span>
       <span class="gt-name">${g.name}</span>
     </button>`;

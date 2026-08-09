@@ -17,16 +17,20 @@ import { navTo, navBack } from '../nav.js';
 import { renderForScreen } from './nav-render.js';
 
 export function renderCatChips() {
+  // Selected category first so it's visible without scrolling the horizontal row.
+  const cats = [...state.CATS].sort((a, b) => (a.n === state.selCat ? -1 : b.n === state.selCat ? 1 : 0));
   const html =
-    state.CATS.map((c) => `<div class="chip${c.n === state.selCat ? ' on' : ''}" data-cat="${c.n}">${c.e} ${c.n}</div>`).join('') +
+    cats.map((c) => `<div class="chip${c.n === state.selCat ? ' on' : ''}" data-cat="${c.n}">${c.e} ${c.n}</div>`).join('') +
     `<div class="chip add-chip" id="addCatChip">＋ New</div>`;
   $('ichips').innerHTML = html;
 }
 
 export function renderPayChips() {
-  // Built-in pay names keep their color classes via data-pay; custom ones get pay-custom.
+  // Selected payment first (same reason). Built-in pay names keep their color
+  // classes via data-pay; custom ones get pay-custom.
+  const pays = [...state.PAYS].sort((a, b) => (a.n === state.selPay ? -1 : b.n === state.selPay ? 1 : 0));
   const html =
-    state.PAYS.map((p) => {
+    pays.map((p) => {
       const cls = 'pay-chip' + (BUILTIN_PAYS.includes(p.n) ? '' : ' pay-custom') + (p.n === state.selPay ? ' on' : '');
       return `<div class="${cls}" data-pay="${p.n}">${p.e || '💰'} ${p.n}</div>`;
     }).join('') + `<div class="pay-chip add-chip" id="addPayChip">＋ New</div>`;
