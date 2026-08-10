@@ -80,10 +80,7 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
    don't apply — give the selected one an explicit accent highlight. */
 #fltScope .pay-chip.on{background:var(--grad-accent);color:#fff;border-color:transparent;box-shadow:0 3px 10px rgba(30,58,95,.25)}
 /* Group members section + add-member picker. */
-.group-members-head{display:flex;align-items:center;justify-content:space-between;margin-top:14px;margin-bottom:.6rem}
-.group-members-head .hdr-btn{height:32px;padding:0 12px;font-size:12.5px}
 .section-sub{text-transform:none;color:var(--ink-mute);font-weight:500}
-#groupMembersList{display:flex;flex-direction:column;gap:2px;margin-bottom:6px}
 .member-row{display:flex;align-items:center;gap:10px;padding:6px 2px}
 .member-row-av{width:28px;height:28px;font-size:12px}
 .member-row-name{font-size:14px;color:var(--ink)}
@@ -100,19 +97,37 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .gt-photo{width:100%;height:100%;object-fit:cover;border-radius:50%;display:block}
 .gt-ico.has-photo{padding:0;overflow:hidden}
 /* Groups popover as an anchored dropdown under the header (not a bottom sheet). */
-#groupsOverlay{align-items:flex-start;justify-content:flex-end}
-#groupsOverlay .sheet{margin:64px 12px 0 auto;width:min(340px,calc(100vw - 24px));border-radius:18px;max-height:min(70vh,560px);animation:screen-in .18s ease}
+/* Groups popover anchored at the TOP, full width (like the bottom sheet, flipped). */
+#groupsOverlay{align-items:flex-start}
+#groupsOverlay .sheet{margin:0 auto;width:100%;max-width:480px;border-radius:0 0 24px 24px;max-height:85vh;animation:sheet-down .25s ease}
+@keyframes sheet-down{from{transform:translateY(-100%)}to{transform:none}}
 .grp-create-full{width:100%;justify-content:center;height:44px}
 /* New Group full-screen page */
 .ng-body{display:flex;flex-direction:column;gap:18px}
-.ng-icon-row{display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:.5rem}
-.ng-icon{width:88px;height:88px;border-radius:50%;border:none;display:flex;align-items:center;justify-content:center;font-size:40px;cursor:pointer;overflow:hidden;box-shadow:var(--sh-md)}
-.ng-icon .gt-photo{width:100%;height:100%;object-fit:cover;border-radius:50%}
-.ng-photo-btn{background:none;border:none;color:var(--accent);font-weight:600;font-size:13px;cursor:pointer}
+/* New Group: wide cover preview banner + cover picker. */
+.ng-icon{width:100%;height:120px;border-radius:var(--radius);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;box-shadow:var(--sh-md);background-size:cover;background-position:center}
+.ng-photo-row{display:flex;justify-content:center;margin-top:12px}
+/* Browse-for-cover-photo button: an outlined pill with an upload glyph, centred.
+   Used on the New Group page and in the group cover editor. */
+.photo-upload-btn{display:inline-flex;align-items:center;gap:7px;background:var(--surface);border:1.5px solid var(--line);color:var(--accent);font-weight:600;font-size:13px;padding:9px 18px;border-radius:var(--radius-pill);cursor:pointer;box-shadow:var(--sh-sm);transition:background .15s,border-color .15s,transform .1s}
+/* When placed directly in a field (cover editor), centre it with top spacing. */
+.cover-preview + .photo-upload-btn{display:flex;margin:12px auto 0}
+.photo-upload-btn:hover{background:var(--bg-2);border-color:var(--accent)}
+.photo-upload-btn:active{transform:scale(.97)}
+.pub-ico{display:inline-flex;align-items:center;justify-content:center}
+.pub-ico svg{display:block}
 .ng-selected{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .ng-chip{display:inline-flex;align-items:center;gap:6px;background:var(--bg-2);border-radius:999px;padding:6px 6px 6px 12px;font-size:13px;font-weight:500}
 .ng-chip-x{border:none;background:rgba(0,0,0,.08);width:20px;height:20px;border-radius:50%;cursor:pointer;font-size:14px;line-height:1;color:var(--ink-soft)}
 #newGroup .member-results{margin-top:8px}
+/* Gradient theme swatches (New Group + group settings). */
+.theme-swatches{display:flex;flex-wrap:wrap;gap:10px}
+.theme-swatch{width:38px;height:38px;border-radius:11px;cursor:pointer;border:3px solid transparent;box-shadow:var(--sh-sm);transition:transform .12s}
+.theme-swatch.on{border-color:var(--ink);transform:scale(1.06)}
+/* Cover preview inside the group-settings modal. */
+.cover-preview{width:100%;height:96px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;overflow:hidden;background-size:cover;background-position:center;box-shadow:var(--sh-sm)}
+/* Popover tile thumbnail (photo cropped, or the cover scene). */
+.gt-thumb{display:flex;align-items:center;justify-content:center;overflow:hidden}
 #ngName,#ngMemberSearch{width:100%;padding:12px 14px;font-size:15px;border:1.5px solid var(--line);border-radius:var(--radius-sm);background:var(--surface)}
 #ngName:focus,#ngMemberSearch:focus{outline:none;border-color:var(--accent)}
 /* Add/Edit form: chip rows (category, payment, group, split-mode) scroll
@@ -358,14 +373,96 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .group-icon-btn .txn-ico{width:58px;height:58px;border-radius:17px;font-size:29px;box-shadow:var(--sh-sm)}
 .group-icon-edit{position:absolute;right:-3px;bottom:-3px;width:21px;height:21px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:var(--sh-sm)}
 .group-icon-edit svg{display:block;width:12px;height:12px}
-.gicon-preview{display:flex;justify-content:center}
-.gicon-preview .txn-ico{width:64px;height:64px;border-radius:20px;font-size:32px}
-.gicon-chip{padding:8px 10px}
+/* Cover picker: a single horizontal slidable row of scene swatches. */
+.theme-row{display:flex;flex-wrap:nowrap;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:4px 2px 6px}
+.theme-row::-webkit-scrollbar{display:none}
+.theme-row .theme-swatch{flex:0 0 auto;width:54px;height:54px}
 
 /* Member avatar (photo or colored initial) — used as the expense-tile icon */
 .member-avatar{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:50%;overflow:hidden;color:#fff;font-weight:700;background:var(--accent)}
 .member-avatar img{width:100%;height:100%;object-fit:cover;display:block}
 .member-avatar.ge-avatar{width:42px;height:42px;font-size:17px}
+
+/* ===== Group detail cover hero ===== */
+/* The group screen has no sticky header; the cover hero replaces it. Pull it up
+   under the safe-area and out to the screen edges so it reads as a banner. */
+#groups.screen{padding-top:0}
+/* The group screen hosts a position:fixed top bar. A transform on the .screen
+   ancestor (the default screen-in slide) would re-anchor that fixed bar to the
+   screen and make the shared title's measured geometry jump when the animation
+   ends — a flicker on open. Use an opacity-only entrance here (no transform). */
+#groups.screen.active{animation:fade-in .25s ease}
+@keyframes fade-in{from{opacity:0}to{opacity:1}}
+.group-hero{position:relative;margin:-1.1rem -1.1rem 1rem;min-height:190px;display:flex;flex-direction:column;justify-content:flex-end;border-radius:0 0 20px 20px;overflow:hidden;box-shadow:var(--sh-md)}
+/* Legibility scrim: darken the bottom of the cover so the name + members read
+   clearly over any gradient or photo. Sits above the bg, below the content. */
+.group-hero::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(to top,rgba(0,0,0,.55) 0%,rgba(0,0,0,.28) 34%,rgba(0,0,0,0) 62%)}
+.group-hero-bg{position:absolute;inset:0;background:var(--grad-accent) center/cover no-repeat;z-index:0}
+/* Fixed top bar over the cover: back + shared title + gear. It stays pinned as the
+   page scrolls; the title element travels from its big left cover pose up into the
+   small centred bar pose, driven per-frame by JS (transform + colour). The bar's
+   solid background fades in gradually via --bar-p (0 expanded → 1 collapsed). */
+.group-topbar{position:fixed;top:0;left:0;right:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:calc(env(safe-area-inset-top,0px) + 12px) 14px 10px;max-width:480px;margin:0 auto;pointer-events:none}
+.group-topbar > *{pointer-events:auto;position:relative;z-index:1}
+/* Gradually-appearing solid surface behind the bar. No backdrop-filter here — a
+   blur applies even at opacity 0 on WebKit/Blink, leaving a faint strip at the top;
+   the opacity-driven solid surface alone is invisible when fully expanded. */
+.group-topbar::before{content:"";position:absolute;inset:0;z-index:0;background:var(--surface);box-shadow:var(--sh-sm);opacity:var(--bar-p,0);pointer-events:none}
+/* The one shared title. Natural (collapsed) pose = small, centred, ink. JS shifts
+   it toward the big white left-aligned cover pose as p→0. Origin left so it scales
+   out from its text start edge cleanly. */
+.group-title{position:absolute;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 12px);text-align:center;font-size:16px;font-weight:800;letter-spacing:-.2px;line-height:38px;height:38px;color:var(--ink);white-space:nowrap;transform-origin:center;pointer-events:none;will-change:transform;z-index:1}
+.hero-btn{display:flex;align-items:center;justify-content:center;width:38px;height:38px;border:none;border-radius:12px;cursor:pointer;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:transform .1s;background:rgba(255,255,255,calc(.22 + .78 * var(--bar-p,0)));box-shadow:0 0 0 1px rgba(0,0,0,calc(.06 * var(--bar-p,0))) inset}
+.hero-btn{color:#fff}
+.hero-btn:active{transform:scale(.92)}
+.hero-btn svg{display:block}
+/* Members block, overlaid on the bottom of the cover (title now lives in the bar). */
+.group-hero-info{position:relative;z-index:2;padding:28px 16px 16px;display:flex;flex-direction:column;gap:8px}
+/* Button on the left, avatar stack to its right, on one row. */
+.group-members-row{display:flex;align-items:center;gap:10px}
+.group-members-btn{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;border:none;cursor:pointer;background:rgba(255,255,255,.22);color:#fff;font-size:13.5px;font-weight:700;padding:8px 16px;border-radius:var(--radius-pill);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:background .15s}
+.group-members-btn:hover{background:rgba(255,255,255,.34)}
+.group-members-btn:active{transform:scale(.96)}
+.group-members-btn svg{display:block;vertical-align:middle}
+#groupMemberCount{display:inline-flex;align-items:center;gap:6px}
+#groupMemberCount svg{width:15px;height:15px}
+/* Avatar stack to the right of the members button. */
+.group-hero-avatars{display:flex;align-items:center}
+.hero-av{width:26px;height:26px;font-size:10px;border:2px solid rgba(255,255,255,.85);margin-left:-8px}
+.hero-av:first-child{margin-left:0}
+.hero-av-more{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(0,0,0,.45);color:#fff;font-weight:700;font-size:10px}
+
+/* ===== Full-screen group settings ===== */
+.gs-section{background:var(--surface);border-radius:var(--radius);box-shadow:var(--sh-sm);overflow:hidden;margin-bottom:18px}
+.gs-section-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--ink-mute);margin:0 4px 8px}
+/* Rows inside a section stack with hairline dividers between them. */
+.gs-row{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:none;border-top:1px solid var(--line);background:var(--surface);padding:15px;font-size:15px;font-weight:600;color:var(--ink);cursor:pointer;transition:background .15s}
+.gs-row:first-child{border-top:none}
+.gs-row:hover{background:var(--bg-2)}
+.gs-row:active{background:var(--line)}
+.gs-label{flex:1}
+.gs-ico{display:inline-flex;align-items:center;justify-content:center;width:22px;color:var(--ink-soft);flex-shrink:0}
+.gs-ico svg{display:block}
+/* Top group row: cover thumbnail + name/meta, pencil affordance on the right. */
+.gs-group-row{display:flex;align-items:center;gap:14px;width:100%;text-align:left;border:none;background:var(--surface);padding:16px;cursor:pointer;transition:background .15s}
+.gs-group-row:hover{background:var(--bg-2)}
+.gs-group-row:active{background:var(--line)}
+.gs-group-cover{flex-shrink:0}
+.gs-group-cover .gt-ico{width:52px;height:52px;border-radius:16px;box-shadow:var(--sh-sm)}
+.gs-group-meta{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.gs-group-name{font-size:17px;font-weight:800;letter-spacing:-.3px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gs-group-sub{font-size:12.5px;color:var(--ink-mute);font-weight:500}
+.gs-edit-ico{flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:10px;background:var(--bg-2);color:var(--ink-soft)}
+.gs-edit-ico svg{display:block}
+/* Retire gets its own amber accent; leave + delete are both red (destructive). */
+.gs-row.gs-retire{color:var(--warn)}
+.gs-row.gs-retire .gs-ico{color:var(--warn)}
+.gs-row.gs-warn{color:var(--neg)}
+.gs-row.gs-warn .gs-ico{color:var(--neg)}
+.gs-row.gs-danger{color:var(--neg)}
+.gs-row.gs-danger .gs-ico{color:var(--neg)}
+
+
 
 /* Groups popover: create/join action rows */
 .grp-actions{display:flex;flex-direction:column;gap:10px;margin-top:6px;padding-top:14px;border-top:1px solid var(--line)}

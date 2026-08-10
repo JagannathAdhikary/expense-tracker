@@ -7,33 +7,101 @@ import { cloudEnabled } from '../supabase.js';
 import { fmt } from '../format.js';
 import { friendlyDate, payBadge } from '../format.js';
 import { $ } from '../dom.js';
-import { loadCloudData, markShareDone, deleteGroupExpense, settleUpWithMember, deleteGroup, setGroupRetired, myFriends, addMemberToGroup, findUserByPhone } from '../features/groups.js';
+import { loadCloudData, markShareDone, deleteGroupExpense, settleUpWithMember, deleteGroup, setGroupRetired, myFriends, addMemberToGroup, findUserByPhone, leaveGroup } from '../features/groups.js';
 import { openEditGroup, showAddForGroup } from './addEdit.js';
 import { expenseHasPayment, owedByUserInGroup, owedToUserInGroup, totalShareInGroup } from '../cloudrows.js';
 import { toastError, toastSuccess } from '../toast.js';
 import { icon } from '../icons.js';
 import { matchFriends } from '../friends.js';
+import { downscaleImage } from '../imgutil.js';
 import { confirmModal, pickSettlePayment } from '../confirm.js';
-import { setGroupIcon, renameGroup } from '../features/groups.js';
-import { navTo, navBack } from '../nav.js';
+import { setGroupIcon, renameGroup, uploadGroupImage, setGroupPhoto } from '../features/groups.js';
+import { navTo, navBack, navReset } from '../nav.js';
 import { renderForScreen } from './nav-render.js';
 import { buildUpiLink } from '../upi.js';
 import { pendingProfileActions, openProfileEdit } from '../features/profile.js';
 
-// Preset icons + colors for the group icon editor.
-const GROUP_ICONS = ['👥', '🏠', '✈️', '🍽️', '🎉', '🛒', '🏖️', '🏔️', '🎬', '⚽', '🎓', '💼', '🚗', '🏥', '🐾', '💡'];
-const GROUP_COLORS = ['#1E3A5F', '#1A6B3A', '#7D3C98', '#C0392B', '#D35400', '#0E6655', '#2874A6', '#B7950B', '#CA6F1E', '#5B2C6F', '#34495E', '#808B96'];
-const DEFAULT_GROUP_ICON = '👥';
-const DEFAULT_GROUP_COLOR = '#1E3A5F';
+// Preset icons + gradient cover themes for the group cover editor.
+// Each cover is a full-cover, multi-colour vector SVG scene, inlined as a data-URI
+// and stretched to fill (center/cover). Encode fully and escape ( ) ' — which
+// encodeURIComponent leaves raw — so the value is valid inside url(...) and an HTML
+// style="" attribute. Consumers assign the string to `background` and get a scene.
+function scene(inner, w = 120, h = 120) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid slice">${inner}</svg>`;
+  const enc = encodeURIComponent(svg).replace(/[()']/g, (m) => ({ '(': '%28', ')': '%29', "'": '%27' }[m]));
+  return `url(data:image/svg+xml,${enc}) center/cover no-repeat`;
+}
+// A linear-gradient <defs> + rect base for a scene.
+const grad = (id, c1, c2) => `<defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><rect width="120" height="120" fill="url(#${id})"/>`;
 
-const groupIcon = (g) => g.icon || DEFAULT_GROUP_ICON;
-const groupColor = (g) => g.color || DEFAULT_GROUP_COLOR;
+// Ready-made cover themes: colourful vector scenes. id is stored in groups.color;
+// ids are stable for backward-compat.
+export const GROUP_THEMES = {
+  // Ocean: layered translucent waves in several blues + a sun disc.
+  ocean: scene(`${grad('g', '#1E3A5F', '#2E7FB8')}<circle cx="92" cy="26" r="16" fill="#FFE08A" opacity=".85"/><path d="M0 78 Q30 62 60 78 T120 78 V120 H0Z" fill="#3E8FD0" opacity=".55"/><path d="M0 92 Q30 78 60 92 T120 92 V120 H0Z" fill="#6FB6E8" opacity=".5"/><path d="M0 104 Q30 92 60 104 T120 104 V120 H0Z" fill="#BFE4F7" opacity=".45"/>`),
+  // Forest: overlapping triangle trees in greens under a mint sky.
+  forest: scene(`${grad('g', '#8FE3B5', '#1A6B3A')}<circle cx="26" cy="24" r="12" fill="#FFF3B0" opacity=".8"/><path d="M60 30 L92 96 L28 96Z" fill="#1E7D45" opacity=".9"/><path d="M32 46 L58 100 L6 100Z" fill="#2FA968" opacity=".85"/><path d="M92 50 L116 100 L68 100Z" fill="#16603A" opacity=".85"/>`),
+  // Grape: confetti dots + arcs in purples/pinks.
+  grape: scene(`${grad('g', '#5B2C6F', '#9B59B6')}<circle cx="30" cy="30" r="18" fill="#C071E0" opacity=".7"/><circle cx="90" cy="80" r="26" fill="#7E3F9C" opacity=".6"/><circle cx="86" cy="26" r="7" fill="#FFB3E6"/><circle cx="24" cy="86" r="6" fill="#E6B3FF"/><circle cx="60" cy="54" r="5" fill="#FFD6F5"/>`),
+  // Sunset: banded sun over warm gradient with clouds.
+  sunset: scene(`${grad('g', '#FF8A5B', '#C0392B')}<circle cx="60" cy="48" r="30" fill="#FFD36B" opacity=".9"/><rect x="20" y="44" width="80" height="6" fill="#FF8A5B" opacity=".8"/><rect x="20" y="56" width="80" height="6" fill="#FF8A5B" opacity=".8"/><path d="M0 96 Q30 84 64 96 T120 92 V120 H0Z" fill="#8E2C24" opacity=".7"/>`),
+  // Amber: rays fanning from a corner sun.
+  amber: scene(`${grad('g', '#FFC24D', '#D35400')}<g fill="#FFE9A8" opacity=".55"><path d="M0 0 L60 0 L0 40Z"/><path d="M0 40 L0 90 L44 0Z" opacity=".7"/></g><circle cx="0" cy="0" r="16" fill="#FFF6D0"/><circle cx="88" cy="90" r="22" fill="#B34700" opacity=".5"/>`),
+  // Teal: bubbles + arc in teals/cyans.
+  teal: scene(`${grad('g', '#0E6655', '#2BC4B6')}<circle cx="34" cy="40" r="24" fill="#7FF0DE" opacity=".55"/><circle cx="92" cy="86" r="18" fill="#0B4F44" opacity=".6"/><circle cx="90" cy="30" r="8" fill="#CFFFF4"/><circle cx="46" cy="90" r="6" fill="#9FF6E6"/>`),
+  // Sky: clouds + sun on a blue gradient.
+  sky: scene(`${grad('g', '#2874A6', '#7FB6F5')}<circle cx="30" cy="28" r="15" fill="#FFF4C2" opacity=".9"/><ellipse cx="80" cy="52" rx="30" ry="14" fill="#EAF4FF" opacity=".8"/><ellipse cx="40" cy="82" rx="26" ry="12" fill="#CFE6FF" opacity=".7"/>`),
+  // Rose: petals / blobs in pinks + magenta.
+  rose: scene(`${grad('g', '#FF9EB5', '#C0398C')}<circle cx="34" cy="36" r="22" fill="#FFD1E0" opacity=".7"/><circle cx="88" cy="82" r="26" fill="#9C2E74" opacity=".6"/><circle cx="92" cy="30" r="10" fill="#FFC2DE"/><path d="M0 96 Q30 82 62 96 T120 92 V120 H0Z" fill="#7E2A63" opacity=".55"/>`),
+  // Slate: geometric facets in cool greys/blues.
+  slate: scene(`${grad('g', '#2C3E50', '#6B7C8F')}<path d="M0 0 L70 0 L0 70Z" fill="#41576E" opacity=".8"/><path d="M120 40 L120 120 L40 120Z" fill="#22303F" opacity=".8"/><path d="M120 0 L120 46 L74 0Z" fill="#8296AB" opacity=".55"/>`),
+  // Mint: leaf arcs + dots in fresh greens.
+  mint: scene(`${grad('g', '#1A8F5A', '#8FE3B5')}<path d="M0 20 Q60 0 120 20 L120 0 L0 0Z" fill="#BFF3D6" opacity=".6"/><circle cx="90" cy="80" r="24" fill="#12784A" opacity=".55"/><circle cx="30" cy="86" r="14" fill="#5FCf95" opacity=".7"/><circle cx="74" cy="30" r="7" fill="#EAFBF1"/>`),
+  // Aurora: sweeping bands of teal/purple/pink over deep indigo with stars.
+  aurora: scene(`${grad('g', '#241C4E', '#3B2B7A')}<path d="M0 40 Q40 10 120 34 L120 54 Q40 34 0 62Z" fill="#3DD6C4" opacity=".55"/><path d="M0 62 Q50 34 120 54 L120 78 Q50 60 0 86Z" fill="#8A5CF0" opacity=".5"/><path d="M0 86 Q50 62 120 78 L120 100 Q50 88 0 108Z" fill="#F06CC0" opacity=".45"/><circle cx="24" cy="24" r="2" fill="#fff"/><circle cx="70" cy="18" r="1.6" fill="#fff"/><circle cx="102" cy="30" r="2" fill="#fff"/>`),
+  // Coral: warm reef bubbles in coral/peach/gold.
+  coral: scene(`${grad('g', '#FF6B6B', '#FF9E7A')}<circle cx="30" cy="34" r="22" fill="#FFC27A" opacity=".7"/><circle cx="92" cy="82" r="26" fill="#E24A6B" opacity=".55"/><circle cx="94" cy="28" r="9" fill="#FFE3B0"/><circle cx="26" cy="90" r="8" fill="#FFB199"/><circle cx="60" cy="58" r="5" fill="#FFF0D6"/>`),
+  // Citrus: bright lime + orange wedges on a sunny field.
+  citrus: scene(`${grad('g', '#F9D423', '#FF7E5F')}<circle cx="40" cy="46" r="30" fill="#B6E62E" opacity=".7"/><path d="M40 46 L70 30 A34 34 0 0 1 74 62Z" fill="#FF8A3D" opacity=".7"/><circle cx="96" cy="94" r="18" fill="#E85D2A" opacity=".55"/><circle cx="98" cy="24" r="7" fill="#FFF4B0"/>`),
+  // Berry: layered berry-toned hills in magenta/violet.
+  berry: scene(`${grad('g', '#7A1F5C', '#C0398C')}<circle cx="90" cy="26" r="14" fill="#FFC7E6" opacity=".85"/><path d="M0 84 Q40 60 80 84 T120 80 V120 H0Z" fill="#9C2E74" opacity=".7"/><path d="M0 98 Q40 78 82 98 T120 96 V120 H0Z" fill="#E14FA0" opacity=".6"/><path d="M0 110 Q40 96 82 110 T120 108 V120 H0Z" fill="#FF8FCB" opacity=".5"/>`),
+};
+const GROUP_THEME_IDS = Object.keys(GROUP_THEMES);
+export const GROUP_THEME_LIST = GROUP_THEMES;
+export const GROUP_THEME_ID_LIST = GROUP_THEME_IDS;
+export const DEFAULT_GROUP_THEME = 'ocean';
 
-// Inner content for a group's icon slot: the uploaded photo if present, else the
-// emoji on its color tile. `cls` lets callers size the slot.
-function groupIconInner(g) {
-  if (g.photo) return `<img class="gt-photo" src="${g.photo}" alt="" referrerpolicy="no-referrer"/>`;
-  return groupIcon(g);
+// The cover scene for a group: a known theme id, else (backward-compat) a gradient
+// from a stored hex colour, else the default cover.
+function gradientFor(g) {
+  const c = g.color;
+  if (c && GROUP_THEMES[c]) return GROUP_THEMES[c];
+  if (c && /^#/.test(c)) return `linear-gradient(135deg,${c} 0%,${c} 100%)`;
+  return GROUP_THEMES[DEFAULT_GROUP_THEME];
+}
+// Keep groupColor for the odd caller that still wants a solid tint (avatars etc.).
+const groupColor = (g) => (g.color && /^#/.test(g.color) ? g.color : DEFAULT_GROUP_COLOR_HEX);
+const DEFAULT_GROUP_COLOR_HEX = '#1E3A5F';
+
+// Background CSS for the cover-hero layer: the photo (cover-fit) if set, else the
+// group's theme scene. A dark scrim layer sits on top so overlaid text stays legible.
+// Uses the `background` shorthand (not background-image) because theme values carry
+// their own position/size (center/cover) which are only valid in the shorthand.
+function coverBgStyle(g) {
+  if (g.photo) return `background:linear-gradient(180deg,rgba(0,0,0,.15),rgba(0,0,0,.55)),center/cover no-repeat url('${g.photo}');`;
+  return `background:linear-gradient(180deg,rgba(0,0,0,.05),rgba(0,0,0,.35)),${gradientFor(g)};`;
+}
+
+// Paint a cover background layer `el` for group `g` (photo or theme scene).
+function paintCover(el, g) {
+  el.style.cssText = coverBgStyle(g);
+  el.innerHTML = '';
+}
+
+// Compact thumbnail (popover tiles): cropped photo, else the theme scene.
+function thumbMarkup(g) {
+  if (g.photo) return `<span class="gt-ico gt-thumb has-photo"><img class="gt-photo" src="${g.photo}" alt="" referrerpolicy="no-referrer"/></span>`;
+  return `<span class="gt-ico gt-thumb" style="background:${gradientFor(g)}"></span>`;
 }
 
 function memberName(group, userId) {
@@ -165,7 +233,7 @@ function groupTile(g) {
   const flag = !hasExpenses ? '' : `<span class="gt-flag ${settled ? 'is-settled' : 'is-owed'}">${settled ? 'Settled' : 'Due'}</span>`;
   return `<button class="group-tile${g.retired ? ' retired' : ''}" data-group="${g.id}">
       <span class="gt-ico-wrap">
-        <span class="gt-ico txn-ico${g.photo ? ' has-photo' : ''}" style="background:${groupColor(g)}20">${groupIconInner(g)}</span>
+        ${thumbMarkup(g)}
         ${flag}
       </span>
       <span class="gt-name">${g.name}</span>
@@ -244,24 +312,28 @@ function showExpenseDetail(expId) {
   $('breakdownModal').classList.add('open');
 }
 
-// Group icon editor — presets + custom emoji + color, editable by any member.
-let giSelIcon = DEFAULT_GROUP_ICON;
-let giSelColor = DEFAULT_GROUP_COLOR;
+// Group cover editor — pick a cover design, or upload a photo. Any member.
+let giSelTheme = DEFAULT_GROUP_THEME;
+let giPhotoFile = null; // pending upload
+let giPhotoPreview = null; // object URL, or existing g.photo
 
 function renderIconModal() {
-  $('giconPresets').innerHTML = GROUP_ICONS.map((e) => `<div class="chip gicon-chip${e === giSelIcon ? ' on' : ''}" data-icon="${e}" style="font-size:20px">${e}</div>`).join('');
-  $('giconSwatches').innerHTML = GROUP_COLORS.map((c) => `<div class="swatch${c === giSelColor ? ' on' : ''}" data-c="${c}" style="background:${c}"></div>`).join('');
+  $('giconSwatches').innerHTML = GROUP_THEME_IDS.map((id) => `<div class="theme-swatch${id === giSelTheme && !giPhotoPreview ? ' on' : ''}" data-theme="${id}" style="background:${GROUP_THEMES[id]}"></div>`).join('');
   const prev = $('giconPreview');
-  prev.textContent = giSelIcon;
-  prev.style.background = giSelColor + '20';
+  if (giPhotoPreview) {
+    prev.style.background = `center/cover no-repeat url('${giPhotoPreview}')`;
+  } else {
+    prev.style.background = GROUP_THEMES[giSelTheme] || GROUP_THEMES[DEFAULT_GROUP_THEME];
+  }
+  prev.innerHTML = '';
 }
 
 function openGroupIconModal() {
   const g = state.groups.find((x) => x.id === state.openGroupId);
   if (!g) return;
-  giSelIcon = groupIcon(g);
-  giSelColor = groupColor(g);
-  $('giconCustom').value = '';
+  giSelTheme = g.color && GROUP_THEMES[g.color] ? g.color : DEFAULT_GROUP_THEME;
+  giPhotoFile = null;
+  giPhotoPreview = g.photo || null;
   $('gsettName').value = g.name; // prefill for rename
   renderIconModal();
   $('groupIconModal').classList.add('open');
@@ -316,6 +388,76 @@ function renderExpenseTile(e, g) {
   </div>`;
 }
 
+// Drive the shared title as one element travelling from its big cover pose (p=0,
+// large + white + low-left over the cover) up into the small bar-center pose (p=1,
+// ink, at rest in the fixed bar). Progress is the scroll offset over the hero's
+// collapse distance; transform + color are lerped per frame for a continuous move.
+const EXPAND_SCALE = 1.7; // how much bigger the title is over the cover
+function updateGroupTopbar() {
+  const bar = $('groupTopBar');
+  const title = $('groupDetailTitle');
+  const hero = $('groupHero');
+  if (!bar || !title || !hero) return;
+
+  const barRect = bar.getBoundingClientRect();
+  const heroRect = hero.getBoundingClientRect();
+  // Progress 0 → 1 as the page scrolls from the top until the cover has scrolled up
+  // to leave only a bar-height sliver. Use scrollY (0 at the very top) so the bar is
+  // fully transparent at rest — measuring heroRect.top instead would start > 0 here
+  // because the hero has a negative top margin to bleed under the safe area.
+  const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+  const dist = Math.max(1, heroRect.height - barRect.height);
+  const p = Math.min(1, Math.max(0, scrollY / dist));
+  const e = 1 - p; // expansion amount: 1 fully expanded (cover), 0 collapsed (bar)
+
+  // The title is absolutely centred in the bar (transform-origin:center), so its
+  // resting (collapsed) pose is dead-centre with no transform. For the expanded pose
+  // it scales up and shifts so its left edge sits at the cover padding, low over the
+  // cover. Interpolate between the two by e.
+  title.style.transform = '';
+  const s = 1 + (EXPAND_SCALE - 1) * e;
+  // Measure the real text width via a Range (the element is full-width, so its own
+  // rect is the whole bar — not the glyphs).
+  let textW = 0;
+  const node = title.firstChild;
+  if (node) {
+    const r = document.createRange();
+    r.selectNodeContents(title);
+    textW = r.getBoundingClientRect().width;
+  }
+  const t = title.getBoundingClientRect();
+  const barCenterX = t.left + t.width / 2;
+  const textCenterY = t.top + t.height / 2;
+  // Left edge of the scaled text at each pose.
+  const collapsedLeft = barCenterX - textW / 2;               // e=0: centred
+  const expandedLeft = heroRect.left + 16;                    // e=1: at cover padding
+  const scaledHalf = (textW * s) / 2;
+  // Where we want the scaled text's left edge to be, blended by e.
+  const targetLeft = expandedLeft * e + collapsedLeft * (1 - e);
+  // Because origin is centre, the scaled left edge is barCenterX - scaledHalf; shift
+  // it to targetLeft.
+  const dx = targetLeft - (barCenterX - scaledHalf);
+  const expandedCenterY = heroRect.bottom - 80;
+  const dy = (expandedCenterY - textCenterY) * e;
+  title.style.transform = `translate(${dx}px, ${dy}px) scale(${s})`;
+
+  // Colour + shadow lerp: white with drop-shadow over the cover → ink in the bar,
+  // fading in over the back half of the travel so text stays readable throughout.
+  const c = Math.min(1, Math.max(0, (p - 0.5) / 0.4));
+  const ch = (a, b) => Math.round(a + (b - a) * c);
+  title.style.color = `rgb(${ch(255, 23)},${ch(255, 26)},${ch(255, 43)})`; // #fff → --ink #171a2b
+  title.style.textShadow = c >= 1 ? 'none' : `0 2px 8px rgba(0,0,0,${(0.5 * (1 - c)).toFixed(2)}),0 1px 3px rgba(0,0,0,${(0.4 * (1 - c)).toFixed(2)})`;
+
+  // Bar background + button restyle fade in gradually with progress (not a snap).
+  bar.style.setProperty('--bar-p', p.toFixed(3));
+  // Back/gear icons crossfade white → ink as the bar solidifies.
+  const btnColor = `rgb(${ch(255, 92)},${ch(255, 101)},${ch(255, 119)})`; // #fff → --ink-soft
+  $('groupsBackBtn').style.color = btnColor;
+  $('groupGearBtn').style.color = btnColor;
+
+  bar.classList.toggle('scrolled', p > 0.85);
+}
+
 function renderGroupDetail() {
   const g = state.groups.find((x) => x.id === state.openGroupId);
   if (!g) {
@@ -325,36 +467,19 @@ function renderGroupDetail() {
     $('home').classList.add('active');
     return;
   }
-  // Cap the displayed name to 30 chars (ellipsis) — it may wrap to a 2nd line.
-  $('groupDetailTitle').textContent = g.name.length > 30 ? g.name.slice(0, 30).trimEnd() + '…' : g.name;
-  $('groupDetailTitle').title = g.name; // full name on hover
-  $('groupInviteCode').textContent = g.invite_code;
-  $('copyCodeBtn').innerHTML = icon.copy({ size: 14 });
-  $('shareGroupBtn').innerHTML = icon.share({ size: 14 });
+  // Cover hero: background (photo/gradient) with the name + members overlaid.
+  paintCover($('groupCover'), g);
+  $('groupDetailTitle').textContent = g.name;
+  $('groupDetailTitle').title = g.name;
+  $('groupGearBtn').innerHTML = icon.gear({ size: 20 });
+  updateGroupTopbar();
   const memCount = g.members.length;
-  $('groupMemberCount').innerHTML = `${icon.users({ size: 12 })} ${memCount} member${memCount === 1 ? '' : 's'}`;
-  // Big group icon (tap to edit — any member). Photo if set, else emoji tile.
-  const bigIco = $('groupIconBig');
-  if (g.photo) {
-    bigIco.innerHTML = `<img class="gt-photo" src="${g.photo}" alt="" referrerpolicy="no-referrer"/>`;
-    bigIco.style.background = 'transparent';
-  } else {
-    bigIco.textContent = groupIcon(g);
-    bigIco.style.background = groupColor(g) + '20';
-  }
-  $('groupIconEditBadge').innerHTML = icon.edit({ size: 13 });
-  // Owner-only header actions (retire + delete). Keep them in layout (hidden) for
-  // non-owners so the title stays centered.
-  const retireBtn = $('retireGroupBtn');
-  retireBtn.innerHTML = icon.archive({ size: 18 });
-  retireBtn.title = g.retired ? 'Reactivate group' : 'Retire group';
-  retireBtn.setAttribute('aria-label', retireBtn.title);
-  retireBtn.style.display = '';
-  retireBtn.style.visibility = g.role === 'owner' ? 'visible' : 'hidden';
-  const delGroupBtn = $('deleteGroupBtn');
-  delGroupBtn.innerHTML = icon.trash({ size: 18 });
-  delGroupBtn.style.display = '';
-  delGroupBtn.style.visibility = g.role === 'owner' ? 'visible' : 'hidden';
+  $('groupMemberCount').innerHTML = `${icon.users({ size: 13 })} ${memCount} member${memCount === 1 ? '' : 's'}`;
+  // Avatar stack to the right of the members button: cap at 5, then +N for the rest.
+  const shown = g.members.slice(0, 5);
+  const extra = g.members.length - shown.length;
+  $('groupHeroAvatars').innerHTML =
+    shown.map((m) => memberAvatar(g, m.id, 'hero-av')).join('') + (extra > 0 ? `<span class="hero-av hero-av-more">+${extra}</span>` : '');
 
   // Retired (read-only) group: show a banner and hide the add-expense FAB.
   if (g.retired) {
@@ -437,16 +562,7 @@ function renderGroupDetail() {
     $('groupOwedTo').innerHTML = '';
   }
 
-  // Members list + count. The "Add member" button lives in the section header
-  // (hidden on retired groups). Any member may add friends.
-  $('groupMembersCount').textContent = g.members.length ? `· ${g.members.length}` : '';
-  $('groupMembersList').innerHTML = g.members
-    .map((m) => {
-      const you = m.id === state.user?.id ? ' (you)' : '';
-      return `<div class="member-row">${memberAvatar(g, m.id, 'member-row-av')}<span class="member-row-name">${m.name}${you}</span></div>`;
-    })
-    .join('');
-  $('addMemberBtn').style.display = g.retired ? 'none' : '';
+  // (Members now live in the cover hero — rendered above.)
 
   // Expense list, grouped by day with collapsible date headers (like the home
   // list). `exps` is already newest-first, so iterating preserves date order.
@@ -549,6 +665,139 @@ export function showGroupDetail(id, focusExpId = null) {
 export function refreshGroupsView() {
   if ($('groupsOverlay').classList.contains('open') && state.user) renderGroupList();
   if ($('groups').classList.contains('active') && state.openGroupId) renderGroupDetail();
+  if ($('groupSettings').classList.contains('active') && state.openGroupId) renderGroupSettings();
+}
+
+// Full-screen group settings/actions (opened by the gear on the cover).
+function renderGroupSettings() {
+  const g = state.groups.find((x) => x.id === state.openGroupId);
+  if (!g) {
+    renderForScreen(navBack());
+    return;
+  }
+  const owner = g.role === 'owner';
+  // A clickable row: [icon] label ... optional right-side control. The whole row
+  // carries data-act so the delegated handler routes it.
+  const row = (id, ico, label, { cls = '', trailing = '' } = {}) =>
+    `<button class="gs-row ${cls}" data-act="${id}"><span class="gs-ico">${ico}</span><span class="gs-label">${label}</span>${trailing}</button>`;
+
+  // --- Top: the group itself. Whole row edits name/cover; pencil is the affordance.
+  const topRow = `<button class="gs-group-row" data-act="edit">
+      <span class="gs-group-cover">${thumbMarkup(g)}</span>
+      <span class="gs-group-meta"><span class="gs-group-name">${g.name}</span><span class="gs-group-sub">${g.members.length} member${g.members.length === 1 ? '' : 's'}</span></span>
+      <span class="gs-edit-ico">${icon.edit({ size: 18 })}</span>
+    </button>`;
+
+  // --- Group members: add + share invite (hidden add when retired).
+  const memberRows = [
+    g.retired ? '' : row('add', icon.users({ size: 18 }), 'Add members'),
+    row('invite', icon.share({ size: 18 }), 'Invite link'),
+  ].filter(Boolean).join('');
+
+  // --- Danger zone: retire (distinct), leave, delete.
+  const dangerRows = [
+    owner ? row('retire', icon.archive({ size: 18 }), g.retired ? 'Reactivate group' : 'Retire group', { cls: 'gs-retire' }) : '',
+    row('leave', icon.logout({ size: 18 }), 'Leave group', { cls: 'gs-warn' }),
+    owner ? row('delete', icon.trash({ size: 18 }), 'Delete group', { cls: 'gs-danger' }) : '',
+  ].filter(Boolean).join('');
+
+  $('gsBody').innerHTML = `
+    <div class="gs-section">${topRow}</div>
+    <p class="gs-section-title">Group members</p>
+    <div class="gs-section">${memberRows}</div>
+    <div class="gs-section gs-section-danger">${dangerRows}</div>`;
+}
+
+export function showGroupSettings() {
+  if (!state.openGroupId) return;
+  navTo('groupSettings');
+  renderGroupSettings();
+}
+
+// Open the add-member picker (from the cover members button or settings -> Add member).
+function openMemberPicker() {
+  const g = state.groups.find((x) => x.id === state.openGroupId);
+  if (!g || g.retired) return; // no adding members to a retired group
+  $('memberSearch').value = '';
+  renderMemberResults();
+  $('memberModal').classList.add('open');
+  setTimeout(() => $('memberSearch').focus(), 60);
+}
+
+// Share the invite via the native share sheet (WhatsApp/Messages/etc.) with a
+// tap-to-join link, falling back to copying the invite text where Web Share
+// isn't available.
+async function shareInvite() {
+  const g = state.groups.find((x) => x.id === state.openGroupId);
+  if (!g) return;
+  const { url, text } = buildInvite(g);
+  try {
+    if (navigator.share) {
+      await navigator.share({ title: `Join "${g.name}"`, text, url });
+    } else {
+      await navigator.clipboard.writeText(`${text}\n${url}`);
+      toastSuccess('Invite copied — paste it to your friends');
+    }
+  } catch (err) {
+    if (err && err.name === 'AbortError') return; // user dismissed the share sheet
+    try {
+      await navigator.clipboard.writeText(`${text}\n${url}`);
+      toastSuccess('Invite copied — paste it to your friends');
+    } catch {
+      toastError('Could not share the invite.');
+    }
+  }
+}
+
+// Dispatch a row tap on the full-screen group settings page.
+async function handleSettingsAction(act) {
+  const g = state.groups.find((x) => x.id === state.openGroupId);
+  if (!g) return;
+  switch (act) {
+    case 'edit':
+      openGroupIconModal();
+      break;
+    case 'add':
+      openMemberPicker();
+      break;
+    case 'invite':
+      shareInvite();
+      break;
+    case 'retire': {
+      const msg = g.retired
+        ? `Reactivate "${g.name}"? Members will be able to add expenses and settle balances again.`
+        : `Retire "${g.name}"? It becomes read-only — no new expenses and no settling — but stays viewable, and you can reactivate it anytime.`;
+      if (!(await confirmModal(msg, { title: g.retired ? 'Reactivate group' : 'Retire group', confirmLabel: g.retired ? 'Reactivate' : 'Retire' }))) return;
+      const ok = await setGroupRetired(g.id, !g.retired);
+      if (ok) {
+        renderGroupSettings();
+        toastSuccess(g.retired ? 'Group reactivated' : 'Group retired');
+      }
+      break;
+    }
+    case 'leave': {
+      if (!(await confirmModal(`Leave "${g.name}"? You'll stop seeing its expenses. Any balances stay recorded — settle up first if you owe or are owed.`, { title: 'Leave group', confirmLabel: 'Leave', danger: true }))) return;
+      const ok = await leaveGroup(g.id);
+      if (ok) {
+        state.openGroupId = null;
+        navReset('home');
+        renderForScreen('home');
+        toastSuccess('You left the group');
+      }
+      break;
+    }
+    case 'delete': {
+      if (!(await confirmModal(`Delete the group "${g.name}"? This permanently removes it and all its expenses for everyone. This cannot be undone.`, { title: 'Delete group', confirmLabel: 'Delete group', danger: true }))) return;
+      const ok = await deleteGroup(g.id);
+      if (ok) {
+        state.openGroupId = null;
+        navReset('home');
+        renderForScreen('home');
+        toastSuccess('Group deleted');
+      }
+      break;
+    }
+  }
 }
 
 // ---- Member picker (add friends by name / number) --------------------------
@@ -602,26 +851,42 @@ export function initGroupsView() {
   $('groupAddBtn').onclick = () => {
     if (state.openGroupId) showAddForGroup(state.openGroupId);
   };
-  // Group icon editor (any member).
-  $('groupIconBtn').onclick = openGroupIconModal;
-  $('giconPresets').addEventListener('click', (e) => {
-    const chip = e.target.closest('.gicon-chip');
-    if (!chip) return;
-    giSelIcon = chip.dataset.icon;
-    $('giconCustom').value = '';
+  // Cover gear -> full-screen group settings. Members button -> add-member picker.
+  $('groupGearBtn').onclick = showGroupSettings;
+  $('membersBtn').onclick = openMemberPicker;
+  // Drive the shared title on scroll, throttled to one update per animation frame.
+  let topbarTick = false;
+  window.addEventListener('scroll', () => {
+    if (topbarTick || !$('groups').classList.contains('active')) return;
+    topbarTick = true;
+    requestAnimationFrame(() => {
+      topbarTick = false;
+      updateGroupTopbar();
+    });
+  }, { passive: true });
+  $('gsBackBtn').innerHTML = icon.back({ size: 20 });
+  $('gsBackBtn').onclick = () => renderForScreen(navBack());
+  $('gsBody').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-act]');
+    if (btn) handleSettingsAction(btn.dataset.act);
+  });
+  // Group cover/name editor modal (opened via settings -> Edit group).
+  $('giconSwatches').addEventListener('click', (e) => {
+    const sw = e.target.closest('.theme-swatch');
+    if (!sw) return;
+    giSelTheme = sw.dataset.theme;
+    giPhotoFile = null;
+    giPhotoPreview = null; // choosing a cover clears a pending/existing photo
     renderIconModal();
   });
-  $('giconCustom').addEventListener('input', (e) => {
-    const v = e.target.value.trim();
-    if (v) {
-      giSelIcon = v;
-      renderIconModal();
-    }
-  });
-  $('giconSwatches').addEventListener('click', (e) => {
-    const sw = e.target.closest('.swatch');
-    if (!sw) return;
-    giSelColor = sw.dataset.c;
+  $('giconPhotoBtn').querySelector('.pub-ico').innerHTML = icon.upload({ size: 16 });
+  $('giconPhotoBtn').onclick = () => $('giconPhotoInput').click();
+  $('giconPhotoInput').addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    giPhotoFile = await downscaleImage(file);
+    if (giPhotoPreview && giPhotoPreview.startsWith('blob:')) URL.revokeObjectURL(giPhotoPreview);
+    giPhotoPreview = URL.createObjectURL(giPhotoFile);
     renderIconModal();
   });
   $('giconCancel').onclick = () => $('groupIconModal').classList.remove('open');
@@ -630,52 +895,30 @@ export function initGroupsView() {
   };
   $('giconSave').onclick = async () => {
     const g = state.groups.find((x) => x.id === state.openGroupId);
-    const custom = $('giconCustom').value.trim();
-    const chosen = custom || giSelIcon;
     const newName = $('gsettName').value.trim();
     if (!newName) {
       $('gsettName').focus();
       toastError('Group name can’t be empty.');
       return;
     }
-    // Save the name only when it actually changed, then icon/color.
-    const nameOk = !g || newName === g.name ? true : await renameGroup(state.openGroupId, newName);
-    if (!nameOk) return;
-    const ok = await setGroupIcon(state.openGroupId, { icon: chosen, color: giSelColor });
-    if (ok || nameOk) {
-      $('groupIconModal').classList.remove('open');
-      renderGroupDetail();
+    if (!g) return;
+    if (newName !== g.name) {
+      const nameOk = await renameGroup(state.openGroupId, newName);
+      if (!nameOk) return;
     }
+    // Save the chosen cover (color). A newly-picked photo uploads + overrides;
+    // clearing the photo (chose a cover design) resets photo_url to null.
+    await setGroupIcon(state.openGroupId, { color: giSelTheme });
+    if (giPhotoFile) {
+      const url = await uploadGroupImage(giPhotoFile, state.openGroupId);
+      if (url) await setGroupPhoto(state.openGroupId, url);
+    } else if (!giPhotoPreview && g.photo) {
+      await setGroupPhoto(state.openGroupId, null); // photo removed in favor of a cover
+    }
+    $('groupIconModal').classList.remove('open');
+    renderGroupDetail();
   };
 
-  // Owner retires / reactivates the group (read-only archive).
-  $('retireGroupBtn').onclick = async () => {
-    const g = state.groups.find((x) => x.id === state.openGroupId);
-    if (!g) return;
-    const msg = g.retired
-      ? `Reactivate "${g.name}"? Members will be able to add expenses and settle balances again.`
-      : `Retire "${g.name}"? It becomes read-only — no new expenses and no settling — but stays viewable, and you can reactivate it anytime.`;
-    if (!(await confirmModal(msg, { title: g.retired ? 'Reactivate group' : 'Retire group', confirmLabel: g.retired ? 'Reactivate' : 'Retire' }))) return;
-    const ok = await setGroupRetired(g.id, !g.retired);
-    if (ok) {
-      renderGroupDetail();
-      toastSuccess(g.retired ? 'Group reactivated' : 'Group retired');
-    }
-  };
-
-  // Owner deletes the whole group.
-  $('deleteGroupBtn').onclick = async () => {
-    const g = state.groups.find((x) => x.id === state.openGroupId);
-    if (!g) return;
-    if (!(await confirmModal(`Delete the group "${g.name}"? This permanently removes it and all its expenses for everyone. This cannot be undone.`, { title: 'Delete group', confirmLabel: 'Delete group', danger: true }))) return;
-    const ok = await deleteGroup(g.id);
-    if (ok) {
-      state.openGroupId = null;
-      $('groups').classList.remove('active');
-      $('home').classList.add('active');
-      toastSuccess('Group deleted');
-    }
-  };
   // Popover close + backdrop click.
   $('closeGroupsSheet').innerHTML = icon.close({ size: 20 });
   $('closeGroupsSheet').onclick = closeGroupsPopover;
@@ -696,49 +939,7 @@ export function initGroupsView() {
     renderGroupList();
   });
 
-  // Copy the invite code to the clipboard.
-  $('copyCodeBtn').onclick = async () => {
-    const code = $('groupInviteCode').textContent.trim();
-    if (!code) return;
-    try {
-      await navigator.clipboard.writeText(code);
-      toastSuccess('Invite code copied');
-    } catch (err) {
-      toastError('Could not copy — code is ' + code);
-    }
-  };
-
-  // Share the invite: native share sheet (WhatsApp/Messages/etc.) with a tap-to-join
-  // link, falling back to copying the invite text where Web Share isn't available.
-  $('shareGroupBtn').onclick = async () => {
-    const g = state.groups.find((x) => x.id === state.openGroupId);
-    if (!g) return;
-    const { url, text } = buildInvite(g);
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: `Join "${g.name}"`, text, url });
-      } else {
-        await navigator.clipboard.writeText(`${text}\n${url}`);
-        toastSuccess('Invite copied — paste it to your friends');
-      }
-    } catch (err) {
-      if (err && err.name === 'AbortError') return; // user dismissed the share sheet
-      try {
-        await navigator.clipboard.writeText(`${text}\n${url}`);
-        toastSuccess('Invite copied — paste it to your friends');
-      } catch {
-        toastError('Could not share the invite.');
-      }
-    }
-  };
-
   // --- Add-member picker ---
-  $('addMemberBtn').onclick = () => {
-    $('memberSearch').value = '';
-    renderMemberResults();
-    $('memberModal').classList.add('open');
-    setTimeout(() => $('memberSearch').focus(), 60);
-  };
   $('memberSearch').addEventListener('input', renderMemberResults);
   $('memberResults').addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-add]');
@@ -750,7 +951,7 @@ export function initGroupsView() {
       toastSuccess('Member added');
     }
   });
-  $('memberInviteBtn').onclick = () => $('shareGroupBtn').click(); // reuse the invite-share flow
+  $('memberInviteBtn').onclick = shareInvite; // reuse the invite-share flow
   $('memberClose').onclick = () => $('memberModal').classList.remove('open');
   $('memberModal').onclick = (e) => {
     if (e.target === $('memberModal')) $('memberModal').classList.remove('open');

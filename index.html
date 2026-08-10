@@ -106,6 +106,16 @@
   <div class="an-trend" id="anTrend"></div>
 </div>
 
+<!-- GROUP SETTINGS (full-screen actions) -->
+<div id="groupSettings" class="screen">
+  <header>
+    <button class="back-btn" id="gsBackBtn" aria-label="Back"></button>
+    <h1>Group settings</h1>
+    <span style="width:40px"></span>
+  </header>
+  <div id="gsBody"></div>
+</div>
+
 <!-- NEW GROUP (full-screen create) -->
 <div id="newGroup" class="screen">
   <header>
@@ -114,9 +124,9 @@
     <span style="width:40px"></span>
   </header>
   <div class="ng-body">
-    <div class="ng-icon-row">
-      <button type="button" class="ng-icon" id="ngIcon" aria-label="Group icon"><span id="ngIconInner">👥</span></button>
-      <button type="button" class="ng-photo-btn" id="ngPhotoBtn">Add photo</button>
+    <button type="button" class="ng-icon" id="ngIcon" aria-label="Group cover"></button>
+    <div class="ng-photo-row">
+      <button type="button" class="photo-upload-btn" id="ngPhotoBtn"><span class="pub-ico"></span><span>Browse</span></button>
       <input type="file" id="ngPhotoInput" accept="image/*" style="display:none"/>
     </div>
     <div class="field">
@@ -125,8 +135,8 @@
       <div class="field-err" id="ngNameErr" style="display:none"></div>
     </div>
     <div class="field">
-      <label>Icon color</label>
-      <div class="color-swatches" id="ngSwatches"></div>
+      <label>Cover</label>
+      <div class="theme-swatches theme-row" id="ngSwatches"></div>
     </div>
     <div class="field">
       <label>Add members <span style="font-size:11px;opacity:.5">(optional)</span></label>
@@ -188,35 +198,31 @@
 
 <!-- GROUPS -->
 <div id="groups" class="screen">
-  <header>
-    <button class="back-btn" id="groupsBackBtn" aria-label="Back"></button>
-    <div class="group-head">
-      <button class="group-icon-btn" id="groupIconBtn" aria-label="Change group icon">
-        <span class="txn-ico" id="groupIconBig">👥</span>
-        <span class="group-icon-edit" id="groupIconEditBadge"></span>
-      </button>
-      <div class="group-head-info">
-        <h1 class="group-head-name" id="groupDetailTitle">Group</h1>
-        <div class="group-head-meta" id="groupMemberCount"></div>
-        <div class="group-head-code">Code: <span id="groupInviteCode"></span><button class="copy-btn" id="copyCodeBtn" aria-label="Copy code"></button><button class="copy-btn" id="shareGroupBtn" aria-label="Share invite"></button></div>
+  <div id="groupDetail">
+    <!-- Fixed top bar: back + settings. The title lives here too and travels from
+         the cover up into the bar center as you scroll (one shared element). -->
+    <div class="group-topbar" id="groupTopBar">
+      <button class="hero-btn" id="groupsBackBtn" aria-label="Back"></button>
+      <h1 class="group-title" id="groupDetailTitle">Group</h1>
+      <button class="hero-btn" id="groupGearBtn" aria-label="Group settings"></button>
+    </div>
+    <!-- Cover hero: background image/gradient with overlaid group info -->
+    <div class="group-hero" id="groupHero">
+      <div class="group-hero-bg" id="groupCover"></div>
+      <div class="group-hero-info">
+        <div class="group-members-row">
+          <button class="group-members-btn" id="membersBtn">
+            <span id="groupMemberCount"></span>
+          </button>
+          <div class="group-hero-avatars" id="groupHeroAvatars"></div>
+        </div>
       </div>
     </div>
-    <div class="group-head-actions">
-      <button class="back-btn" id="retireGroupBtn" aria-label="Retire group" style="display:none"></button>
-      <button class="back-btn danger-icon" id="deleteGroupBtn" aria-label="Delete group" style="display:none"></button>
-    </div>
-  </header>
-  <div id="groupDetail">
     <div id="groupRetiredBanner"></div>
     <div id="groupPendingBanner"></div>
     <div id="groupTotal"></div>
     <div id="groupOwe"></div>
     <div id="groupOwedTo"></div>
-    <div class="group-members-head">
-      <p class="section-title" style="margin:0">Members <span id="groupMembersCount" class="section-sub"></span></p>
-      <button class="hdr-btn" id="addMemberBtn">+ Add member</button>
-    </div>
-    <div id="groupMembersList"></div>
     <p class="section-title" style="margin-top:14px">Expenses</p>
     <div id="groupExpenseList"></div>
   </div>
@@ -547,21 +553,18 @@
   <div class="modal-box">
     <h3>Group settings</h3>
     <div class="field">
+      <label>Cover preview</label>
+      <div class="cover-preview" id="giconPreview"></div>
+      <button type="button" class="photo-upload-btn" id="giconPhotoBtn"><span class="pub-ico"></span><span>Browse</span></button>
+      <input type="file" id="giconPhotoInput" accept="image/*" style="display:none"/>
+    </div>
+    <div class="field">
       <label>Name</label>
       <input type="text" id="gsettName" placeholder="Group name" maxlength="40"/>
     </div>
     <div class="field">
-      <label>Icon</label>
-      <div class="chips" id="giconPresets"></div>
-      <input type="text" id="giconCustom" placeholder="Or type any emoji 🎯" maxlength="4" style="font-size:20px;margin-top:8px"/>
-    </div>
-    <div class="field">
-      <label>Color</label>
-      <div class="color-swatches" id="giconSwatches"></div>
-    </div>
-    <div class="field">
-      <label>Preview</label>
-      <div class="gicon-preview"><span class="txn-ico" id="giconPreview">👥</span></div>
+      <label>Cover</label>
+      <div class="theme-swatches theme-row" id="giconSwatches"></div>
     </div>
     <div class="modal-actions">
       <button id="giconCancel">Cancel</button>

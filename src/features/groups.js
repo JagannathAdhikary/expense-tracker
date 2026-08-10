@@ -348,12 +348,15 @@ export async function deleteGroupExpense(expenseId) {
   return true;
 }
 
-// Set a group's icon (emoji) and color tile. Any member may change these.
-export async function setGroupIcon(groupId, { icon, color }) {
+// Set a group's cover (color scene) and optional icon. Any member may change these.
+export async function setGroupIcon(groupId, { icon, color } = {}) {
   if (!cloudEnabled() || !state.user) return false;
-  const { error } = await supabase.from('groups').update({ icon, color }).eq('id', groupId);
+  const patch = {};
+  if (icon !== undefined) patch.icon = icon;
+  if (color !== undefined) patch.color = color;
+  const { error } = await supabase.from('groups').update(patch).eq('id', groupId);
   if (error) {
-    toastError('Could not update group icon: ' + error.message);
+    toastError('Could not update group cover: ' + error.message);
     return false;
   }
   await loadCloudData();
@@ -385,6 +388,19 @@ export async function deleteGroup(groupId) {
   const { error } = await supabase.from('groups').delete().eq('id', groupId).eq('created_by', state.user.id);
   if (error) {
     toastError('Could not delete group: ' + error.message);
+    return false;
+  }
+  await loadCloudData();
+  return true;
+}
+
+// Leave a group: remove only your own membership (RLS members_delete_self allows
+// this). Other members and the group stay. The owner should delete/transfer instead.
+export async function leaveGroup(groupId) {
+  if (!cloudEnabled() || !state.user) return false;
+  const { error } = await supabase.from('group_members').delete().eq('group_id', groupId).eq('user_id', state.user.id);
+  if (error) {
+    toastError('Could not leave group: ' + error.message);
     return false;
   }
   await loadCloudData();
