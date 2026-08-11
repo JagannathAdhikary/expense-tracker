@@ -118,13 +118,24 @@ export async function createGroup(name, memberIds = [], opts = {}) {
     toastError('Could not create group: ' + error.message);
     return null;
   }
-  // Add the creator as owner, plus any friends picked during creation (as members).
-  const rows = [{ group_id: grp.id, user_id: state.user.id, role: 'owner' }];
-  for (const uid of memberIds) {
-    if (uid && uid !== state.user.id) rows.push({ group_id: grp.id, user_id: uid, role: 'member' });
+  // Add the creator as owner FIRST (satisfies members_insert's `user_id = auth.uid()`),
+  // then add friends in a second insert — by then is_group_member(group_id) is true for
+  // the creator, so the "member may add others" branch of the policy passes. Doing both
+  // in one multi-row insert fails the friend rows (the creator row isn't visible to the
+  // policy check within the same statement).
+  const { error: ownErr } = await supabase.from('group_members').insert({ group_id: grp.id, user_id: state.user.id, role: 'owner' });
+  if (ownErr) {
+    toastError('Could not create group: ' + ownErr.message);
+    return null;
   }
-  const { error: mErr } = await supabase.from('group_members').insert(rows);
-  if (mErr) toastError('Group created, but adding some members failed: ' + mErr.message);
+  const friendRows = [];
+  for (const uid of memberIds) {
+    if (uid && uid !== state.user.id) friendRows.push({ group_id: grp.id, user_id: uid, role: 'member' });
+  }
+  if (friendRows.length) {
+    const { error: mErr } = await supabase.from('group_members').insert(friendRows);
+    if (mErr) toastError('Group created, but adding some members failed: ' + mErr.message);
+  }
   await loadCloudData();
   return grp;
 }
