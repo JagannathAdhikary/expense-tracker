@@ -98,6 +98,14 @@ function paintCover(el, g) {
   el.innerHTML = '';
 }
 
+// Compact cover background (no scrim) for tiny chips/thumbnails elsewhere (e.g. the
+// add-expense "Split with" groups strip): the photo cover-fit, else the theme scene.
+export function groupCoverBg(g) {
+  if (!g) return `background:${GROUP_THEMES[DEFAULT_GROUP_THEME]}`;
+  if (g.photo) return `background:center/cover no-repeat url('${g.photo}')`;
+  return `background:${gradientFor(g)}`;
+}
+
 // Compact thumbnail (popover tiles): cropped photo, else the theme scene.
 function thumbMarkup(g) {
   if (g.photo) return `<span class="gt-ico gt-thumb has-photo"><img class="gt-photo" src="${g.photo}" alt="" referrerpolicy="no-referrer"/></span>`;

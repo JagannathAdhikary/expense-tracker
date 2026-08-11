@@ -10,6 +10,7 @@ import { openPayModal } from '../features/payments.js';
 import { cloudEnabled } from '../supabase.js';
 import { computeSplits } from '../split.js';
 import { saveGroupExpense, editGroupExpense, updateMySplitMeta, updateGroupExpenseMeta, isGroupRetired, myFriends, findUserByPhone, findOrCreateDirectSplit } from '../features/groups.js';
+import { groupCoverBg } from './groups.js';
 import { matchFriends } from '../friends.js';
 import { pushRecord, syncOn } from '../features/sync.js';
 import { expenseHasPayment } from '../cloudrows.js';
@@ -83,21 +84,34 @@ export function renderGroupChips() {
   }
   $('splitLocked').style.display = 'none';
   $('splitPicker').style.display = '';
+  // A group is a single, exclusive choice — once picked, hide the search input +
+  // results entirely (no friends can be added). Removing the group chip brings it back.
+  const groupChosen = !!state.selGroup;
+  $('splitSearch').style.display = groupChosen ? 'none' : '';
+  if (groupChosen) $('splitResults').innerHTML = '';
   renderSplitSelected();
-  renderSplitResults();
+  if (!groupChosen) renderSplitResults();
   renderSplitConfig();
 }
 
-// Chips for the current selection: the chosen group, or the chosen friends.
+// Chips for the current selection: the chosen group (cover + name), or the chosen
+// friends (avatar only — no name, to stay compact).
 function renderSplitSelected() {
   const wrap = $('splitSelected');
   if (state.selGroup) {
     const g = state.groups.find((x) => x.id === state.selGroup);
-    wrap.innerHTML = `<span class="ng-chip">👥 ${g ? g.name : 'Group'}<button class="ng-chip-x" data-clear-group aria-label="Remove">×</button></span>`;
+    wrap.innerHTML = `<span class="ng-chip split-group-selected"><span class="split-group-ico" style="${groupCoverBg(g)}"></span>${g ? g.name : 'Group'}<button class="ng-chip-x" data-clear-group aria-label="Remove">×</button></span>`;
     return;
   }
   const friends = [...(state.splitFriends?.values() || [])];
-  wrap.innerHTML = friends.map((f) => `<span class="ng-chip">${f.name}<button class="ng-chip-x" data-remove-friend="${f.id}" aria-label="Remove">×</button></span>`).join('');
+  wrap.innerHTML = friends
+    .map(
+      (f) => `<span class="split-friend-chip" title="${f.name}">
+        ${f.avatar ? `<img class="split-friend-av" src="${f.avatar}" alt="${f.name}" referrerpolicy="no-referrer"/>` : `<span class="split-friend-av">${(f.name || '?').charAt(0).toUpperCase()}</span>`}
+        <button class="split-friend-x" data-remove-friend="${f.id}" aria-label="Remove ${f.name}">×</button>
+      </span>`,
+    )
+    .join('');
 }
 
 // The split-with results panel: hidden until the user focuses the search box. When
@@ -128,7 +142,7 @@ async function renderSplitResults() {
     ? `<div class="split-groups-strip">${groupMatches
         .map(
           (g) => `<button class="split-group-chip" data-pick-group="${g.id}">
-            <span class="split-group-ico" style="background:${g.color && /^#/.test(g.color) ? g.color : 'var(--accent)'}">${g.icon || '👥'}</span>
+            <span class="split-group-ico" style="${groupCoverBg(g)}"></span>
             <span class="split-group-name">${g.name}</span>
           </button>`,
         )
