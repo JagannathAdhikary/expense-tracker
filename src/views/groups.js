@@ -7,7 +7,7 @@ import { cloudEnabled } from '../supabase.js';
 import { fmt } from '../format.js';
 import { friendlyDate, payBadge } from '../format.js';
 import { $ } from '../dom.js';
-import { loadCloudData, markShareDone, deleteGroupExpense, settleUpWithMember, settleAllMyDebts, deleteGroup, setGroupRetired, setGroupSimplify, myFriends, addMemberToGroup, findUserByPhone, leaveGroup } from '../features/groups.js';
+import { loadCloudData, markShareDone, deleteGroupExpense, settleUpWithMember, settleAllMyDebts, deleteGroup, setGroupRetired, setGroupSimplify, myFriends, addMemberToGroup, findUserByPhone, leaveGroup, groupDisplayName } from '../features/groups.js';
 import { openEditGroup, showAddForGroup } from './addEdit.js';
 import { expenseHasPayment, owedByUserInGroup, owedToUserInGroup, totalShareInGroup } from '../cloudrows.js';
 import { toastError, toastSuccess } from '../toast.js';
@@ -241,7 +241,7 @@ function groupTile(g) {
         ${thumbMarkup(g)}
         ${flag}
       </span>
-      <span class="gt-name">${g.name}</span>
+      <span class="gt-name">${groupDisplayName(g)}</span>
     </button>`;
 }
 
@@ -475,8 +475,8 @@ function renderGroupDetail() {
   }
   // Cover hero: background (photo/gradient) with the name + members overlaid.
   paintCover($('groupCover'), g);
-  $('groupDetailTitle').textContent = g.name;
-  $('groupDetailTitle').title = g.name;
+  $('groupDetailTitle').textContent = groupDisplayName(g);
+  $('groupDetailTitle').title = groupDisplayName(g);
   $('groupGearBtn').innerHTML = icon.gear({ size: 20 });
   updateGroupTopbar();
   const memCount = g.members.length;
@@ -692,7 +692,7 @@ function renderGroupSettings() {
   const topRow = g.direct
     ? `<div class="gs-group-row gs-group-row--static">
         <span class="gs-group-cover">${thumbMarkup(g)}</span>
-        <span class="gs-group-meta"><span class="gs-group-name">${g.name}</span><span class="gs-group-sub">Direct split · ${g.members.length} member${g.members.length === 1 ? '' : 's'}</span></span>
+        <span class="gs-group-meta"><span class="gs-group-name">${groupDisplayName(g)}</span><span class="gs-group-sub">Direct split · ${g.members.length} member${g.members.length === 1 ? '' : 's'}</span></span>
       </div>`
     : `<button class="gs-group-row" data-act="edit">
         <span class="gs-group-cover">${thumbMarkup(g)}</span>

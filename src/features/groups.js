@@ -155,19 +155,25 @@ export async function findOrCreateDirectSplit(friendIds) {
     return ids.size === wanted.size && [...wanted].every((id) => ids.has(id));
   });
   if (existing) return existing.id;
-  // Auto-name from the friends' display names ("You, Asha & Ravi").
-  const names = friendIds
-    .map((id) => {
-      for (const g of state.groups) {
-        const m = (g.members || []).find((x) => x.id === id);
-        if (m) return m.name;
-      }
-      return null;
-    })
-    .filter(Boolean);
-  const name = names.length ? `You & ${names.join(', ')}` : 'Direct split';
-  const grp = await createGroup(name, friendIds, { isDirect: true });
+  // Store a neutral placeholder — a direct split's shown name is derived per-viewer
+  // (each person sees the OTHER members) via groupDisplayName(), never this string.
+  const grp = await createGroup('Direct split', friendIds, { isDirect: true });
   return grp ? grp.id : null;
+}
+
+// The name to SHOW for a group/direct split, from the current user's perspective.
+// Real groups use their stored name. A direct split has no shared name (that would
+// bake in one person's viewpoint, e.g. "You & B" showing to B too), so we build it
+// live from the OTHER members' names ("Asha", "Asha & Ravi", "Asha & 2 others").
+export function groupDisplayName(g) {
+  if (!g) return 'Group';
+  if (!g.direct) return g.name;
+  const uid = state.user?.id;
+  const others = (g.members || []).filter((m) => m.id !== uid).map((m) => (m.name || 'Member').split(' ')[0]);
+  if (!others.length) return 'Direct split';
+  if (others.length === 1) return others[0];
+  if (others.length === 2) return `${others[0]} & ${others[1]}`;
+  return `${others[0]} & ${others.length - 1} others`;
 }
 
 // Look up a registered user by exact mobile number (via the SECURITY DEFINER RPC).

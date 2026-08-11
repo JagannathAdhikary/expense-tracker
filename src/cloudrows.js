@@ -23,7 +23,20 @@ const splitsByExpense = () => {
   return m;
 };
 
-const groupName = (gid) => state.groups.find((g) => g.id === gid)?.name || 'Group';
+// Display name for the group an expense belongs to. A direct split has no shared
+// name (that would bake in one viewer's perspective), so build it from the OTHER
+// members relative to the current user.
+const groupName = (gid) => {
+  const g = state.groups.find((x) => x.id === gid);
+  if (!g) return 'Group';
+  if (!g.direct) return g.name;
+  const uid = state.user?.id;
+  const others = (g.members || []).filter((m) => m.id !== uid).map((m) => (m.name || 'Member').split(' ')[0]);
+  if (!others.length) return 'Direct split';
+  if (others.length === 1) return others[0];
+  if (others.length === 2) return `${others[0]} & ${others[1]}`;
+  return `${others[0]} & ${others.length - 1} others`;
+};
 
 // True if any non-payer share of this expense has been settled. Used to lock
 // edits (amount/group/split) and block deletion once money has changed hands.
