@@ -297,7 +297,7 @@ function showExpenseDetail(expId) {
   // owe, or a status badge once it's settled. In a retired (read-only) group the
   // settle button is replaced by a plain "you owe" badge so no settle can start.
   const action = $('expDetailAction');
-  if (mine && !iPaid) {
+  if (mine && !iPaid && Number(mine.share_amount) > 0) {
     if (mine.status !== 'pending') {
       action.innerHTML = `<div class="exp-detail-done">Settled ${fmt(mine.share_amount)} ✓</div>`;
     } else if (g.retired) {
@@ -351,7 +351,7 @@ function renderExpenseTile(e, g) {
   // "Settle" footer button below carries the amount, so no pill — unless the
   // group is retired (no footer button), where we surface the owed pill instead.
   let status = '';
-  if (mine && !iPaid) {
+  if (mine && !iPaid && Number(mine.share_amount) > 0) {
     if (mine.status !== 'pending') status = `<span class="pay-badge shared-done">settled ✓</span>`;
     else if (readOnly) status = `<span class="pay-badge shared-pending">you owe ${fmt(mine.share_amount)}</span>`;
   } else if (iPaid) {
@@ -359,9 +359,10 @@ function renderExpenseTile(e, g) {
     status = pend > 0 ? `<span class="pay-badge shared-pending">${pend} pending</span>` : `<span class="pay-badge shared-done">all settled</span>`;
   }
   // Full-width footer action: a pending share you owe gets its own settle
-  // button here (never truncated) — suppressed in a retired (read-only) group.
+  // button here (never truncated) — suppressed in a retired (read-only) group, and
+  // omitted when your share is 0 (nothing to settle).
   const footer =
-    !readOnly && mine && !iPaid && mine.status === 'pending'
+    !readOnly && mine && !iPaid && mine.status === 'pending' && Number(mine.share_amount) > 0
       ? `<button class="ge-settle-btn" data-settle="${mine.id}">Settle your share ${fmt(mine.share_amount)}</button>`
       : '';
   const editBtn = !readOnly && iPaid ? `<button class="icon-btn gedit" data-gid="${e.id}" title="Edit" aria-label="Edit">${icon.edit({ size: 17 })}</button>` : '';

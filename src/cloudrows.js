@@ -157,6 +157,9 @@ export function sharedRows() {
     } else {
       const mine = rowsFor.find((s) => s.debtor_id === uid);
       if (!mine) continue; // not involved
+      // A zero share means this expense wasn't split to me — nothing owed, nothing to
+      // settle. Don't surface it as a borrowed row (and no ₹0.00 settle prompt).
+      if (Number(mine.share_amount) === 0) continue;
       // Debtor's personal category/note; payment is ONLY their own settlement method
       // (never the payer's — that's private to the payer).
       const personal = { cat: mine.cat || base.cat, desc: mine.note || base.desc, pay: mine.pay || null };
