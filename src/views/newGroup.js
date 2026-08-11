@@ -47,6 +47,32 @@ function avatarDot(f) {
     : `<span class="member-row-av member-avatar">${(f.name || '?').charAt(0).toUpperCase()}</span>`;
 }
 
+// Show the friends list under the search bar. Empty query -> all friends (not yet
+// selected); typing filters by name, and a 10-digit number looks up anyone by phone.
+let searchSeq = 0;
+async function renderNgMembers() {
+  const seq = ++searchSeq;
+  const q = $('ngMemberSearch').value;
+  const friends = myFriends().filter((f) => !selected.has(f.id));
+  const rowHtml = (f) => `<button class="member-result" data-pick="${f.id}" data-name="${encodeURIComponent(f.name)}">${avatarDot(f)}<span class="member-row-name">${f.name}</span><span class="member-add-plus">+</span></button>`;
+  let html;
+  if (!q.trim()) {
+    html = friends.length
+      ? friends.map(rowHtml).join('')
+      : '<div class="member-empty">No friends yet. Search by mobile number, or share the invite link after creating.</div>';
+  } else {
+    let results = matchFriends(friends, q);
+    if (!results.length && digits(q).length >= 10) {
+      const u = await findUserByPhone(q);
+      if (u && !selected.has(u.id)) results = [{ id: u.id, name: u.name, avatar: u.avatar }];
+    }
+    html = results.length
+      ? results.map(rowHtml).join('')
+      : '<div class="member-empty">No match. They may not be on the app yet — you can share the invite link after creating.</div>';
+  }
+  if (seq === searchSeq) $('ngMemberResults').innerHTML = html; // ignore stale async
+}
+
 export function showNewGroup() {
   theme = DEFAULT_GROUP_THEME;
   photoFile = null;
@@ -54,11 +80,11 @@ export function showNewGroup() {
   selected.clear();
   $('ngName').value = '';
   $('ngMemberSearch').value = '';
-  $('ngMemberResults').innerHTML = '';
   $('ngNameErr').style.display = 'none';
   renderCover();
   renderThemes();
   renderSelected();
+  renderNgMembers(); // show friends immediately, before any typing
   navTo('newGroup');
   setTimeout(() => $('ngName').focus(), 80);
 }
@@ -94,32 +120,15 @@ export function initNewGroup() {
     renderThemes();
   });
 
-  let searchSeq = 0;
-  $('ngMemberSearch').addEventListener('input', async () => {
-    const seq = ++searchSeq;
-    const q = $('ngMemberSearch').value;
-    const friends = myFriends().filter((f) => !selected.has(f.id));
-    let html = '';
-    if (q.trim()) {
-      let results = matchFriends(friends, q);
-      if (!results.length && digits(q).length >= 10) {
-        const u = await findUserByPhone(q);
-        if (u && !selected.has(u.id)) results = [{ id: u.id, name: u.name, avatar: u.avatar }];
-      }
-      html = results.length
-        ? results.map((f) => `<button class="member-result" data-pick="${f.id}" data-name="${encodeURIComponent(f.name)}">${avatarDot(f)}<span class="member-row-name">${f.name}</span><span class="member-add-plus">+</span></button>`).join('')
-        : '<div class="member-empty">No match. They may not be on the app yet — you can share the invite link after creating.</div>';
-    }
-    if (seq === searchSeq) $('ngMemberResults').innerHTML = html; // ignore stale async
-  });
+  $('ngMemberSearch').addEventListener('input', renderNgMembers);
 
   $('ngMemberResults').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-pick]');
     if (!btn) return;
     selected.set(btn.dataset.pick, { id: btn.dataset.pick, name: decodeURIComponent(btn.dataset.name) });
     $('ngMemberSearch').value = '';
-    $('ngMemberResults').innerHTML = '';
     renderSelected();
+    renderNgMembers(); // refresh so the picked friend drops out of the list
   });
 
   $('ngSelected').addEventListener('click', (e) => {
@@ -127,6 +136,7 @@ export function initNewGroup() {
     if (!x) return;
     selected.delete(x.dataset.remove);
     renderSelected();
+    renderNgMembers(); // the removed friend reappears in the list
   });
 
   $('ngCreateBtn').onclick = async () => {
