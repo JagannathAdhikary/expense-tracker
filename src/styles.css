@@ -122,6 +122,17 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .ng-chip{display:inline-flex;align-items:center;gap:6px;background:var(--bg-2);border-radius:999px;padding:6px 6px 6px 12px;font-size:13px;font-weight:500}
 .ng-chip-x{border:none;background:rgba(0,0,0,.08);width:20px;height:20px;border-radius:50%;cursor:pointer;font-size:14px;line-height:1;color:var(--ink-soft)}
 #newGroup .member-results{margin-top:8px}
+/* Add-expense "Split with" control (groups + friends). */
+.split-locked{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink);background:var(--bg-2);border-radius:var(--radius-sm);padding:11px 13px}
+.split-locked-ico{font-size:16px}
+.split-selected{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.split-selected:empty{margin-bottom:0}
+.split-search{width:100%;padding:11px 14px;font-size:15px;border:1.5px solid var(--line);border-radius:var(--radius-sm);background:var(--surface)}
+.split-search:focus{outline:none;border-color:var(--accent)}
+#splitResults{margin-top:6px}
+#splitResults:empty{margin-top:0}
+/* "group" tag on group results in the split-with list. */
+.split-kind{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--accent);background:rgba(30,58,95,.1);border-radius:var(--radius-pill);padding:2px 8px}
 /* Gradient theme swatches (New Group + group settings). */
 .theme-swatches{display:flex;flex-wrap:wrap;gap:10px}
 .theme-swatch{width:38px;height:38px;border-radius:11px;cursor:pointer;border:3px solid transparent;box-shadow:var(--sh-sm);transition:transform .12s}
@@ -470,6 +481,10 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .gs-ico svg{display:block}
 /* Top group row: cover thumbnail + name/meta, pencil affordance on the right. */
 .gs-group-row{display:flex;align-items:center;gap:14px;width:100%;text-align:left;border:none;background:var(--surface);padding:16px;cursor:pointer;transition:background .15s}
+.gs-group-row--static{cursor:default}
+.gs-group-row--static:hover,.gs-group-row--static:active{background:var(--surface)}
+/* "Shared splits" section heading in the groups popover. */
+.shared-splits-title{margin-top:18px}
 .gs-group-row:hover{background:var(--bg-2)}
 .gs-group-row:active{background:var(--line)}
 .gs-group-cover{flex-shrink:0}

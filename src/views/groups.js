@@ -200,8 +200,12 @@ let groupTab = 'active';
 
 function renderGroupList() {
   const wrap = $('groupList');
-  const active = state.groups.filter((g) => !g.retired);
-  const retired = state.groups.filter((g) => g.retired);
+  // Direct-split containers are not real groups — they're listed separately below.
+  const realGroups = state.groups.filter((g) => !g.direct);
+  const active = realGroups.filter((g) => !g.retired);
+  const retired = realGroups.filter((g) => g.retired);
+  // Direct splits the user is part of that actually have expenses (skip empty ones).
+  const directSplits = state.groups.filter((g) => g.direct && state.groupExpenses.some((e) => e.group_id === g.id));
 
   // Show the Retired tab only when some exist; if the retired tab is selected
   // but nothing's left retired, fall back to active.
@@ -210,18 +214,19 @@ function renderGroupList() {
   if (groupTab === 'retired' && !retired.length) groupTab = 'active';
   $('grpTabs').querySelectorAll('.grp-tab').forEach((t) => t.classList.toggle('on', t.dataset.tab === groupTab));
 
-  if (state.groups.length === 0) {
-    wrap.innerHTML = '<div class="empty"><span>👥</span>No groups yet.<br>Create one or join with a code.</div>';
+  // "Shared splits" section (direct splits with friends), appended below the groups.
+  const sharedBlock = directSplits.length
+    ? `<p class="section-title shared-splits-title">Shared splits</p><div class="group-tiles">${directSplits.map(groupTile).join('')}</div>`
+    : '';
+
+  if (realGroups.length === 0 && !directSplits.length) {
+    wrap.innerHTML = '<div class="empty"><span>👥</span>No groups yet.<br>Create one, or split an expense with friends.</div>';
     return;
   }
 
   const shown = groupTab === 'retired' ? retired : active;
-  if (!shown.length) {
-    wrap.innerHTML = '<div class="empty"><span>👥</span>No groups here.</div>';
-    return;
-  }
-
-  wrap.innerHTML = `<div class="group-tiles">` + shown.map(groupTile).join('') + `</div>`;
+  const groupsBlock = shown.length ? `<div class="group-tiles">${shown.map(groupTile).join('')}</div>` : (groupTab === 'retired' ? '<div class="empty"><span>👥</span>No groups here.</div>' : '');
+  wrap.innerHTML = groupsBlock + sharedBlock;
 }
 
 // A compact group tile: just the icon + truncated name, with a small label badge
@@ -683,17 +688,25 @@ function renderGroupSettings() {
     `<button class="gs-row ${cls}" data-act="${id}"><span class="gs-ico">${ico}</span><span class="gs-label">${label}</span>${trailing}</button>`;
 
   // --- Top: the group itself. Whole row edits name/cover; pencil is the affordance.
-  const topRow = `<button class="gs-group-row" data-act="edit">
-      <span class="gs-group-cover">${thumbMarkup(g)}</span>
-      <span class="gs-group-meta"><span class="gs-group-name">${g.name}</span><span class="gs-group-sub">${g.members.length} member${g.members.length === 1 ? '' : 's'}</span></span>
-      <span class="gs-edit-ico">${icon.edit({ size: 18 })}</span>
-    </button>`;
+  // A direct split has no cover/name to edit, so its top row is static.
+  const topRow = g.direct
+    ? `<div class="gs-group-row gs-group-row--static">
+        <span class="gs-group-cover">${thumbMarkup(g)}</span>
+        <span class="gs-group-meta"><span class="gs-group-name">${g.name}</span><span class="gs-group-sub">Direct split · ${g.members.length} member${g.members.length === 1 ? '' : 's'}</span></span>
+      </div>`
+    : `<button class="gs-group-row" data-act="edit">
+        <span class="gs-group-cover">${thumbMarkup(g)}</span>
+        <span class="gs-group-meta"><span class="gs-group-name">${g.name}</span><span class="gs-group-sub">${g.members.length} member${g.members.length === 1 ? '' : 's'}</span></span>
+        <span class="gs-edit-ico">${icon.edit({ size: 18 })}</span>
+      </button>`;
 
-  // --- Group members: add + share invite. A retired group takes no new members,
-  // so both are hidden (the whole section drops out when retired).
+  // --- Group members: add + share invite. A retired group takes no new members;
+  // a direct split has no invite link (and adding people would make it a real group).
   const memberRows = g.retired
     ? ''
-    : [row('add', icon.users({ size: 18 }), 'Add members'), row('invite', icon.share({ size: 18 }), 'Invite link')].join('');
+    : g.direct
+      ? row('add', icon.users({ size: 18 }), 'Add members')
+      : [row('add', icon.users({ size: 18 }), 'Add members'), row('invite', icon.share({ size: 18 }), 'Invite link')].join('');
 
   // --- Danger zone: retire (distinct), leave, delete.
   const dangerRows = [

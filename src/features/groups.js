@@ -43,7 +43,7 @@ export async function loadCloudData() {
   // Groups I'm a member of. Filter to MY membership rows: RLS lets co-members see
   // each other, so an unfiltered select returns one row per member of each group
   // (which would make a group appear multiple times in the list).
-  const { data: memberships, error: mErr } = await supabase.from('group_members').select('group_id, role, groups(id, name, invite_code, icon, color, retired_at, photo_url, simplify_debts)').eq('user_id', state.user.id);
+  const { data: memberships, error: mErr } = await supabase.from('group_members').select('group_id, role, groups(id, name, invite_code, icon, color, retired_at, photo_url, simplify_debts, is_direct)').eq('user_id', state.user.id);
   if (mErr) {
     console.error('load groups failed', mErr);
     return;
@@ -74,6 +74,7 @@ export async function loadCloudData() {
     photo: m.groups.photo_url || null,
     retired: !!m.groups.retired_at, // read-only when retired (no add / no settle)
     simplifyDebts: !!m.groups.simplify_debts, // group-wide: minimize number of repayments
+    direct: !!m.groups.is_direct, // hidden direct-split container (not a real group)
     role: m.role,
     members: membersByGroup[m.group_id] || [],
   }));
@@ -111,6 +112,7 @@ export async function createGroup(name, memberIds = [], opts = {}) {
   if (opts.icon) row.icon = opts.icon;
   if (opts.color) row.color = opts.color;
   if (opts.photoUrl) row.photo_url = opts.photoUrl;
+  if (opts.isDirect) row.is_direct = true;
   const { data: grp, error } = await supabase.from('groups').insert(row).select().single();
   if (error) {
     toastError('Could not create group: ' + error.message);
@@ -125,6 +127,36 @@ export async function createGroup(name, memberIds = [], opts = {}) {
   if (mErr) toastError('Group created, but adding some members failed: ' + mErr.message);
   await loadCloudData();
   return grp;
+}
+
+// Find (or create) the hidden "direct split" container for the current user + the
+// given friends. Reuses an existing direct container whose member set is EXACTLY those
+// users, so repeat splits with the same people don't spawn duplicates. Returns the
+// container's group id, or null on failure. `friendIds` excludes the current user.
+export async function findOrCreateDirectSplit(friendIds) {
+  if (!cloudEnabled() || !state.user) return null;
+  const uid = state.user.id;
+  const wanted = new Set([uid, ...friendIds.filter((id) => id && id !== uid)]);
+  // Reuse an existing direct container with the same exact membership.
+  const existing = state.groups.find((g) => {
+    if (!g.direct) return false;
+    const ids = new Set((g.members || []).map((m) => m.id));
+    return ids.size === wanted.size && [...wanted].every((id) => ids.has(id));
+  });
+  if (existing) return existing.id;
+  // Auto-name from the friends' display names ("You, Asha & Ravi").
+  const names = friendIds
+    .map((id) => {
+      for (const g of state.groups) {
+        const m = (g.members || []).find((x) => x.id === id);
+        if (m) return m.name;
+      }
+      return null;
+    })
+    .filter(Boolean);
+  const name = names.length ? `You & ${names.join(', ')}` : 'Direct split';
+  const grp = await createGroup(name, friendIds, { isDirect: true });
+  return grp ? grp.id : null;
 }
 
 // Look up a registered user by exact mobile number (via the SECURITY DEFINER RPC).

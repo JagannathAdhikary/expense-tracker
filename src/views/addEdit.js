@@ -9,7 +9,8 @@ import { openCatModal } from '../features/categories.js';
 import { openPayModal } from '../features/payments.js';
 import { cloudEnabled } from '../supabase.js';
 import { computeSplits } from '../split.js';
-import { saveGroupExpense, editGroupExpense, updateMySplitMeta, updateGroupExpenseMeta, isGroupRetired } from '../features/groups.js';
+import { saveGroupExpense, editGroupExpense, updateMySplitMeta, updateGroupExpenseMeta, isGroupRetired, myFriends, findUserByPhone, findOrCreateDirectSplit } from '../features/groups.js';
+import { matchFriends } from '../friends.js';
 import { pushRecord, syncOn } from '../features/sync.js';
 import { expenseHasPayment } from '../cloudrows.js';
 import { toastError, toastSuccess } from '../toast.js';
@@ -42,15 +43,27 @@ export function setPayChip(pay) {
   document.querySelectorAll('#ipaychips .pay-chip').forEach((c) => c.classList.toggle('on', c.dataset.pay === pay && !c.classList.contains('add-chip')));
 }
 
-// ---- Group split UI -------------------------------------------------------
+// ---- Split-with UI --------------------------------------------------------
 
-// The members of the currently-tagged group (empty if none / not signed in).
-function taggedGroupMembers() {
-  const g = state.groups.find((x) => x.id === state.selGroup);
-  return g ? g.members : [];
+// The members participating in the split, as {id,name,avatar} objects:
+// - a chosen group -> its members;
+// - loose friends -> the current user + the chosen friends;
+// - nobody -> [] (personal expense).
+function splitMembers() {
+  if (state.selGroup) {
+    const g = state.groups.find((x) => x.id === state.selGroup);
+    return g ? g.members : [];
+  }
+  const friends = [...(state.splitFriends?.values() || [])];
+  if (!friends.length) return [];
+  const me = { id: state.user?.id, name: 'You', avatar: state.user?.avatar || null };
+  return [me, ...friends];
 }
 
-// Render the group picker chips. Only shown when signed in with ≥1 group.
+let splitSearchSeq = 0;
+
+// The "Split with" control: static line when locked in a group, else a search box
+// (groups + friends) with the current selection shown as removable chips.
 export function renderGroupChips() {
   const field = $('groupField');
   if (!cloudEnabled() || !state.user || state.groups.length === 0) {
@@ -58,30 +71,80 @@ export function renderGroupChips() {
     return;
   }
   field.style.display = 'block';
+
+  // Adding from a group's detail page: locked to that group, no picker.
   if (state.groupPickLocked && state.selGroup) {
-    // Adding from a group's detail page: this expense belongs to that group only.
     const g = state.groups.find((x) => x.id === state.selGroup);
-    $('igroupchips').innerHTML = `<div class="chip on" data-group="${state.selGroup}">👥 ${g ? g.name : 'Group'}</div>`;
+    $('splitLocked').style.display = '';
+    $('splitLocked').innerHTML = `<span class="split-locked-ico">👥</span> Splitting in <strong>${g ? g.name : 'group'}</strong>`;
+    $('splitPicker').style.display = 'none';
     renderSplitConfig();
     return;
   }
-  $('igroupchips').innerHTML =
-    `<div class="chip${state.selGroup === null ? ' on' : ''}" data-group="">Just me</div>` +
-    state.groups.filter((g) => !g.retired).map((g) => `<div class="chip${g.id === state.selGroup ? ' on' : ''}" data-group="${g.id}">👥 ${g.name}</div>`).join('');
+  $('splitLocked').style.display = 'none';
+  $('splitPicker').style.display = '';
+  renderSplitSelected();
+  renderSplitResults();
   renderSplitConfig();
 }
 
-// Show/hide the split-mode + per-member config for the tagged group.
+// Chips for the current selection: the chosen group, or the chosen friends.
+function renderSplitSelected() {
+  const wrap = $('splitSelected');
+  if (state.selGroup) {
+    const g = state.groups.find((x) => x.id === state.selGroup);
+    wrap.innerHTML = `<span class="ng-chip">👥 ${g ? g.name : 'Group'}<button class="ng-chip-x" data-clear-group aria-label="Remove">×</button></span>`;
+    return;
+  }
+  const friends = [...(state.splitFriends?.values() || [])];
+  wrap.innerHTML = friends.map((f) => `<span class="ng-chip">${f.name}<button class="ng-chip-x" data-remove-friend="${f.id}" aria-label="Remove">×</button></span>`).join('');
+}
+
+// Search results: matching groups first, then friends. Empty query shows a few of
+// each. A picked group replaces any friend selection (a split is a group OR friends).
+async function renderSplitResults() {
+  const seq = ++splitSearchSeq;
+  const q = $('splitSearch').value.trim();
+  const out = $('splitResults');
+  // If a group is already chosen, the box is inert until it's cleared.
+  if (state.selGroup) {
+    out.innerHTML = '';
+    return;
+  }
+  const chosen = state.splitFriends || new Map();
+  const groups = state.groups.filter((g) => !g.retired && !g.direct);
+  const groupMatches = q ? groups.filter((g) => g.name.toLowerCase().includes(q.toLowerCase())) : groups;
+  let friends = myFriends().filter((f) => !chosen.has(f.id));
+  if (q) friends = matchFriends(friends, q);
+  let html =
+    groupMatches.map((g) => `<button class="member-result" data-pick-group="${g.id}"><span class="member-row-av member-avatar" style="background:var(--accent)">👥</span><span class="member-row-name">${g.name}</span><span class="split-kind">group</span></button>`).join('') +
+    friends.map((f) => `<button class="member-result" data-pick-friend="${f.id}" data-name="${encodeURIComponent(f.name)}">${avatarDot(f)}<span class="member-row-name">${f.name}</span><span class="member-add-plus">+</span></button>`).join('');
+  if (!html && q && q.replace(/\D/g, '').length >= 10) {
+    const u = await findUserByPhone(q);
+    if (seq !== splitSearchSeq) return;
+    if (u && !chosen.has(u.id)) html = `<button class="member-result" data-pick-friend="${u.id}" data-name="${encodeURIComponent(u.name)}">${avatarDot(u)}<span class="member-row-name">${u.name}</span><span class="member-add-plus">+</span></button>`;
+  }
+  if (!html) html = '<div class="member-empty">No match. Search a group name, friend, or mobile number.</div>';
+  if (seq === splitSearchSeq) out.innerHTML = html;
+}
+
+function avatarDot(f) {
+  return f.avatar
+    ? `<span class="member-row-av member-avatar"><img src="${f.avatar}" alt="" referrerpolicy="no-referrer"/></span>`
+    : `<span class="member-row-av member-avatar">${(f.name || '?').charAt(0).toUpperCase()}</span>`;
+}
+
+// Show/hide the split-mode + per-member config for the current split target.
 function renderSplitConfig() {
   const cfg = $('splitConfig');
-  if (!state.selGroup) {
+  const members = splitMembers();
+  if (!members.length) {
     cfg.style.display = 'none';
     return;
   }
   cfg.style.display = 'block';
   document.querySelectorAll('#isplitmode .pay-chip').forEach((c) => c.classList.toggle('on', c.dataset.mode === state.selSplitMode));
 
-  const members = taggedGroupMembers();
   const weights = $('splitWeights');
   if (state.selSplitMode === 'equal') {
     weights.innerHTML = '';
@@ -103,17 +166,17 @@ function renderSplitConfig() {
 
 function renderSplitPreview() {
   const el = $('splitPreview');
-  const members = taggedGroupMembers().map((m) => m.id);
+  const memberObjs = splitMembers();
+  const members = memberObjs.map((m) => m.id);
   const amt = parseFloat($('iamt').value);
-  if (!state.selGroup || !amt || amt <= 0 || members.length === 0) {
+  if (!members.length || !amt || amt <= 0) {
     el.textContent = '';
     return;
   }
   try {
     const shares = computeSplits({ amount: amt, members, mode: state.selSplitMode, weights: state.splitWeights, payerId: state.user?.id });
     const byId = Object.fromEntries(shares.map((s) => [s.userId, s.share]));
-    const names = taggedGroupMembers();
-    el.textContent = names.map((m) => `${m.name.split(' ')[0]}: ${fmt(byId[m.id] || 0)}`).join('  ·  ');
+    el.textContent = memberObjs.map((m) => `${m.name.split(' ')[0]}: ${fmt(byId[m.id] || 0)}`).join('  ·  ');
   } catch (e) {
     el.textContent = '';
   }
@@ -132,6 +195,7 @@ export function showAdd() {
   state.selCat = initialCat();
   state.selPay = initialPay();
   state.selGroup = null;
+  state.splitFriends = new Map();
   state.selSplitMode = 'equal';
   state.splitWeights = {};
   state.editGroupExpId = null;
@@ -190,6 +254,7 @@ export function showEdit(id) {
   $('form-title').textContent = 'Edit expense';
   // Allow tagging a group to MOVE this personal expense into a group.
   state.selGroup = null;
+  state.splitFriends = new Map();
   state.selSplitMode = 'equal';
   state.splitWeights = {};
   renderCatChips();
@@ -283,7 +348,7 @@ export function openEditMySplit(splitId) {
 function applyGroupLock() {
   const locked = state.groupEditLocked;
   $('iamt').disabled = locked;
-  document.querySelectorAll('#igroupchips .chip, #isplitmode .pay-chip, #splitWeights .split-weight').forEach((el) => {
+  document.querySelectorAll('#splitPicker .split-search, #isplitmode .pay-chip, #splitWeights .split-weight').forEach((el) => {
     if (el.tagName === 'INPUT') el.disabled = locked;
     el.classList.toggle('locked', locked);
   });
@@ -403,12 +468,34 @@ export function initAddEdit() {
     setPayChip(chip.dataset.pay);
   });
 
-  // Group picker: "Just me" (null) or a specific group.
-  $('igroupchips').addEventListener('click', (e) => {
-    if (state.groupEditLocked || state.groupPickLocked) return; // locked (payment made, or added from group page)
-    const chip = e.target.closest('.chip');
-    if (!chip) return;
-    state.selGroup = chip.dataset.group || null;
+  // Split-with search: type to find groups/friends.
+  $('splitSearch').addEventListener('input', renderSplitResults);
+  // Pick a group or friend from the results.
+  $('splitResults').addEventListener('click', (e) => {
+    const gBtn = e.target.closest('[data-pick-group]');
+    const fBtn = e.target.closest('[data-pick-friend]');
+    if (gBtn) {
+      state.selGroup = gBtn.dataset.pickGroup;
+      state.splitFriends = new Map(); // a group replaces any loose-friend selection
+    } else if (fBtn) {
+      state.selGroup = null; // friends and a group are mutually exclusive
+      state.splitFriends.set(fBtn.dataset.pickFriend, { id: fBtn.dataset.pickFriend, name: decodeURIComponent(fBtn.dataset.name), avatar: null });
+    } else {
+      return;
+    }
+    state.splitWeights = {};
+    $('splitSearch').value = '';
+    renderGroupChips();
+  });
+  // Remove a selection (clear the group, or remove a friend chip).
+  $('splitSelected').addEventListener('click', (e) => {
+    if (e.target.closest('[data-clear-group]')) {
+      state.selGroup = null;
+    } else {
+      const rm = e.target.closest('[data-remove-friend]');
+      if (!rm) return;
+      state.splitFriends.delete(rm.dataset.removeFriend);
+    }
     state.splitWeights = {};
     renderGroupChips();
   });
@@ -432,7 +519,7 @@ export function initAddEdit() {
 
   // Keep the split preview in sync as the amount changes.
   $('iamt').addEventListener('input', () => {
-    if (state.selGroup) renderSplitPreview();
+    renderSplitPreview();
   });
 
   $('savebtn').onclick = async function () {
@@ -472,9 +559,21 @@ export function initAddEdit() {
     const desc = $('idesc').value.trim();
     const date = $('idate').value || isoDay(new Date());
 
-    // Group expense: creating new, editing an existing group expense, or MOVING
-    // a personal expense into a group. (Not when plain-editing a personal record.)
-    if (state.selGroup && !state.editMySplitId) {
+    // Split expense: a chosen group, an in-group locked add, editing an existing group
+    // expense, moving a personal expense into a group, OR splitting with loose friends
+    // (resolved to a hidden "direct" container). Not for plain personal edits.
+    const hasFriends = state.splitFriends && state.splitFriends.size > 0;
+    if ((state.selGroup || hasFriends) && !state.editMySplitId) {
+      // Loose friends with no group -> find/create the direct container, then treat it
+      // like any group below.
+      if (!state.selGroup && hasFriends) {
+        const gid = await findOrCreateDirectSplit([...state.splitFriends.keys()]);
+        if (!gid) {
+          toastError('Could not set up the split. Try again.');
+          return;
+        }
+        state.selGroup = gid;
+      }
       // Retired group + editing an existing expense: labels only (amount/split are
       // frozen). Skip the split recompute entirely and update just the meta fields.
       if (state.editGroupExpId && isGroupRetired(state.selGroup)) {
@@ -492,7 +591,7 @@ export function initAddEdit() {
         }
         return;
       }
-      const members = taggedGroupMembers().map((m) => m.id);
+      const members = splitMembers().map((m) => m.id);
       let shares;
       try {
         shares = computeSplits({ amount: amt, members, mode: state.selSplitMode, weights: state.splitWeights, payerId: state.user?.id });

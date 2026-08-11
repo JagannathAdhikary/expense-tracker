@@ -34,6 +34,7 @@ create table if not exists public.groups (
   color       text,                            -- hex tile background for the icon
   retired_at  timestamptz,                     -- when the group was retired (null = active)
   simplify_debts boolean not null default false, -- group-wide: minimize the number of repayments
+  is_direct   boolean not null default false,   -- hidden "direct split" container (friends, not a real group)
   created_by  uuid not null references public.profiles(id) on delete cascade,
   created_at  timestamptz not null default now()
 );
@@ -46,6 +47,8 @@ alter table public.groups add column if not exists retired_at timestamptz;
 alter table public.groups add column if not exists photo_url text;
 -- For projects created before group-wide debt simplification was added:
 alter table public.groups add column if not exists simplify_debts boolean not null default false;
+-- For projects created before direct (group-less) splits were added:
+alter table public.groups add column if not exists is_direct boolean not null default false;
 
 create table if not exists public.group_members (
   group_id  uuid not null references public.groups(id) on delete cascade,

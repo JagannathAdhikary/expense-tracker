@@ -276,8 +276,15 @@
       <div class="pay-chips" id="ipaychips"></div>
     </div>
     <div class="field" id="groupField" style="display:none">
-      <label>Split with group <span style="font-size:11px;opacity:.5">(optional)</span></label>
-      <div class="chips" id="igroupchips"></div>
+      <label>Split with <span style="font-size:11px;opacity:.5">(optional)</span></label>
+      <!-- In-group add: a static line instead of a picker -->
+      <div id="splitLocked" class="split-locked" style="display:none"></div>
+      <!-- Generic add: search for a group or friends, chips show the selection -->
+      <div id="splitPicker">
+        <div id="splitSelected" class="split-selected"></div>
+        <input type="text" id="splitSearch" class="split-search" placeholder="Add a group or friend…" autocomplete="off"/>
+        <div id="splitResults" class="member-results"></div>
+      </div>
       <div id="splitConfig" style="display:none;margin-top:12px">
         <div class="pay-chips" id="isplitmode" style="margin-bottom:10px">
           <div class="pay-chip on" data-mode="equal">＝ Equal</div>
