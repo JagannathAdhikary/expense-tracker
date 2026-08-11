@@ -61,6 +61,16 @@ function splitMembers() {
   return [me, ...friends];
 }
 
+// Members who actually take a share. In Equal mode, unchecked members are excluded;
+// other modes include everyone (a 0 weight already yields a 0 share).
+function activeSplitMembers() {
+  const all = splitMembers();
+  if (state.selSplitMode !== 'equal') return all;
+  const ex = state.splitExclude || new Set();
+  const kept = all.filter((m) => !ex.has(m.id));
+  return kept.length ? kept : all; // never exclude everyone
+}
+
 let splitSearchSeq = 0;
 
 // The "Split with" control: static line when locked in a group, else a search box
@@ -180,24 +190,36 @@ function renderSplitConfig() {
     return;
   }
   cfg.style.display = 'block';
-  document.querySelectorAll('#isplitmode .pay-chip').forEach((c) => c.classList.toggle('on', c.dataset.mode === state.selSplitMode));
+  document.querySelectorAll('#isplitmode .split-mode').forEach((c) => c.classList.toggle('on', c.dataset.mode === state.selSplitMode));
 
   const weights = $('splitWeights');
+  const exclude = state.splitExclude || (state.splitExclude = new Set());
   if (state.selSplitMode === 'equal') {
-    weights.innerHTML = '';
+    // Each member has a checkbox; only checked members split the bill equally.
+    weights.innerHTML = members
+      .map((m) => {
+        const on = !exclude.has(m.id);
+        return `<label class="split-check-row${on ? '' : ' off'}">
+          <span class="split-weight-av">${avatarDot(m)}</span>
+          <span class="split-weight-name">${m.name}${m.id === state.user?.id && m.name !== 'You' ? ' (you)' : ''}</span>
+          <input type="checkbox" class="split-include" data-member="${m.id}" ${on ? 'checked' : ''}/>
+          <span class="split-check-box"></span>
+        </label>`;
+      })
+      .join('');
   } else {
-    const percent = state.selSplitMode === 'percent';
+    const mode = state.selSplitMode; // amount | percent | shares
     weights.innerHTML = members
       .map((m) => {
         const val = state.splitWeights[m.id] ?? '';
-        // Unit affix stays visible while typing: ₹ prefix for amounts, % suffix for percent.
-        const affix = percent
-          ? `<input type="number" class="split-weight" data-member="${m.id}" value="${val}" placeholder="0" inputmode="decimal" min="0"/><span class="swf-unit swf-suffix">%</span>`
-          : `<span class="swf-unit swf-prefix">₹</span><input type="number" class="split-weight" data-member="${m.id}" value="${val}" placeholder="0" inputmode="decimal" min="0"/>`;
+        let affix;
+        if (mode === 'percent') affix = `<input type="number" class="split-weight" data-member="${m.id}" value="${val}" placeholder="0" inputmode="decimal" min="0"/><span class="swf-unit swf-suffix">%</span>`;
+        else if (mode === 'shares') affix = `<input type="number" class="split-weight" data-member="${m.id}" value="${val}" placeholder="0" inputmode="numeric" min="0"/><span class="swf-unit swf-suffix">×</span>`;
+        else affix = `<span class="swf-unit swf-prefix">₹</span><input type="number" class="split-weight" data-member="${m.id}" value="${val}" placeholder="0" inputmode="decimal" min="0"/>`;
         return `<div class="split-weight-row">
           <span class="split-weight-av">${avatarDot(m)}</span>
           <span class="split-weight-name">${m.name}${m.id === state.user?.id && m.name !== 'You' ? ' (you)' : ''}</span>
-          <span class="split-weight-field${percent ? ' is-percent' : ''}">${affix}</span>
+          <span class="split-weight-field${mode === 'percent' || mode === 'shares' ? ' is-suffix' : ''}">${affix}</span>
         </div>`;
       })
       .join('');
@@ -213,6 +235,7 @@ function renderSplitConfig() {
 // `changed` is the input the user just edited (so we don't overwrite it). Only fires
 // when exactly one field is still blank; clamps the remainder at 0.
 function autoFillLastWeight(changed) {
+  if (state.selSplitMode === 'shares') return; // ratios have no fixed total to balance
   const inputs = [...$('splitWeights').querySelectorAll('.split-weight')];
   if (inputs.length < 2) return;
   const blanks = inputs.filter((i) => i.value.trim() === '');
@@ -229,7 +252,7 @@ function autoFillLastWeight(changed) {
 
 function renderSplitPreview() {
   const el = $('splitPreview');
-  const memberObjs = splitMembers();
+  const memberObjs = activeSplitMembers();
   const members = memberObjs.map((m) => m.id);
   const amt = parseFloat($('iamt').value);
   if (!members.length || !amt || amt <= 0) {
@@ -262,6 +285,7 @@ export function showAdd() {
   state.splitPanelOpen = false;
   state.selSplitMode = 'equal';
   state.splitWeights = {};
+  state.splitExclude = new Set();
   state.editGroupExpId = null;
   state.groupEditLocked = false;
   state.groupPickLocked = false;
@@ -322,6 +346,7 @@ export function showEdit(id) {
   state.splitPanelOpen = false;
   state.selSplitMode = 'equal';
   state.splitWeights = {};
+  state.splitExclude = new Set();
   renderCatChips();
   renderPayChips();
   renderGroupChips();
@@ -594,13 +619,23 @@ export function initAddEdit() {
   // Split-mode selector.
   $('isplitmode').addEventListener('click', (e) => {
     if (state.groupEditLocked) return; // locked once a payment is made
-    const chip = e.target.closest('.pay-chip');
+    const chip = e.target.closest('.split-mode');
     if (!chip) return;
     state.selSplitMode = chip.dataset.mode;
-    renderGroupChips();
+    renderSplitConfig();
   });
 
-  // Per-member weight inputs (amount / percent modes).
+  // Equal-mode include/exclude checkboxes.
+  $('splitWeights').addEventListener('change', (e) => {
+    const box = e.target.closest('.split-include');
+    if (!box) return;
+    const id = box.dataset.member;
+    if (box.checked) state.splitExclude.delete(id);
+    else state.splitExclude.add(id);
+    renderSplitConfig();
+  });
+
+  // Per-member weight inputs (amount / percent / shares modes).
   $('splitWeights').addEventListener('input', (e) => {
     const input = e.target.closest('.split-weight');
     if (!input) return;
@@ -683,7 +718,7 @@ export function initAddEdit() {
         }
         return;
       }
-      const members = splitMembers().map((m) => m.id);
+      const members = activeSplitMembers().map((m) => m.id);
       let shares;
       try {
         shares = computeSplits({ amount: amt, members, mode: state.selSplitMode, weights: state.splitWeights, payerId: state.user?.id });

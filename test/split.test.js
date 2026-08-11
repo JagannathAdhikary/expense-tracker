@@ -35,6 +35,23 @@ describe('computeSplits', () => {
     expect(sum(s)).toBe(100);
     expect(s.find((x) => x.userId === 'A').share).toBe(45); // 40 + 5 leftover
   });
+  it('shares mode splits by ratio (A=2,B=3 of 500 -> 200/300)', () => {
+    const s = computeSplits({ amount: 500, members: ['A', 'B'], mode: 'shares', weights: { A: 2, B: 3 }, payerId: 'A' });
+    expect(sum(s)).toBe(500);
+    expect(s.find((x) => x.userId === 'A').share).toBe(200);
+    expect(s.find((x) => x.userId === 'B').share).toBe(300);
+  });
+  it('shares mode rounds and hands the remainder to the payer', () => {
+    // 100 split 1:1:1 -> 33.33 each; payer A absorbs the leftover paise.
+    const s = computeSplits({ amount: 100, members: ['A', 'B', 'C'], mode: 'shares', weights: { A: 1, B: 1, C: 1 }, payerId: 'A' });
+    expect(sum(s)).toBe(100);
+    expect(s.find((x) => x.userId === 'A').share).toBeCloseTo(33.34, 2);
+  });
+  it('shares mode with no weights falls back to an even split', () => {
+    const s = computeSplits({ amount: 90, members: ['A', 'B', 'C'], mode: 'shares', weights: {}, payerId: 'A' });
+    expect(sum(s)).toBe(90);
+    expect(s.every((x) => x.share === 30)).toBe(true);
+  });
 });
 
 describe('netForUser / pendingOwedByUser — worked example', () => {

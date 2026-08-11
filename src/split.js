@@ -55,6 +55,28 @@ export function computeSplits({ amount, members, mode = 'equal', weights = {}, p
       assigned += v;
     });
     shares[remainderHolder] += total - assigned;
+  } else if (mode === 'shares') {
+    // Ratio shares per member: member's cut = weight / sum(weights) × total.
+    // e.g. A=2, B=3 -> A gets 2/5, B gets 3/5. Remainder holder absorbs rounding.
+    // If no weights given, falls back to an even split.
+    const totalShares = members.reduce((s, m) => s + Math.max(0, Number(weights[m] || 0)), 0);
+    shares = {};
+    let assigned = 0;
+    if (totalShares > 0) {
+      members.forEach((m) => {
+        const w = Math.max(0, Number(weights[m] || 0));
+        const v = Math.floor((total * w) / totalShares);
+        shares[m] = v;
+        assigned += v;
+      });
+    } else {
+      const base = Math.floor(total / members.length);
+      members.forEach((m) => {
+        shares[m] = base;
+        assigned += base;
+      });
+    }
+    shares[remainderHolder] += total - assigned;
   } else {
     throw new Error(`Unknown split mode: ${mode}`);
   }

@@ -286,10 +286,11 @@
         <div id="splitResults" class="member-results"></div>
       </div>
       <div id="splitConfig" style="display:none;margin-top:12px">
-        <div class="pay-chips" id="isplitmode" style="margin-bottom:10px">
-          <div class="pay-chip on" data-mode="equal">＝ Equal</div>
-          <div class="pay-chip" data-mode="amount">₹ Amounts</div>
-          <div class="pay-chip" data-mode="percent">% Percent</div>
+        <div class="split-modes" id="isplitmode">
+          <button type="button" class="split-mode on" data-mode="equal">Equal</button>
+          <button type="button" class="split-mode" data-mode="amount">Amount</button>
+          <button type="button" class="split-mode" data-mode="percent">Percent</button>
+          <button type="button" class="split-mode" data-mode="shares">Shares</button>
         </div>
         <div id="splitWeights"></div>
         <div id="splitPreview" style="font-size:12px;color:#888;margin-top:6px"></div>

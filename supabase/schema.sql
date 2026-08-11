@@ -67,7 +67,7 @@ create table if not exists public.group_expenses (
   category    text,
   pay         text,
   spent_on    date not null default current_date,
-  split_mode  text not null default 'equal' check (split_mode in ('equal','amount','percent')),
+  split_mode  text not null default 'equal' check (split_mode in ('equal','amount','percent','shares')),
   created_at  timestamptz not null default now()
 );
 -- For projects created before payment method was added:
