@@ -100,13 +100,19 @@ function renderSplitSelected() {
   wrap.innerHTML = friends.map((f) => `<span class="ng-chip">${f.name}<button class="ng-chip-x" data-remove-friend="${f.id}" aria-label="Remove">×</button></span>`).join('');
 }
 
-// Search results: matching groups first, then friends. Empty query shows a few of
-// each. A picked group replaces any friend selection (a split is a group OR friends).
+// The split-with results panel: hidden until the user focuses the search box. When
+// open it shows a horizontal-scrolling strip of groups (icon + name) and, below, a
+// vertical list of friends (~3 visible, scrollable). Typing filters both.
 async function renderSplitResults() {
   const seq = ++splitSearchSeq;
   const q = $('splitSearch').value.trim();
   const out = $('splitResults');
-  // If a group is already chosen, the box is inert until it's cleared.
+  // Closed (not focused) and nothing typed -> show nothing.
+  if (!state.splitPanelOpen && !q) {
+    out.innerHTML = '';
+    return;
+  }
+  // A chosen group makes the box inert until it's cleared.
   if (state.selGroup) {
     out.innerHTML = '';
     return;
@@ -116,14 +122,31 @@ async function renderSplitResults() {
   const groupMatches = q ? groups.filter((g) => g.name.toLowerCase().includes(q.toLowerCase())) : groups;
   let friends = myFriends().filter((f) => !chosen.has(f.id));
   if (q) friends = matchFriends(friends, q);
-  let html =
-    groupMatches.map((g) => `<button class="member-result" data-pick-group="${g.id}"><span class="member-row-av member-avatar" style="background:var(--accent)">👥</span><span class="member-row-name">${g.name}</span><span class="split-kind">group</span></button>`).join('') +
-    friends.map((f) => `<button class="member-result" data-pick-friend="${f.id}" data-name="${encodeURIComponent(f.name)}">${avatarDot(f)}<span class="member-row-name">${f.name}</span><span class="member-add-plus">+</span></button>`).join('');
-  if (!html && q && q.replace(/\D/g, '').length >= 10) {
+
+  // Horizontal group strip.
+  const groupStrip = groupMatches.length
+    ? `<div class="split-groups-strip">${groupMatches
+        .map(
+          (g) => `<button class="split-group-chip" data-pick-group="${g.id}">
+            <span class="split-group-ico" style="background:${g.color && /^#/.test(g.color) ? g.color : 'var(--accent)'}">${g.icon || '👥'}</span>
+            <span class="split-group-name">${g.name}</span>
+          </button>`,
+        )
+        .join('')}</div>`
+    : '';
+
+  // Vertical friends list (scrollable; ~3 rows tall via CSS).
+  let friendRows = friends
+    .map((f) => `<button class="member-result" data-pick-friend="${f.id}" data-name="${encodeURIComponent(f.name)}">${avatarDot(f)}<span class="member-row-name">${f.name}</span><span class="member-add-plus">+</span></button>`)
+    .join('');
+  if (!friendRows && q && q.replace(/\D/g, '').length >= 10) {
     const u = await findUserByPhone(q);
     if (seq !== splitSearchSeq) return;
-    if (u && !chosen.has(u.id)) html = `<button class="member-result" data-pick-friend="${u.id}" data-name="${encodeURIComponent(u.name)}">${avatarDot(u)}<span class="member-row-name">${u.name}</span><span class="member-add-plus">+</span></button>`;
+    if (u && !chosen.has(u.id)) friendRows = `<button class="member-result" data-pick-friend="${u.id}" data-name="${encodeURIComponent(u.name)}">${avatarDot(u)}<span class="member-row-name">${u.name}</span><span class="member-add-plus">+</span></button>`;
   }
+  const friendsList = friendRows ? `<div class="split-friends-list">${friendRows}</div>` : '';
+
+  let html = groupStrip + friendsList;
   if (!html) html = '<div class="member-empty">No match. Search a group name, friend, or mobile number.</div>';
   if (seq === splitSearchSeq) out.innerHTML = html;
 }
@@ -196,6 +219,7 @@ export function showAdd() {
   state.selPay = initialPay();
   state.selGroup = null;
   state.splitFriends = new Map();
+  state.splitPanelOpen = false;
   state.selSplitMode = 'equal';
   state.splitWeights = {};
   state.editGroupExpId = null;
@@ -255,6 +279,7 @@ export function showEdit(id) {
   // Allow tagging a group to MOVE this personal expense into a group.
   state.selGroup = null;
   state.splitFriends = new Map();
+  state.splitPanelOpen = false;
   state.selSplitMode = 'equal';
   state.splitWeights = {};
   renderCatChips();
@@ -468,7 +493,18 @@ export function initAddEdit() {
     setPayChip(chip.dataset.pay);
   });
 
-  // Split-with search: type to find groups/friends.
+  // Split-with search: opens the results panel on focus; type to filter. Blur closes
+  // it (deferred so a result click registers first).
+  $('splitSearch').addEventListener('focus', () => {
+    state.splitPanelOpen = true;
+    renderSplitResults();
+  });
+  $('splitSearch').addEventListener('blur', () => {
+    setTimeout(() => {
+      state.splitPanelOpen = false;
+      if (!$('splitSearch').value.trim()) renderSplitResults();
+    }, 150);
+  });
   $('splitSearch').addEventListener('input', renderSplitResults);
   // Pick a group or friend from the results.
   $('splitResults').addEventListener('click', (e) => {
@@ -484,6 +520,7 @@ export function initAddEdit() {
       return;
     }
     state.splitWeights = {};
+    state.splitPanelOpen = false; // collapse after a pick
     $('splitSearch').value = '';
     renderGroupChips();
   });
