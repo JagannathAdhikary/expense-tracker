@@ -701,11 +701,11 @@ function renderGroupSettings() {
     owner ? row('delete', icon.trash({ size: 18 }), 'Delete group', { cls: 'gs-danger' }) : '',
   ].filter(Boolean).join('');
 
-  // --- Advanced: per-user "simplify debts" toggle. Re-routes only YOUR balances
-  // into fewer repayments (your view only; others are unaffected).
+  // --- Advanced: group-wide "simplify debts" toggle. Minimizes the number of
+  // repayments to settle the group; everyone sees the same simplified payments.
   const simplifyRow = `<button class="gs-row gs-toggle-row" data-act="simplify">
       <span class="gs-ico">${icon.sparkle({ size: 18 })}</span>
-      <span class="gs-label gs-label-stack"><span>Simplify my debts</span><span class="gs-sub">Combine debts into fewer repayments (your view)</span></span>
+      <span class="gs-label gs-label-stack"><span>Simplify group debts</span><span class="gs-sub">Combine debts to reduce the number of repayments</span></span>
       <span class="switch${g.simplifyDebts ? ' on' : ''}" id="simplifySwitch"></span>
     </button>`;
 
@@ -773,8 +773,13 @@ async function handleSettingsAction(act) {
       shareInvite();
       break;
     case 'simplify': {
-      const ok = await setGroupSimplify(g.id, !g.simplifyDebts);
-      if (ok) renderGroupSettings(); // reflect the new .on state
+      const target = !g.simplifyDebts;
+      // Optimistic: flip the switch immediately so it feels responsive, then persist.
+      const sw = $('simplifySwitch');
+      if (sw) sw.classList.toggle('on', target);
+      const ok = await setGroupSimplify(g.id, target);
+      renderGroupSettings(); // reflect the persisted state (reverts the switch if it failed)
+      if (ok) refreshGroupsView();
       break;
     }
     case 'retire': {

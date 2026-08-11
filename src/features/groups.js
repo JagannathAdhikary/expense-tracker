@@ -43,7 +43,7 @@ export async function loadCloudData() {
   // Groups I'm a member of. Filter to MY membership rows: RLS lets co-members see
   // each other, so an unfiltered select returns one row per member of each group
   // (which would make a group appear multiple times in the list).
-  const { data: memberships, error: mErr } = await supabase.from('group_members').select('group_id, role, simplify_debts, groups(id, name, invite_code, icon, color, retired_at, photo_url)').eq('user_id', state.user.id);
+  const { data: memberships, error: mErr } = await supabase.from('group_members').select('group_id, role, groups(id, name, invite_code, icon, color, retired_at, photo_url, simplify_debts)').eq('user_id', state.user.id);
   if (mErr) {
     console.error('load groups failed', mErr);
     return;
@@ -73,7 +73,7 @@ export async function loadCloudData() {
     color: m.groups.color || null,
     photo: m.groups.photo_url || null,
     retired: !!m.groups.retired_at, // read-only when retired (no add / no settle)
-    simplifyDebts: !!m.simplify_debts, // per-user: re-route my balances to fewer payments
+    simplifyDebts: !!m.groups.simplify_debts, // group-wide: minimize number of repayments
     role: m.role,
     members: membersByGroup[m.group_id] || [],
   }));
@@ -426,12 +426,13 @@ export async function setGroupRetired(groupId, retired) {
 // True when the given group is retired (read-only). Used to block mutations.
 const groupIsRetired = (groupId) => state.groups.some((g) => g.id === groupId && g.retired);
 
-// Per-user "simplify debts" toggle: re-routes only this user's own balances into
-// fewer repayments (view + settle routing; no split rewrite). Stored on the caller's
-// own membership row, so it syncs across their devices and affects only their view.
+// Group-wide "simplify debts" toggle: minimizes the number of repayments needed to
+// settle the group, and everyone in the group sees the same simplified payments
+// (view + settle routing; no split rewrite). Any member may toggle it (groups_update
+// RLS allows members). Stored on the group so it's consistent for all.
 export async function setGroupSimplify(groupId, on) {
   if (!cloudEnabled() || !state.user) return false;
-  const { error } = await supabase.from('group_members').update({ simplify_debts: !!on }).eq('group_id', groupId).eq('user_id', state.user.id);
+  const { error } = await supabase.from('groups').update({ simplify_debts: !!on }).eq('id', groupId);
   if (error) {
     toastError('Could not update simplify setting: ' + error.message);
     return false;
@@ -577,6 +578,8 @@ export function subscribeRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'group_expenses' }, scheduleReload)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'expense_splits' }, scheduleReload)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'settlements' }, scheduleReload)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'groups' }, scheduleReload)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members' }, scheduleReload)
     .subscribe();
 }
 

@@ -33,6 +33,7 @@ create table if not exists public.groups (
   icon        text,                            -- emoji shown as the group's icon
   color       text,                            -- hex tile background for the icon
   retired_at  timestamptz,                     -- when the group was retired (null = active)
+  simplify_debts boolean not null default false, -- group-wide: minimize the number of repayments
   created_by  uuid not null references public.profiles(id) on delete cascade,
   created_at  timestamptz not null default now()
 );
@@ -43,17 +44,16 @@ alter table public.groups add column if not exists color text;
 alter table public.groups add column if not exists retired_at timestamptz;
 -- For projects created before group photos were added (URL of an uploaded image):
 alter table public.groups add column if not exists photo_url text;
+-- For projects created before group-wide debt simplification was added:
+alter table public.groups add column if not exists simplify_debts boolean not null default false;
 
 create table if not exists public.group_members (
   group_id  uuid not null references public.groups(id) on delete cascade,
   user_id   uuid not null references public.profiles(id) on delete cascade,
   role      text not null default 'member',   -- 'owner' | 'member'
-  simplify_debts boolean not null default false, -- per-user: re-route this member's balances to fewer payments
   joined_at timestamptz not null default now(),
   primary key (group_id, user_id)
 );
--- For projects created before the per-user simplify-debts preference was added:
-alter table public.group_members add column if not exists simplify_debts boolean not null default false;
 
 create table if not exists public.group_expenses (
   id          uuid primary key default gen_random_uuid(),
@@ -333,7 +333,7 @@ create policy settlements_delete on public.settlements
 do $$
 declare t text;
 begin
-  foreach t in array array['group_expenses','expense_splits','settlements'] loop
+  foreach t in array array['group_expenses','expense_splits','settlements','groups','group_members'] loop
     if not exists (
       select 1 from pg_publication_tables
       where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t
