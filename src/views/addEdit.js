@@ -206,6 +206,27 @@ function renderSplitConfig() {
   if (state.editGroupExpId && state.groupEditLocked) applyGroupLock();
 }
 
+// When every member's split field is filled EXCEPT one, auto-fill that last blank
+// field with the remainder so the split always balances:
+//   amount  -> (total expense amount) − sum(others)
+//   percent -> 100 − sum(others)
+// `changed` is the input the user just edited (so we don't overwrite it). Only fires
+// when exactly one field is still blank; clamps the remainder at 0.
+function autoFillLastWeight(changed) {
+  const inputs = [...$('splitWeights').querySelectorAll('.split-weight')];
+  if (inputs.length < 2) return;
+  const blanks = inputs.filter((i) => i.value.trim() === '');
+  if (blanks.length !== 1) return;
+  const last = blanks[0];
+  if (last === changed) return; // don't fill the one being typed
+  const filledSum = inputs.filter((i) => i !== last).reduce((s, i) => s + (parseFloat(i.value) || 0), 0);
+  const percent = state.selSplitMode === 'percent';
+  const cap = percent ? 100 : parseFloat($('iamt').value) || 0;
+  const remainder = Math.max(0, Math.round((cap - filledSum) * 100) / 100);
+  last.value = remainder;
+  state.splitWeights[last.dataset.member] = remainder;
+}
+
 function renderSplitPreview() {
   const el = $('splitPreview');
   const memberObjs = splitMembers();
@@ -584,6 +605,7 @@ export function initAddEdit() {
     const input = e.target.closest('.split-weight');
     if (!input) return;
     state.splitWeights[input.dataset.member] = parseFloat(input.value) || 0;
+    autoFillLastWeight(input); // once only one person is blank, fill their remainder
     renderSplitPreview();
   });
 
