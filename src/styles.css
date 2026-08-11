@@ -24,8 +24,7 @@
 }
 
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html{overflow-x:hidden}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased;letter-spacing:.1px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;-webkit-font-smoothing:antialiased;letter-spacing:.1px}
 .screen{display:none;width:100%;padding:1.1rem;max-width:480px;margin:0 auto;padding-bottom:6rem}
 .screen.active{display:block;animation:screen-in .25s ease}
 /* The add/edit screen has its own Save button (no floating FAB), so it doesn't
