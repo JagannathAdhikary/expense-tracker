@@ -190,9 +190,10 @@ function renderSplitConfig() {
     weights.innerHTML = members
       .map((m) => {
         const val = state.splitWeights[m.id] ?? '';
-        return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-          <span style="flex:1;font-size:13px">${m.name}${m.id === state.user?.id ? ' (you)' : ''}</span>
-          <input type="number" class="split-weight" data-member="${m.id}" value="${val}" placeholder="${unit}" inputmode="decimal" style="width:90px;padding:8px"/>
+        return `<div class="split-weight-row">
+          <span class="split-weight-av">${avatarDot(m)}</span>
+          <span class="split-weight-name">${m.name}${m.id === state.user?.id && m.name !== 'You' ? ' (you)' : ''}</span>
+          <input type="number" class="split-weight" data-member="${m.id}" value="${val}" placeholder="${unit}" inputmode="decimal"/>
         </div>`;
       })
       .join('');
