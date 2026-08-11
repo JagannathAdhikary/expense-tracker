@@ -151,12 +151,12 @@ async function renderSplitResults() {
 
   // Vertical friends list (scrollable; ~3 rows tall via CSS).
   let friendRows = friends
-    .map((f) => `<button class="member-result" data-pick-friend="${f.id}" data-name="${encodeURIComponent(f.name)}">${avatarDot(f)}<span class="member-row-name">${f.name}</span><span class="member-add-plus">+</span></button>`)
+    .map((f) => `<button class="member-result" data-pick-friend="${f.id}" data-name="${encodeURIComponent(f.name)}" data-avatar="${f.avatar ? encodeURIComponent(f.avatar) : ''}">${avatarDot(f)}<span class="member-row-name">${f.name}</span><span class="member-add-plus">+</span></button>`)
     .join('');
   if (!friendRows && q && q.replace(/\D/g, '').length >= 10) {
     const u = await findUserByPhone(q);
     if (seq !== splitSearchSeq) return;
-    if (u && !chosen.has(u.id)) friendRows = `<button class="member-result" data-pick-friend="${u.id}" data-name="${encodeURIComponent(u.name)}">${avatarDot(u)}<span class="member-row-name">${u.name}</span><span class="member-add-plus">+</span></button>`;
+    if (u && !chosen.has(u.id)) friendRows = `<button class="member-result" data-pick-friend="${u.id}" data-name="${encodeURIComponent(u.name)}" data-avatar="${u.avatar ? encodeURIComponent(u.avatar) : ''}">${avatarDot(u)}<span class="member-row-name">${u.name}</span><span class="member-add-plus">+</span></button>`;
   }
   const friendsList = friendRows ? `<div class="split-friends-list">${friendRows}</div>` : '';
 
@@ -525,18 +525,26 @@ export function initAddEdit() {
     const gBtn = e.target.closest('[data-pick-group]');
     const fBtn = e.target.closest('[data-pick-friend]');
     if (gBtn) {
+      // A group is exclusive: replace any friends and collapse the picker.
       state.selGroup = gBtn.dataset.pickGroup;
-      state.splitFriends = new Map(); // a group replaces any loose-friend selection
+      state.splitFriends = new Map();
+      state.splitWeights = {};
+      state.splitPanelOpen = false;
+      $('splitSearch').value = '';
+      renderGroupChips();
     } else if (fBtn) {
-      state.selGroup = null; // friends and a group are mutually exclusive
-      state.splitFriends.set(fBtn.dataset.pickFriend, { id: fBtn.dataset.pickFriend, name: decodeURIComponent(fBtn.dataset.name), avatar: null });
-    } else {
-      return;
+      // Friends are multi-select: add and KEEP the panel open so more can be picked.
+      state.selGroup = null;
+      const av = fBtn.dataset.avatar ? decodeURIComponent(fBtn.dataset.avatar) : null;
+      state.splitFriends.set(fBtn.dataset.pickFriend, { id: fBtn.dataset.pickFriend, name: decodeURIComponent(fBtn.dataset.name), avatar: av });
+      state.splitWeights = {};
+      state.splitPanelOpen = true;
+      $('splitSearch').value = '';
+      renderSplitSelected();
+      renderSplitResults(); // refresh so the picked friend drops out of the list
+      renderSplitConfig();
+      $('splitSearch').focus(); // keep focus for the next pick
     }
-    state.splitWeights = {};
-    state.splitPanelOpen = false; // collapse after a pick
-    $('splitSearch').value = '';
-    renderGroupChips();
   });
   // Remove a selection (clear the group, or remove a friend chip).
   $('splitSelected').addEventListener('click', (e) => {
