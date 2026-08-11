@@ -520,6 +520,12 @@ export function initAddEdit() {
     }, 150);
   });
   $('splitSearch').addEventListener('input', renderSplitResults);
+  // Tapping a result must NOT blur the search input (which would close the panel via
+  // the blur timer). Prevent the default focus-steal so the input keeps focus and the
+  // panel stays open — essential for picking multiple friends in a row.
+  $('splitResults').addEventListener('mousedown', (e) => {
+    if (e.target.closest('[data-pick-friend], [data-pick-group]')) e.preventDefault();
+  });
   // Pick a group or friend from the results.
   $('splitResults').addEventListener('click', (e) => {
     const gBtn = e.target.closest('[data-pick-group]');
