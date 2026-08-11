@@ -19,8 +19,10 @@ export function friendlyDate(dateStr) {
   const d = new Date(dateStr);
   const today = isoDay(new Date());
   const yesterday = isoDay(new Date(Date.now() - 86400000));
+  const tomorrow = isoDay(new Date(Date.now() + 86400000));
   if (dateStr === today) return 'Today';
   if (dateStr === yesterday) return 'Yesterday';
+  if (dateStr === tomorrow) return 'Tomorrow';
   return DAYS[d.getDay()] + ', ' + d.getDate() + ' ' + MN[d.getMonth()];
 }
 

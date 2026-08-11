@@ -20,6 +20,30 @@ export function isValidUpi(id) {
   return VPA_RE.test(v);
 }
 
+// Normalize, validate, and de-duplicate a list of VPAs, preserving first-seen order.
+// Drops blanks, malformed handles, and repeats. Returns a fresh array.
+export function dedupeUpis(list) {
+  const out = [];
+  const seen = new Set();
+  for (const raw of list || []) {
+    const v = normalizeUpi(raw);
+    if (!isValidUpi(v) || seen.has(v)) continue;
+    seen.add(v);
+    out.push(v);
+  }
+  return out;
+}
+
+// Given a (raw) list and a desired primary, return a cleaned `{ list, primary }`.
+// The list is deduped; primary is normalized and, if missing/invalid/absent from the
+// list, falls back to the first entry (or null when the list is empty).
+export function withPrimary(list, primary) {
+  const clean = dedupeUpis(list);
+  const p = normalizeUpi(primary);
+  const chosen = p && clean.includes(p) ? p : clean[0] || null;
+  return { list: clean, primary: chosen };
+}
+
 // Build a `upi://pay` deep link. amount is in rupees (number/string); tn = note.
 // Returns null if the payee VPA is invalid (caller shows a fallback then).
 //

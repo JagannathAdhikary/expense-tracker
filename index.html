@@ -538,8 +538,12 @@
       <div class="field-err" id="profPhoneErr" style="display:none"></div>
     </div>
     <div class="field">
-      <label>UPI ID <span style="font-size:11px;opacity:.5">(optional)</span></label>
-      <input type="text" id="profUpi" placeholder="e.g. rahul@okaxis" autocapitalize="off" autocorrect="off" spellcheck="false"/>
+      <label>UPI IDs <span style="font-size:11px;opacity:.5">(optional)</span></label>
+      <div id="profUpiList" class="upi-list"></div>
+      <div class="upi-add-row">
+        <input type="text" id="profUpi" placeholder="Add a UPI ID — e.g. rahul@okaxis" autocapitalize="off" autocorrect="off" spellcheck="false"/>
+        <button type="button" class="upi-add-btn" id="profUpiAdd">Add</button>
+      </div>
       <div class="field-err" id="profUpiErr" style="display:none"></div>
     </div>
     <div class="modal-actions">

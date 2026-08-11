@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isValidUpi, normalizeUpi, buildUpiLink } from '../src/upi.js';
+import { isValidUpi, normalizeUpi, buildUpiLink, dedupeUpis, withPrimary } from '../src/upi.js';
 
 describe('isValidUpi', () => {
   it('accepts well-formed VPAs', () => {
@@ -50,5 +50,32 @@ describe('buildUpiLink', () => {
   it('lowercases/trims the payee', () => {
     const q = new URLSearchParams(buildUpiLink({ pa: ' Rahul@OKAxis ', amount: 10 }).slice('upi://pay?'.length));
     expect(q.get('pa')).toBe('rahul@okaxis');
+  });
+});
+
+describe('dedupeUpis', () => {
+  it('normalizes, drops invalid + duplicates, preserves order', () => {
+    expect(dedupeUpis([' Rahul@OKAxis ', 'ab@ybl', 'rahul@okaxis', 'nope', ''])).toEqual(['rahul@okaxis', 'ab@ybl']);
+  });
+  it('handles empty/nullish input', () => {
+    expect(dedupeUpis()).toEqual([]);
+    expect(dedupeUpis([])).toEqual([]);
+    expect(dedupeUpis(['bad', 'x'])).toEqual([]);
+  });
+});
+
+describe('withPrimary', () => {
+  it('keeps a valid primary that is in the list', () => {
+    expect(withPrimary(['aa@ybl', 'bb@okaxis'], 'bb@okaxis')).toEqual({ list: ['aa@ybl', 'bb@okaxis'], primary: 'bb@okaxis' });
+  });
+  it('defaults primary to the first entry when missing/invalid/absent', () => {
+    expect(withPrimary(['aa@ybl', 'bb@okaxis'], '')).toEqual({ list: ['aa@ybl', 'bb@okaxis'], primary: 'aa@ybl' });
+    expect(withPrimary(['aa@ybl', 'bb@okaxis'], 'cc@paytm')).toEqual({ list: ['aa@ybl', 'bb@okaxis'], primary: 'aa@ybl' });
+  });
+  it('returns null primary for an empty list', () => {
+    expect(withPrimary([], 'aa@ybl')).toEqual({ list: [], primary: null });
+  });
+  it('back-compat: a single legacy upi_id seeds a one-item list', () => {
+    expect(withPrimary(['rahul@okaxis'], 'rahul@okaxis')).toEqual({ list: ['rahul@okaxis'], primary: 'rahul@okaxis' });
   });
 });
