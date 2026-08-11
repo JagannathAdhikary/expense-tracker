@@ -48,9 +48,12 @@ create table if not exists public.group_members (
   group_id  uuid not null references public.groups(id) on delete cascade,
   user_id   uuid not null references public.profiles(id) on delete cascade,
   role      text not null default 'member',   -- 'owner' | 'member'
+  simplify_debts boolean not null default false, -- per-user: re-route this member's balances to fewer payments
   joined_at timestamptz not null default now(),
   primary key (group_id, user_id)
 );
+-- For projects created before the per-user simplify-debts preference was added:
+alter table public.group_members add column if not exists simplify_debts boolean not null default false;
 
 create table if not exists public.group_expenses (
   id          uuid primary key default gen_random_uuid(),
@@ -97,7 +100,7 @@ create table if not exists public.settlements (
   from_user  uuid not null references public.profiles(id) on delete cascade,
   to_user    uuid not null references public.profiles(id) on delete cascade,
   amount     numeric(12,2) not null check (amount > 0),
-  kind       text not null default 'manual' check (kind in ('manual')),
+  kind       text not null default 'manual' check (kind in ('manual','simplified')),
   created_by uuid not null references public.profiles(id) on delete cascade,
   created_at timestamptz not null default now()
 );

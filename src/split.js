@@ -167,3 +167,83 @@ export function netBetweenPaise(expenses, splits, U, M) {
 export function netBetween(expenses, splits, U, M) {
   return toRupees(netBetweenPaise(expenses, splits, U, M));
 }
+
+// ---- Debt simplification (per-user view + settle routing) ------------------
+// The pieces below re-route balances so a member settles with fewer payments,
+// without touching the underlying expense_splits (they stay the source of truth).
+
+/**
+ * Each member's overall signed balance across the whole group, in PAISE.
+ * > 0  => the member is a net debtor (owes others overall)
+ * < 0  => the member is a net creditor (is owed overall)
+ * The values sum to 0 (paise-exact), since every pending share is one debtor's
+ * debit and one payer's credit.
+ * Returns a Map<userId, paise>.
+ */
+export function groupNetsPaise(expenses, splits, memberIds) {
+  const nets = new Map(memberIds.map((id) => [id, 0]));
+  // Sum each ordered pair once; add to debtor, subtract from creditor.
+  for (let i = 0; i < memberIds.length; i++) {
+    for (let j = i + 1; j < memberIds.length; j++) {
+      const a = memberIds[i];
+      const b = memberIds[j];
+      const ab = netBetweenPaise(expenses, splits, a, b); // >0 => a owes b
+      if (ab === 0) continue;
+      nets.set(a, nets.get(a) + ab);
+      nets.set(b, nets.get(b) - ab);
+    }
+  }
+  return nets;
+}
+
+/**
+ * Greedy minimum-cash-flow: given signed balances (paise), produce the transfers
+ * that settle everyone in at most (n-1) payments. Each transfer is
+ * { from, to, amount } in paise, amount > 0 (from = debtor, to = creditor).
+ * `nets` is a Map<userId, paise>; it is not mutated.
+ */
+export function simplifyTransfers(nets) {
+  // Work on copies so callers keep their map.
+  const debtors = []; // { id, amt } amt>0 (owes)
+  const creditors = []; // { id, amt } amt>0 (is owed)
+  for (const [id, paise] of nets) {
+    if (paise > 0) debtors.push({ id, amt: paise });
+    else if (paise < 0) creditors.push({ id, amt: -paise });
+  }
+  // Largest first for a compact result.
+  debtors.sort((x, y) => y.amt - x.amt);
+  creditors.sort((x, y) => y.amt - x.amt);
+
+  const transfers = [];
+  let di = 0;
+  let ci = 0;
+  while (di < debtors.length && ci < creditors.length) {
+    const d = debtors[di];
+    const c = creditors[ci];
+    const pay = Math.min(d.amt, c.amt);
+    if (pay > 0) transfers.push({ from: d.id, to: c.id, amount: pay });
+    d.amt -= pay;
+    c.amt -= pay;
+    if (d.amt === 0) di++;
+    if (c.amt === 0) ci++;
+  }
+  return transfers;
+}
+
+/**
+ * The simplified view for one user: run the group-wide reduction, then keep only
+ * the transfers that involve `userId`. Amounts are in RUPEES to match the card
+ * helpers.
+ *   owe:  [{ toId, amount }]   — people this user should pay
+ *   owed: [{ fromId, amount }] — people who should pay this user
+ */
+export function simplifiedForUser(expenses, splits, memberIds, userId) {
+  const transfers = simplifyTransfers(groupNetsPaise(expenses, splits, memberIds));
+  const owe = [];
+  const owed = [];
+  for (const t of transfers) {
+    if (t.from === userId) owe.push({ toId: t.to, amount: toRupees(t.amount) });
+    else if (t.to === userId) owed.push({ fromId: t.from, amount: toRupees(t.amount) });
+  }
+  return { owe, owed };
+}

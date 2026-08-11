@@ -12,7 +12,7 @@
 // Each row carries { shared:true, pending, amt, cat, desc, meta, date, settleId }.
 
 import { state } from './state.js';
-import { netBetween } from './split.js';
+import { netBetween, simplifiedForUser } from './split.js';
 
 const splitsByExpense = () => {
   const m = new Map();
@@ -50,9 +50,25 @@ function netsForGroup(groupId) {
   }));
 }
 
+// The current user's simplified view for a group (when simplify is on): re-routes
+// balances group-wide, then keeps only transfers touching the user.
+function simplifiedView(groupId) {
+  const uid = state.user.id;
+  const group = state.groups.find((g) => g.id === groupId);
+  const exps = state.groupExpenses.filter((e) => e.group_id === groupId);
+  const memberIds = (group.members || []).map((m) => m.id);
+  return simplifiedForUser(exps, state.mySplits, memberIds, uid);
+}
+
 // What the current user owes within a group, netted per creditor.
 // Returns { byPayer: [{payerId, amount}], total } — only pairs where I owe (net > 0).
 export function owedByUserInGroup(groupId) {
+  if (!state.user) return { byPayer: [], total: 0 };
+  const group = state.groups.find((g) => g.id === groupId);
+  if (group?.simplifyDebts) {
+    const byPayer = simplifiedView(groupId).owe.map((t) => ({ payerId: t.toId, amount: t.amount }));
+    return { byPayer, total: byPayer.reduce((s, x) => s + x.amount, 0) };
+  }
   const nets = netsForGroup(groupId).filter((n) => n.net > 0);
   const byPayer = nets.map((n) => ({ payerId: n.otherId, amount: n.net }));
   const total = byPayer.reduce((s, x) => s + x.amount, 0);
@@ -62,6 +78,12 @@ export function owedByUserInGroup(groupId) {
 // What others owe the current user within a group, netted per debtor.
 // Returns { byDebtor: [{debtorId, amount}], total } — only pairs where I'm owed (net < 0).
 export function owedToUserInGroup(groupId) {
+  if (!state.user) return { byDebtor: [], total: 0 };
+  const group = state.groups.find((g) => g.id === groupId);
+  if (group?.simplifyDebts) {
+    const byDebtor = simplifiedView(groupId).owed.map((t) => ({ debtorId: t.fromId, amount: t.amount }));
+    return { byDebtor, total: byDebtor.reduce((s, x) => s + x.amount, 0) };
+  }
   const nets = netsForGroup(groupId).filter((n) => n.net < 0);
   const byDebtor = nets.map((n) => ({ debtorId: n.otherId, amount: -n.net }));
   const total = byDebtor.reduce((s, x) => s + x.amount, 0);

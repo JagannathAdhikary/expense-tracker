@@ -7,7 +7,7 @@ import { cloudEnabled } from '../supabase.js';
 import { fmt } from '../format.js';
 import { friendlyDate, payBadge } from '../format.js';
 import { $ } from '../dom.js';
-import { loadCloudData, markShareDone, deleteGroupExpense, settleUpWithMember, deleteGroup, setGroupRetired, myFriends, addMemberToGroup, findUserByPhone, leaveGroup } from '../features/groups.js';
+import { loadCloudData, markShareDone, deleteGroupExpense, settleUpWithMember, settleAllMyDebts, deleteGroup, setGroupRetired, setGroupSimplify, myFriends, addMemberToGroup, findUserByPhone, leaveGroup } from '../features/groups.js';
 import { openEditGroup, showAddForGroup } from './addEdit.js';
 import { expenseHasPayment, owedByUserInGroup, owedToUserInGroup, totalShareInGroup } from '../cloudrows.js';
 import { toastError, toastSuccess } from '../toast.js';
@@ -529,7 +529,7 @@ function renderGroupDetail() {
       .join('');
     $('groupOwe').innerHTML = `
       <div class="owe-card">
-        <div class="owe-head"><span>You owe</span><span class="owe-total">${fmt(owe.total)}</span></div>
+        <div class="owe-head"><span>You owe${g.simplifyDebts ? ' <span class="simplified-tag">simplified</span>' : ''}</span><span class="owe-total">${fmt(owe.total)}</span></div>
         ${rows}
       </div>`;
   } else {
@@ -701,9 +701,19 @@ function renderGroupSettings() {
     owner ? row('delete', icon.trash({ size: 18 }), 'Delete group', { cls: 'gs-danger' }) : '',
   ].filter(Boolean).join('');
 
+  // --- Advanced: per-user "simplify debts" toggle. Re-routes only YOUR balances
+  // into fewer repayments (your view only; others are unaffected).
+  const simplifyRow = `<button class="gs-row gs-toggle-row" data-act="simplify">
+      <span class="gs-ico">${icon.sparkle({ size: 18 })}</span>
+      <span class="gs-label gs-label-stack"><span>Simplify my debts</span><span class="gs-sub">Combine debts into fewer repayments (your view)</span></span>
+      <span class="switch${g.simplifyDebts ? ' on' : ''}" id="simplifySwitch"></span>
+    </button>`;
+
   $('gsBody').innerHTML = `
     <div class="gs-section">${topRow}</div>
     ${memberRows ? `<p class="gs-section-title">Group members</p><div class="gs-section">${memberRows}</div>` : ''}
+    <p class="gs-section-title">Advanced</p>
+    <div class="gs-section">${simplifyRow}</div>
     <div class="gs-section gs-section-danger">${dangerRows}</div>`;
 }
 
@@ -762,6 +772,11 @@ async function handleSettingsAction(act) {
     case 'invite':
       shareInvite();
       break;
+    case 'simplify': {
+      const ok = await setGroupSimplify(g.id, !g.simplifyDebts);
+      if (ok) renderGroupSettings(); // reflect the new .on state
+      break;
+    }
     case 'retire': {
       const msg = g.retired
         ? `Reactivate "${g.name}"? Members will be able to add expenses and settle balances again.`
@@ -963,9 +978,19 @@ export function initGroupsView() {
     const g = state.groups.find((x) => x.id === state.openGroupId);
     const payeeId = btn.dataset.payer;
     const name = g ? memberName(g, payeeId) : 'this person';
-    // Amount you owe them (net) — for the UPI pre-fill.
+    // Amount you owe them (net, or re-routed under simplify) — for the UPI pre-fill.
     const owe = owedByUserInGroup(state.openGroupId).byPayer.find((o) => o.payerId === payeeId);
     if (owe && g) await offerUpiPay(g, payeeId, owe.amount, `Settle ${g.name}`);
+    if (g && g.simplifyDebts) {
+      // Simplified view: the payee is a re-routed creditor. Paying them clears your
+      // real underlying debts (net → 0), so this settles your whole position here.
+      if (!(await confirmModal(`Pay ${name} ${fmt(owe ? owe.amount : 0)}? With simplify on, this settles all your debts in "${g.name}".`, { title: 'Settle up', confirmLabel: 'Continue' }))) return;
+      const { confirmed, pay } = await pickSettlePayment();
+      if (!confirmed) return;
+      await settleAllMyDebts(state.openGroupId, payeeId, owe ? owe.amount : 0, pay);
+      renderGroupDetail();
+      return;
+    }
     if (!(await confirmModal(`Settle up with ${name}? This clears everything between you two — what you owe them and what they owe you.`, { title: 'Settle up', confirmLabel: 'Continue' }))) return;
     const { confirmed, pay } = await pickSettlePayment();
     if (!confirmed) return;

@@ -43,7 +43,7 @@ export async function loadCloudData() {
   // Groups I'm a member of. Filter to MY membership rows: RLS lets co-members see
   // each other, so an unfiltered select returns one row per member of each group
   // (which would make a group appear multiple times in the list).
-  const { data: memberships, error: mErr } = await supabase.from('group_members').select('group_id, role, groups(id, name, invite_code, icon, color, retired_at, photo_url)').eq('user_id', state.user.id);
+  const { data: memberships, error: mErr } = await supabase.from('group_members').select('group_id, role, simplify_debts, groups(id, name, invite_code, icon, color, retired_at, photo_url)').eq('user_id', state.user.id);
   if (mErr) {
     console.error('load groups failed', mErr);
     return;
@@ -73,6 +73,7 @@ export async function loadCloudData() {
     color: m.groups.color || null,
     photo: m.groups.photo_url || null,
     retired: !!m.groups.retired_at, // read-only when retired (no add / no settle)
+    simplifyDebts: !!m.simplify_debts, // per-user: re-route my balances to fewer payments
     role: m.role,
     members: membersByGroup[m.group_id] || [],
   }));
@@ -425,6 +426,20 @@ export async function setGroupRetired(groupId, retired) {
 // True when the given group is retired (read-only). Used to block mutations.
 const groupIsRetired = (groupId) => state.groups.some((g) => g.id === groupId && g.retired);
 
+// Per-user "simplify debts" toggle: re-routes only this user's own balances into
+// fewer repayments (view + settle routing; no split rewrite). Stored on the caller's
+// own membership row, so it syncs across their devices and affects only their view.
+export async function setGroupSimplify(groupId, on) {
+  if (!cloudEnabled() || !state.user) return false;
+  const { error } = await supabase.from('group_members').update({ simplify_debts: !!on }).eq('group_id', groupId).eq('user_id', state.user.id);
+  if (error) {
+    toastError('Could not update simplify setting: ' + error.message);
+    return false;
+  }
+  await loadCloudData();
+  return true;
+}
+
 // Public predicate for views (e.g. to route to a label-only edit when retired).
 export const isGroupRetired = (groupId) => groupIsRetired(groupId);
 
@@ -509,6 +524,37 @@ export async function settleUpWithMember(groupId, otherId, pay = null) {
     const from_user = net > 0 ? uid : otherId;
     const to_user = net > 0 ? otherId : uid;
     await supabase.from('settlements').insert({ group_id: groupId, from_user, to_user, amount: absAmt, kind: 'manual', created_by: uid });
+  }
+  await loadCloudData();
+}
+
+// Settle my ENTIRE net-debtor position in a group (used by the simplified view,
+// where the "You owe" card shows one consolidated re-routed payment). Flips ALL of
+// my still-pending shares to 'done' so my net becomes 0 — reconciles regardless of
+// which member the payment was re-routed to. Records a `simplified` settlement row
+// to `payeeId` (the displayed re-routed creditor) for history + the UPI target.
+export async function settleAllMyDebts(groupId, payeeId, amount, pay = null) {
+  if (!cloudEnabled() || !state.user) return;
+  if (groupIsRetired(groupId)) {
+    toastError('This group is retired — reactivate it to make changes.');
+    return;
+  }
+  const uid = state.user.id;
+  const expInGroup = state.groupExpenses.filter((e) => e.group_id === groupId);
+  // Every expense someone else paid that I still owe a pending share on.
+  const notMine = new Set(expInGroup.filter((e) => e.payer_id !== uid).map((e) => e.id));
+  const myPending = state.mySplits.filter((s) => s.debtor_id === uid && s.status === 'pending' && notMine.has(s.expense_id));
+  if (myPending.length) {
+    const patch = { status: 'done', settled_at: new Date().toISOString() };
+    if (pay) patch.pay = pay;
+    const { error } = await supabase.from('expense_splits').update(patch).in('id', myPending.map((s) => s.id)).eq('debtor_id', uid);
+    if (error) {
+      toastError('Could not settle: ' + error.message);
+      return;
+    }
+  }
+  if (amount > 0 && payeeId) {
+    await supabase.from('settlements').insert({ group_id: groupId, from_user: uid, to_user: payeeId, amount, kind: 'simplified', created_by: uid });
   }
   await loadCloudData();
 }
