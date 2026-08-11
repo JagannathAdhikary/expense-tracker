@@ -94,8 +94,8 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .member-empty{font-size:13px;color:var(--ink-soft);padding:12px 4px;text-align:center}
 #memberSearch{width:100%;padding:12px 14px;font-size:15px;border:1.5px solid var(--line);border-radius:var(--radius-sm);background:var(--surface)}
 #memberSearch:focus{outline:none;border-color:var(--accent)}
-/* Group photo fills the round icon slot (tiles + detail header). */
-.gt-photo{width:100%;height:100%;object-fit:cover;border-radius:50%;display:block}
+/* Group photo fills the rounded-square icon tile (clipped by .has-photo's overflow). */
+.gt-photo{width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block}
 .gt-ico.has-photo{padding:0;overflow:hidden}
 /* Groups popover as an anchored dropdown under the header (not a bottom sheet). */
 /* Groups popover anchored at the TOP, full width (like the bottom sheet, flipped). */
@@ -471,13 +471,18 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .gs-group-sub{font-size:12.5px;color:var(--ink-mute);font-weight:500}
 .gs-edit-ico{flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:10px;background:var(--bg-2);color:var(--ink-soft)}
 .gs-edit-ico svg{display:block}
-/* Retire gets its own amber accent; leave + delete are both red (destructive). */
+/* Three clearly-distinct weights in the danger section:
+   Retire  = amber text (caution, reversible),
+   Leave   = red text (destructive, you exit),
+   Delete  = solid red fill (most destructive, irreversible). */
 .gs-row.gs-retire{color:var(--warn)}
 .gs-row.gs-retire .gs-ico{color:var(--warn)}
 .gs-row.gs-warn{color:var(--neg)}
 .gs-row.gs-warn .gs-ico{color:var(--neg)}
-.gs-row.gs-danger{color:var(--neg)}
-.gs-row.gs-danger .gs-ico{color:var(--neg)}
+.gs-row.gs-danger{color:#fff;background:var(--neg);border-top-color:transparent}
+.gs-row.gs-danger .gs-ico{color:#fff}
+.gs-row.gs-danger:hover{background:#a5271b}
+.gs-row.gs-danger:active{background:#8f2117}
 
 
 

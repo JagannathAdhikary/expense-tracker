@@ -688,11 +688,11 @@ function renderGroupSettings() {
       <span class="gs-edit-ico">${icon.edit({ size: 18 })}</span>
     </button>`;
 
-  // --- Group members: add + share invite (hidden add when retired).
-  const memberRows = [
-    g.retired ? '' : row('add', icon.users({ size: 18 }), 'Add members'),
-    row('invite', icon.share({ size: 18 }), 'Invite link'),
-  ].filter(Boolean).join('');
+  // --- Group members: add + share invite. A retired group takes no new members,
+  // so both are hidden (the whole section drops out when retired).
+  const memberRows = g.retired
+    ? ''
+    : [row('add', icon.users({ size: 18 }), 'Add members'), row('invite', icon.share({ size: 18 }), 'Invite link')].join('');
 
   // --- Danger zone: retire (distinct), leave, delete.
   const dangerRows = [
@@ -703,8 +703,7 @@ function renderGroupSettings() {
 
   $('gsBody').innerHTML = `
     <div class="gs-section">${topRow}</div>
-    <p class="gs-section-title">Group members</p>
-    <div class="gs-section">${memberRows}</div>
+    ${memberRows ? `<p class="gs-section-title">Group members</p><div class="gs-section">${memberRows}</div>` : ''}
     <div class="gs-section gs-section-danger">${dangerRows}</div>`;
 }
 
