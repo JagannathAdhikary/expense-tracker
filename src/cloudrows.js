@@ -117,13 +117,9 @@ export function sharedRows() {
   if (!state.user) return [];
   const uid = state.user.id;
   const byExp = splitsByExpense();
-  // Direct-split containers are shown in their own "Shared splits" section, not mixed
-  // into the home/category/analytics lists — exclude their expenses here.
-  const directIds = new Set(state.groups.filter((g) => g.direct).map((g) => g.id));
   const rows = [];
 
   for (const exp of state.groupExpenses) {
-    if (directIds.has(exp.group_id)) continue;
     const rowsFor = byExp.get(exp.id) || [];
     const iPaid = exp.payer_id === uid;
     // Deletable only by the payer, and only while no one has settled a share yet.
