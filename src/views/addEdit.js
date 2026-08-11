@@ -186,14 +186,18 @@ function renderSplitConfig() {
   if (state.selSplitMode === 'equal') {
     weights.innerHTML = '';
   } else {
-    const unit = state.selSplitMode === 'percent' ? '%' : '₹';
+    const percent = state.selSplitMode === 'percent';
     weights.innerHTML = members
       .map((m) => {
         const val = state.splitWeights[m.id] ?? '';
+        // Unit affix stays visible while typing: ₹ prefix for amounts, % suffix for percent.
+        const affix = percent
+          ? `<input type="number" class="split-weight" data-member="${m.id}" value="${val}" placeholder="0" inputmode="decimal" min="0"/><span class="swf-unit swf-suffix">%</span>`
+          : `<span class="swf-unit swf-prefix">₹</span><input type="number" class="split-weight" data-member="${m.id}" value="${val}" placeholder="0" inputmode="decimal" min="0"/>`;
         return `<div class="split-weight-row">
           <span class="split-weight-av">${avatarDot(m)}</span>
           <span class="split-weight-name">${m.name}${m.id === state.user?.id && m.name !== 'You' ? ' (you)' : ''}</span>
-          <input type="number" class="split-weight" data-member="${m.id}" value="${val}" placeholder="${unit}" inputmode="decimal"/>
+          <span class="split-weight-field${percent ? ' is-percent' : ''}">${affix}</span>
         </div>`;
       })
       .join('');
