@@ -101,6 +101,8 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 /* Groups popover anchored at the TOP, full width (like the bottom sheet, flipped). */
 #groupsOverlay{align-items:flex-start}
 #groupsOverlay .sheet{margin:0 auto;width:100%;max-width:480px;border-radius:0 0 24px 24px;max-height:85vh;animation:sheet-down .25s ease}
+/* Groups dropdown drops from the top (square top corners), so its sticky head is too. */
+#groupsOverlay .sheet-head{border-radius:0}
 @keyframes sheet-down{from{transform:translateY(-100%)}to{transform:none}}
 .grp-create-full{width:100%;justify-content:center;height:44px}
 /* New Group full-screen page */
@@ -283,7 +285,7 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .overlay{display:none;position:fixed;inset:0;background:rgba(18,26,45,.5);backdrop-filter:blur(2px);z-index:20;align-items:flex-end}
 .overlay.open{display:flex;animation:fade-in .2s ease}
 @keyframes fade-in{from{opacity:0}to{opacity:1}}
-.sheet{background:var(--surface);border-radius:24px 24px 0 0;padding:1.5rem;width:100%;max-width:480px;margin:0 auto;max-height:85vh;overflow-y:auto;box-shadow:var(--sh-lg);animation:sheet-up .25s ease}
+.sheet{background:var(--surface);border-radius:24px 24px 0 0;padding:0 1.5rem 1.5rem;width:100%;max-width:480px;margin:0 auto;max-height:85vh;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;box-shadow:var(--sh-lg);animation:sheet-up .25s ease}
 @keyframes sheet-up{from{transform:translateY(100%)}to{transform:none}}
 .sheet h3{font-size:16px;font-weight:700;margin-bottom:1rem;color:var(--ink)}
 .sheet-btn{display:flex;align-items:center;gap:12px;width:100%;padding:14px 4px;border:none;background:none;font-size:14.5px;font-weight:500;color:var(--ink);cursor:pointer;border-bottom:1px solid var(--line);text-align:left}
@@ -614,7 +616,10 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .pending-banner-btn{width:100%;text-align:left;cursor:pointer;font:inherit;margin:0 0 12px}
 
 /* ---- Menu sheet refinements ---- */
-.sheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
+/* Sticky header: stays pinned while the sheet body scrolls. Negative margins +
+   matching padding let its opaque background span the sheet's full width and cover
+   content scrolling underneath. */
+.sheet-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;margin:0 -1.5rem 1rem;padding:1.5rem 1.5rem .8rem;background:var(--surface);border-radius:24px 24px 0 0}
 .sheet-head h3{margin-bottom:0}
 .sheet-close{width:34px;height:34px;border-radius:11px;border:none;background:var(--bg-2);color:var(--ink-soft);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s}
 .sheet-close:hover{background:var(--line)}
