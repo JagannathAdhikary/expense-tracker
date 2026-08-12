@@ -19,7 +19,7 @@ export const icon = {
   // through the apex are DASHED and lighter (the roundabout/unnecessary transactions);
   // the base is a SOLID full-strength line (the one simplified transaction).
   simplify: (o) =>
-    svg('<path d="M7 16.5 12 7.5" stroke-dasharray="2 2" stroke-opacity=".4"/><path d="M12 7.5 17 16.5" stroke-dasharray="2 2" stroke-opacity=".4"/><path d="M7.2 17H16.8"/><circle cx="12" cy="6.5" r="1.9"/><circle cx="6" cy="17.5" r="1.9"/><circle cx="18" cy="17.5" r="1.9"/>', o),
+    svg('<path d="M5 18 12 5.5" stroke-dasharray="2 2" stroke-opacity=".4"/><path d="M12 5.5 19 18" stroke-dasharray="2 2" stroke-opacity=".4"/><path d="M5.5 19H18.5"/><circle cx="12" cy="4" r="2.1"/><circle cx="4" cy="19" r="2.1"/><circle cx="20" cy="19" r="2.1"/>', o),
   login: (o) => svg('<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>', o),
   logout: (o) => svg('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>', o),
   tag: (o) => svg('<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>', o),
