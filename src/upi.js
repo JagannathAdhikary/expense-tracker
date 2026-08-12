@@ -47,17 +47,28 @@ export function withPrimary(list, primary) {
 // Build a `upi://pay` deep link. amount is in rupees (number/string); tn = note.
 // Returns null if the payee VPA is invalid (caller shows a fallback then).
 //
-// NOTE: we build the query string by hand rather than with URLSearchParams,
-// because URLSearchParams percent-encodes '@' in the VPA to %40. Most UPI apps
-// decode that, but BHIM does NOT — it reads "name%40bank" literally and fails.
-// The payee address (pa) is passed with its '@' intact; other values are encoded
-// but with '@' preserved for safety.
+// NOTES on app quirks:
+//  - URLSearchParams encodes '@' in the VPA to %40; most apps decode it but BHIM
+//    reads "name%40bank" literally and fails — so we build the query by hand and
+//    keep '@' intact.
+//  - BHIM is also strict about the payee name (pn) and note (tn): punctuation such
+//    as ':' and other symbols make it error out ("blank"/invalid) even when GPay /
+//    PhonePe accept the same link. So pn/tn are sanitized to letters, digits, and
+//    spaces before encoding. pn always gets a non-empty value.
+function cleanText(s, fallback) {
+  const t = String(s || '')
+    .replace(/[^a-zA-Z0-9 ]+/g, ' ') // drop punctuation BHIM rejects (:, &, etc.)
+    .replace(/\s+/g, ' ')
+    .trim();
+  return t || fallback;
+}
+
 export function buildUpiLink({ pa, pn, amount, note }) {
   if (!isValidUpi(pa)) return null;
   const enc = (v) => encodeURIComponent(String(v)).replace(/%40/g, '@');
-  const parts = [`pa=${enc(normalizeUpi(pa))}`, 'cu=INR'];
-  if (pn) parts.push(`pn=${enc(pn)}`);
+  const parts = [`pa=${enc(normalizeUpi(pa))}`, `pn=${enc(cleanText(pn, 'Payee'))}`, 'cu=INR'];
   if (amount != null && Number(amount) > 0) parts.push(`am=${Number(amount).toFixed(2)}`);
-  if (note) parts.push(`tn=${enc(note)}`);
+  const tn = cleanText(note, '');
+  if (tn) parts.push(`tn=${enc(tn)}`);
   return 'upi://pay?' + parts.join('&');
 }
