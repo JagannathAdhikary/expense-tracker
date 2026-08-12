@@ -164,16 +164,15 @@ export async function findOrCreateDirectSplit(friendIds) {
 // The name to SHOW for a group/direct split, from the current user's perspective.
 // Real groups use their stored name. A direct split has no shared name (that would
 // bake in one person's viewpoint, e.g. "You & B" showing to B too), so we build it
-// live from the OTHER members' names ("Asha", "Asha & Ravi", "Asha & 2 others").
+// live from the OTHER members: the first name, plus "+N" for any beyond it. So for
+// A,B person A sees "B"; for A,B,C person C sees "A, +1".
 export function groupDisplayName(g) {
   if (!g) return 'Group';
   if (!g.direct) return g.name;
   const uid = state.user?.id;
   const others = (g.members || []).filter((m) => m.id !== uid).map((m) => (m.name || 'Member').split(' ')[0]);
   if (!others.length) return 'Direct split';
-  if (others.length === 1) return others[0];
-  if (others.length === 2) return `${others[0]} & ${others[1]}`;
-  return `${others[0]} & ${others.length - 1} others`;
+  return others.length === 1 ? others[0] : `${others[0]}, +${others.length - 1}`;
 }
 
 // Look up a registered user by exact mobile number (via the SECURITY DEFINER RPC).

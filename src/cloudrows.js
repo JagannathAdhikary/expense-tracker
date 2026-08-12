@@ -33,9 +33,7 @@ const groupName = (gid) => {
   const uid = state.user?.id;
   const others = (g.members || []).filter((m) => m.id !== uid).map((m) => (m.name || 'Member').split(' ')[0]);
   if (!others.length) return 'Direct split';
-  if (others.length === 1) return others[0];
-  if (others.length === 2) return `${others[0]} & ${others[1]}`;
-  return `${others[0]} & ${others.length - 1} others`;
+  return others.length === 1 ? others[0] : `${others[0]}, +${others.length - 1}`;
 };
 
 // True if any non-payer share of this expense has been settled. Used to lock
