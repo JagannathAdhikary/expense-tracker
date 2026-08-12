@@ -34,6 +34,12 @@ describe('buildUpiLink', () => {
     expect(link).toContain('pa=rahul@okaxis');
     expect(link).not.toContain('%40');
   });
+  it('encodes spaces as "+" not "%20" — BHIM shows %20 literally otherwise', () => {
+    const link = buildUpiLink({ pa: 'rahul@okaxis', pn: 'Bikram Kumar', amount: 10, note: 'Trip Goa' });
+    expect(link).toContain('pn=Bikram+Kumar');
+    expect(link).toContain('tn=Trip+Goa');
+    expect(link).not.toContain('%20');
+  });
   it('sanitizes pn/tn punctuation that BHIM rejects (e.g. the colon in a note)', () => {
     const q = new URLSearchParams(buildUpiLink({ pa: 'rahul@okaxis', pn: 'Rahul: K & Co.', amount: 10, note: 'Goa Trip: dinner!' }).slice('upi://pay?'.length));
     expect(q.get('pn')).toBe('Rahul K Co');

@@ -51,6 +51,9 @@ export function withPrimary(list, primary) {
 //  - URLSearchParams encodes '@' in the VPA to %40; most apps decode it but BHIM
 //    reads "name%40bank" literally and fails — so we build the query by hand and
 //    keep '@' intact.
+//  - BHIM also does NOT decode %20 in the payee name — it literally displays
+//    "Bikram%20Kumar". Spaces must be sent as '+' (the standard query-string space),
+//    which every UPI app decodes back to a space.
 //  - BHIM is also strict about the payee name (pn) and note (tn): punctuation such
 //    as ':' and other symbols make it error out ("blank"/invalid) even when GPay /
 //    PhonePe accept the same link. So pn/tn are sanitized to letters, digits, and
@@ -65,7 +68,8 @@ function cleanText(s, fallback) {
 
 export function buildUpiLink({ pa, pn, amount, note }) {
   if (!isValidUpi(pa)) return null;
-  const enc = (v) => encodeURIComponent(String(v)).replace(/%40/g, '@');
+  // Keep '@' intact (BHIM won't decode %40); send spaces as '+' (BHIM won't decode %20).
+  const enc = (v) => encodeURIComponent(String(v)).replace(/%40/g, '@').replace(/%20/g, '+');
   const parts = [`pa=${enc(normalizeUpi(pa))}`, `pn=${enc(cleanText(pn, 'Payee'))}`, 'cu=INR'];
   if (amount != null && Number(amount) > 0) parts.push(`am=${Number(amount).toFixed(2)}`);
   const tn = cleanText(note, '');
