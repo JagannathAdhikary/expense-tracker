@@ -636,8 +636,10 @@ export function initAddEdit() {
   $('isplitmode').addEventListener('click', (e) => {
     if (state.groupEditLocked) return; // locked once a payment is made
     const chip = e.target.closest('.split-mode');
-    if (!chip) return;
+    if (!chip || chip.dataset.mode === state.selSplitMode) return;
     state.selSplitMode = chip.dataset.mode;
+    // Weights mean different things per mode (₹ vs % vs ratio), so don't carry them over.
+    state.splitWeights = {};
     renderSplitConfig();
   });
 

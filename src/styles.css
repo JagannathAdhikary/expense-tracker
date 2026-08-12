@@ -173,10 +173,12 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 #splitWeights .split-check-row{display:flex;align-items:center;gap:10px;margin-bottom:6px;cursor:pointer;user-select:none;position:relative;font-size:13.5px;color:var(--ink);font-weight:400}
 #splitWeights .split-check-row .split-weight-name{flex:1}
 .split-check-row .split-include{position:absolute;opacity:0;pointer-events:none}
-.split-check-box{flex:0 0 auto;margin-left:auto;width:22px;height:22px;border-radius:7px;border:2px solid var(--line);display:inline-flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s}
+.split-check-box{flex:0 0 auto;margin-left:auto;width:24px;height:24px;border-radius:7px;border:2px solid var(--ink-mute);background:var(--surface);display:inline-flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s}
 .split-check-row .split-include:checked ~ .split-check-box{background:var(--accent);border-color:var(--accent)}
 .split-check-row .split-include:checked ~ .split-check-box::after{content:"";width:6px;height:11px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg);margin-top:-2px}
-.split-check-row.off{opacity:.55}
+/* Excluded row: dim only the avatar + name (strike-through), never the checkbox —
+   the box must still read as tappable, not disabled. */
+.split-check-row.off .split-weight-av{opacity:.5}
 .split-check-row.off .split-weight-name{text-decoration:line-through;color:var(--ink-mute)}
 /* Gradient theme swatches (New Group + group settings). */
 .theme-swatches{display:flex;flex-wrap:wrap;gap:10px}
