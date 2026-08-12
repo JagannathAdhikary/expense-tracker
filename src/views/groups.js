@@ -92,8 +92,14 @@ function coverBgStyle(g) {
   return `background:linear-gradient(180deg,rgba(0,0,0,.05),rgba(0,0,0,.35)),${gradientFor(g)};`;
 }
 
-// Paint a cover background layer `el` for group `g` (photo or theme scene).
+// Paint a cover background layer `el` for group `g`. Direct splits use an avatar
+// collage; real groups use their photo or theme scene.
 function paintCover(el, g) {
+  if (g.direct) {
+    el.style.cssText = 'background:var(--bg-2);';
+    el.innerHTML = `${collageMarkup(g)}<span class="cover-scrim"></span>`;
+    return;
+  }
   el.style.cssText = coverBgStyle(g);
   el.innerHTML = '';
 }
@@ -106,8 +112,31 @@ export function groupCoverBg(g) {
   return `background:${gradientFor(g)}`;
 }
 
-// Compact thumbnail (popover tiles): cropped photo, else the theme scene.
+// Avatar-collage cover for a direct split: a tiled grid of member avatars (photo or
+// coloured initial). Layout adapts to the count (1, 2, 3, or 4+ with a "+N" tile).
+// Returns the inner HTML for a `.avatar-collage` container.
+function collageMarkup(g) {
+  const members = g.members || [];
+  const cell = (m, extraCls = '') => {
+    if (m && m.avatar) return `<span class="ac-cell${extraCls ? ' ' + extraCls : ''}"><img src="${m.avatar}" alt="" referrerpolicy="no-referrer"/></span>`;
+    const name = m ? m.name : '?';
+    return `<span class="ac-cell${extraCls ? ' ' + extraCls : ''}" style="background:${avatarColor(m ? m.id : 'x')}">${(name || '?').charAt(0).toUpperCase()}</span>`;
+  };
+  const n = members.length;
+  let cells;
+  if (n <= 4) {
+    cells = members.map((m) => cell(m)).join('');
+  } else {
+    // Show the first 3, then a "+N" tile for the rest.
+    cells = members.slice(0, 3).map((m) => cell(m)).join('') + `<span class="ac-cell ac-more">+${n - 3}</span>`;
+  }
+  return `<div class="avatar-collage ac-n${Math.min(n, 4)}">${cells}</div>`;
+}
+
+// Compact thumbnail (popover tiles): direct split -> avatar collage; else cropped
+// photo or the theme scene.
 function thumbMarkup(g) {
+  if (g.direct) return `<span class="gt-ico gt-thumb has-collage">${collageMarkup(g)}</span>`;
   if (g.photo) return `<span class="gt-ico gt-thumb has-photo"><img class="gt-photo" src="${g.photo}" alt="" referrerpolicy="no-referrer"/></span>`;
   return `<span class="gt-ico gt-thumb" style="background:${gradientFor(g)}"></span>`;
 }

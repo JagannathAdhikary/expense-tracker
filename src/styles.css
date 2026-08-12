@@ -96,6 +96,21 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 /* Group photo fills the rounded-square icon tile (clipped by .has-photo's overflow). */
 .gt-photo{width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block}
 .gt-ico.has-photo{padding:0;overflow:hidden}
+/* Avatar-collage cover (direct splits): a tiled grid of member avatars filling the
+   cover surface. Used in the detail hero, tiles, and settings row. */
+.gt-ico.has-collage{padding:0;overflow:hidden}
+.avatar-collage{position:absolute;inset:0;display:grid;gap:1px;background:var(--line)}
+.gt-thumb .avatar-collage,.cover-preview .avatar-collage{position:relative;inset:auto;width:100%;height:100%}
+.avatar-collage.ac-n1{grid-template-columns:1fr}
+.avatar-collage.ac-n2{grid-template-columns:1fr 1fr}
+.avatar-collage.ac-n3{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.avatar-collage.ac-n3 .ac-cell:first-child{grid-row:span 2}
+.avatar-collage.ac-n4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.ac-cell{display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--accent);color:#fff;font-weight:700;font-size:clamp(14px,6vw,40px)}
+.ac-cell img{width:100%;height:100%;object-fit:cover;display:block}
+.ac-more{background:rgba(0,0,0,.45);font-size:clamp(12px,4vw,22px)}
+/* Legibility scrim over the hero collage (matches the theme-cover scrim). */
+.cover-scrim{position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(180deg,rgba(0,0,0,.05),rgba(0,0,0,.35))}
 /* Groups popover as an anchored dropdown under the header (not a bottom sheet). */
 /* Groups popover anchored at the TOP, full width (like the bottom sheet, flipped). */
 #groupsOverlay{align-items:flex-start}
