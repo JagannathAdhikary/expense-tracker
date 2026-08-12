@@ -163,16 +163,24 @@ export async function findOrCreateDirectSplit(friendIds) {
 
 // The name to SHOW for a group/direct split, from the current user's perspective.
 // Real groups use their stored name. A direct split has no shared name (that would
-// bake in one person's viewpoint, e.g. "You & B" showing to B too), so we build it
-// live from the OTHER members: the first name, plus "+N" for any beyond it. So for
-// A,B person A sees "B"; for A,B,C person C sees "A, +1".
+// bake in one person's viewpoint), so we build it from the OTHER members: the first
+// member's full name, plus "+N" for any beyond it. Plain-string form (for titles /
+// aria); use directNameParts() where the "+N" must survive truncation.
 export function groupDisplayName(g) {
-  if (!g) return 'Group';
-  if (!g.direct) return g.name;
+  const p = directNameParts(g);
+  return p.extra ? `${p.name} +${p.extra}` : p.name;
+}
+
+// Structured form: { name, extra } so callers can render a truncatable name span
+// plus a fixed "+N" span (e.g. "Jagannath Ad… +2"). extra is 0 when there are no
+// additional members. For a non-direct group, name = the group's own name.
+export function directNameParts(g) {
+  if (!g) return { name: 'Group', extra: 0 };
+  if (!g.direct) return { name: g.name, extra: 0 };
   const uid = state.user?.id;
-  const others = (g.members || []).filter((m) => m.id !== uid).map((m) => (m.name || 'Member').split(' ')[0]);
-  if (!others.length) return 'Direct split';
-  return others.length === 1 ? others[0] : `${others[0]}, +${others.length - 1}`;
+  const others = (g.members || []).filter((m) => m.id !== uid).map((m) => m.name || 'Member');
+  if (!others.length) return { name: 'Direct split', extra: 0 };
+  return { name: others[0], extra: others.length - 1 };
 }
 
 // Look up a registered user by exact mobile number (via the SECURITY DEFINER RPC).

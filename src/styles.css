@@ -422,7 +422,10 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .gt-flag{position:absolute;top:-7px;left:50%;transform:translateX(-50%);font-size:9px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;padding:2px 7px;border-radius:var(--radius-pill);border:2px solid var(--surface);box-shadow:var(--sh-sm);white-space:nowrap}
 .gt-flag.is-settled{background:#e9f7ef;color:var(--pos)}
 .gt-flag.is-owed{background:#fdf0e8;color:var(--warn)}
-.group-tile .gt-name{font-size:12.5px;font-weight:600;color:var(--ink);max-width:100%;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.group-tile .gt-name{font-size:12.5px;font-weight:600;color:var(--ink);max-width:100%;display:flex;align-items:baseline;justify-content:center;gap:3px;white-space:nowrap;overflow:hidden}
+/* Name truncates (ellipsis), the trailing "+N" never does. */
+.dsp-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.dsp-extra{flex:0 0 auto;color:var(--ink-mute)}
 .group-tile.retired{opacity:.6}
 /* "Retired — read-only" banner at the top of a retired group's detail page */
 #groupRetiredBanner:not(:empty){margin:12px 0 4px}
@@ -534,7 +537,7 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .gs-group-cover{flex-shrink:0}
 .gs-group-cover .gt-ico{width:52px;height:52px;border-radius:16px;box-shadow:var(--sh-sm)}
 .gs-group-meta{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
-.gs-group-name{font-size:17px;font-weight:800;letter-spacing:-.3px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gs-group-name{font-size:17px;font-weight:800;letter-spacing:-.3px;color:var(--ink);display:flex;align-items:baseline;gap:4px;overflow:hidden;white-space:nowrap}
 .gs-group-sub{font-size:12.5px;color:var(--ink-mute);font-weight:500}
 .gs-edit-ico{flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:10px;background:var(--bg-2);color:var(--ink-soft)}
 .gs-edit-ico svg{display:block}

@@ -7,7 +7,7 @@ import { cloudEnabled } from '../supabase.js';
 import { fmt } from '../format.js';
 import { friendlyDate, payBadge } from '../format.js';
 import { $ } from '../dom.js';
-import { loadCloudData, markShareDone, deleteGroupExpense, settleUpWithMember, settleAllMyDebts, deleteGroup, setGroupRetired, setGroupSimplify, myFriends, addMemberToGroup, findUserByPhone, leaveGroup, groupDisplayName } from '../features/groups.js';
+import { loadCloudData, markShareDone, deleteGroupExpense, settleUpWithMember, settleAllMyDebts, deleteGroup, setGroupRetired, setGroupSimplify, myFriends, addMemberToGroup, findUserByPhone, leaveGroup, groupDisplayName, directNameParts } from '../features/groups.js';
 import { openEditGroup, showAddForGroup } from './addEdit.js';
 import { expenseHasPayment, owedByUserInGroup, owedToUserInGroup, totalShareInGroup } from '../cloudrows.js';
 import { toastError, toastSuccess } from '../toast.js';
@@ -237,6 +237,13 @@ function renderGroupList() {
   wrap.innerHTML = groupsBlock + sharedBlock;
 }
 
+// Name markup that keeps a trailing "+N" visible while the name itself truncates in
+// the middle (e.g. "Jagannath Ad… +2"). The name span shrinks/ellipsises; +N is fixed.
+function nameHtml(g) {
+  const { name, extra } = directNameParts(g);
+  return `<span class="dsp-name">${name}</span>${extra ? `<span class="dsp-extra">+${extra}</span>` : ''}`;
+}
+
 // A compact group tile: just the icon + truncated name, with a small label badge
 // on the icon showing whether MY balance in the group is clear or outstanding.
 function groupTile(g) {
@@ -249,7 +256,7 @@ function groupTile(g) {
         ${thumbMarkup(g)}
         ${flag}
       </span>
-      <span class="gt-name">${groupDisplayName(g)}</span>
+      <span class="gt-name">${nameHtml(g)}</span>
     </button>`;
 }
 
@@ -700,7 +707,7 @@ function renderGroupSettings() {
   const topRow = g.direct
     ? `<div class="gs-group-row gs-group-row--static">
         <span class="gs-group-cover">${thumbMarkup(g)}</span>
-        <span class="gs-group-meta"><span class="gs-group-name">${groupDisplayName(g)}</span><span class="gs-group-sub">Direct split · ${g.members.length} member${g.members.length === 1 ? '' : 's'}</span></span>
+        <span class="gs-group-meta"><span class="gs-group-name">${nameHtml(g)}</span><span class="gs-group-sub">Direct split · ${g.members.length} member${g.members.length === 1 ? '' : 's'}</span></span>
       </div>`
     : `<button class="gs-group-row" data-act="edit">
         <span class="gs-group-cover">${thumbMarkup(g)}</span>

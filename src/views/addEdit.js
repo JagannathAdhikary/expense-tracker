@@ -233,21 +233,35 @@ function renderSplitConfig() {
 //   amount  -> (total expense amount) − sum(others)
 //   percent -> 100 − sum(others)
 // `changed` is the input the user just edited (so we don't overwrite it). Only fires
-// when exactly one field is still blank; clamps the remainder at 0.
+// Auto-balance the "remainder" person for amount / percent. When exactly one field is
+// blank, that person becomes the auto-filled remainder holder; thereafter, editing ANY
+// other field keeps re-adjusting them (so 2→48, then 25→75, etc. stays balanced). If
+// the user edits the auto-filled field itself, they take control and it's released.
 function autoFillLastWeight(changed) {
   if (state.selSplitMode === 'shares') return; // ratios have no fixed total to balance
   const inputs = [...$('splitWeights').querySelectorAll('.split-weight')];
   if (inputs.length < 2) return;
-  const blanks = inputs.filter((i) => i.value.trim() === '');
-  if (blanks.length !== 1) return;
-  const last = blanks[0];
-  if (last === changed) return; // don't fill the one being typed
-  const filledSum = inputs.filter((i) => i !== last).reduce((s, i) => s + (parseFloat(i.value) || 0), 0);
-  const percent = state.selSplitMode === 'percent';
-  const cap = percent ? 100 : parseFloat($('iamt').value) || 0;
+
+  // If the user typed into the auto-filled field, stop auto-managing it.
+  if (changed && changed.dataset.member === state.splitAutoId) {
+    state.splitAutoId = null;
+    return;
+  }
+
+  // Pick the remainder holder: a freshly-blank field (exactly one), else the field we
+  // were already auto-filling. Never the field being edited.
+  const blanks = inputs.filter((i) => i.value.trim() === '' && i !== changed);
+  let target = null;
+  if (blanks.length === 1) target = blanks[0];
+  else if (state.splitAutoId) target = inputs.find((i) => i.dataset.member === state.splitAutoId && i !== changed) || null;
+  if (!target) return;
+
+  const filledSum = inputs.filter((i) => i !== target).reduce((s, i) => s + (parseFloat(i.value) || 0), 0);
+  const cap = state.selSplitMode === 'percent' ? 100 : parseFloat($('iamt').value) || 0;
   const remainder = Math.max(0, Math.round((cap - filledSum) * 100) / 100);
-  last.value = remainder;
-  state.splitWeights[last.dataset.member] = remainder;
+  target.value = remainder;
+  state.splitWeights[target.dataset.member] = remainder;
+  state.splitAutoId = target.dataset.member; // remember to keep adjusting it
 }
 
 function renderSplitPreview() {
@@ -302,6 +316,7 @@ export function showAdd() {
   state.selSplitMode = 'equal';
   state.splitWeights = {};
   state.splitExclude = new Set();
+  state.splitAutoId = null;
   state.editGroupExpId = null;
   state.groupEditLocked = false;
   state.groupPickLocked = false;
@@ -363,6 +378,7 @@ export function showEdit(id) {
   state.selSplitMode = 'equal';
   state.splitWeights = {};
   state.splitExclude = new Set();
+  state.splitAutoId = null;
   renderCatChips();
   renderPayChips();
   renderGroupChips();
@@ -640,6 +656,7 @@ export function initAddEdit() {
     state.selSplitMode = chip.dataset.mode;
     // Weights mean different things per mode (₹ vs % vs ratio), so don't carry them over.
     state.splitWeights = {};
+    state.splitAutoId = null;
     renderSplitConfig();
   });
 
