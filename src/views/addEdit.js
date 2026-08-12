@@ -61,14 +61,14 @@ function splitMembers() {
   return [me, ...friends];
 }
 
-// Members who actually take a share. In Equal mode, unchecked members are excluded;
-// other modes include everyone (a 0 weight already yields a 0 share).
+// Members who actually take a share. In Equal mode, unchecked members are excluded
+// (possibly leaving an empty list — the caller must validate before saving); other
+// modes include everyone (a 0 weight already yields a 0 share).
 function activeSplitMembers() {
   const all = splitMembers();
   if (state.selSplitMode !== 'equal') return all;
   const ex = state.splitExclude || new Set();
-  const kept = all.filter((m) => !ex.has(m.id));
-  return kept.length ? kept : all; // never exclude everyone
+  return all.filter((m) => !ex.has(m.id));
 }
 
 let splitSearchSeq = 0;
@@ -254,6 +254,13 @@ function renderSplitPreview() {
   const el = $('splitPreview');
   const memberObjs = activeSplitMembers();
   const members = memberObjs.map((m) => m.id);
+  // Equal mode with everyone unchecked: warn instead of silently splitting.
+  if (state.selSplitMode === 'equal' && !members.length) {
+    el.textContent = 'Select at least one person to split with.';
+    el.style.color = 'var(--neg)';
+    return;
+  }
+  el.style.color = '';
   const amt = parseFloat($('iamt').value);
   if (!members.length || !amt || amt <= 0) {
     el.textContent = '';
@@ -719,6 +726,10 @@ export function initAddEdit() {
         return;
       }
       const members = activeSplitMembers().map((m) => m.id);
+      if (!members.length) {
+        toastError('Pick at least one person to split with.');
+        return;
+      }
       let shares;
       try {
         shares = computeSplits({ amount: amt, members, mode: state.selSplitMode, weights: state.splitWeights, payerId: state.user?.id });
