@@ -34,6 +34,15 @@ describe('buildUpiLink', () => {
     expect(link).toContain('pa=rahul@okaxis');
     expect(link).not.toContain('%40');
   });
+  it('sanitizes pn/tn punctuation that BHIM rejects (e.g. the colon in a note)', () => {
+    const q = new URLSearchParams(buildUpiLink({ pa: 'rahul@okaxis', pn: 'Rahul: K & Co.', amount: 10, note: 'Goa Trip: dinner!' }).slice('upi://pay?'.length));
+    expect(q.get('pn')).toBe('Rahul K Co');
+    expect(q.get('tn')).toBe('Goa Trip dinner');
+  });
+  it('always sends a non-empty pn (defaults to "Payee")', () => {
+    const q = new URLSearchParams(buildUpiLink({ pa: 'rahul@okaxis', amount: 10 }).slice('upi://pay?'.length));
+    expect(q.get('pn')).toBe('Payee');
+  });
   it('formats amount to 2 decimals', () => {
     const q = new URLSearchParams(buildUpiLink({ pa: 'ab@ybl', amount: 33.3 }).slice('upi://pay?'.length));
     expect(q.get('am')).toBe('33.30');

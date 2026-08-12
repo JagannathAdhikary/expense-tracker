@@ -132,7 +132,7 @@ function renderUpiList() {
     .map((v) => {
       const isPrimary = v === primary;
       return `<div class="upi-row${isPrimary ? ' is-primary' : ''}">
-        <button type="button" class="upi-star" data-primary="${v}" title="${isPrimary ? 'Primary' : 'Make primary'}" aria-label="${isPrimary ? 'Primary' : 'Make primary'}">${isPrimary ? '★' : '☆'}</button>
+        <button type="button" class="upi-radio${isPrimary ? ' on' : ''}" data-primary="${v}" title="${isPrimary ? 'Primary UPI' : 'Make primary'}" aria-label="${isPrimary ? 'Primary UPI' : 'Make primary'}" aria-pressed="${isPrimary}"></button>
         <span class="upi-vpa">${v}</span>
         ${isPrimary ? '<span class="upi-badge">Primary</span>' : ''}
         <button type="button" class="upi-remove" data-remove="${v}" aria-label="Remove">×</button>

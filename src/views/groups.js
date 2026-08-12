@@ -762,7 +762,7 @@ function renderGroupSettings() {
   // --- Advanced: group-wide "simplify debts" toggle. Minimizes the number of
   // repayments to settle the group; everyone sees the same simplified payments.
   const simplifyRow = `<button class="gs-row gs-toggle-row" data-act="simplify">
-      <span class="gs-ico">${icon.sparkle({ size: 18 })}</span>
+      <span class="gs-ico">${icon.simplify({ size: 20 })}</span>
       <span class="gs-label gs-label-stack"><span>Simplify group debts</span><span class="gs-sub">Combine debts to reduce the number of repayments</span></span>
       <span class="switch${g.simplifyDebts ? ' on' : ''}" id="simplifySwitch"></span>
     </button>`;

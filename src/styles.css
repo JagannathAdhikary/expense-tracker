@@ -383,8 +383,12 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .upi-empty{font-size:12.5px;color:var(--ink-mute);line-height:1.4;padding:2px 0}
 .upi-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1.5px solid var(--line);border-radius:var(--radius-sm);background:var(--surface)}
 .upi-row.is-primary{border-color:var(--accent);background:linear-gradient(0deg,rgba(30,58,95,.04),rgba(30,58,95,.04)),var(--surface)}
-.upi-star{flex:0 0 auto;border:none;background:none;cursor:pointer;font-size:18px;line-height:1;color:var(--ink-mute);padding:0;width:22px;text-align:center}
-.upi-row.is-primary .upi-star{color:#e0a400}
+/* Primary selector: a radio-style dot — filled accent ring with a centre dot when
+   primary, a hollow grey ring (tap to select) otherwise. */
+.upi-radio{flex:0 0 auto;width:20px;height:20px;padding:0;border:2px solid var(--ink-mute);border-radius:50%;background:none;cursor:pointer;position:relative;transition:border-color .15s}
+.upi-radio.on{border-color:var(--accent)}
+.upi-radio.on::after{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--accent)}
+.upi-radio:not(.on):hover{border-color:var(--accent)}
 .upi-vpa{flex:1;min-width:0;font-size:14px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .upi-badge{flex:0 0 auto;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--accent);background:rgba(30,58,95,.1);border-radius:var(--radius-pill);padding:2px 8px}
 .upi-remove{flex:0 0 auto;border:none;background:none;cursor:pointer;font-size:20px;line-height:1;color:var(--ink-mute);padding:0 2px}
