@@ -15,11 +15,11 @@ export const icon = {
   phone: (o) => svg('<rect x="6" y="2" width="12" height="20" rx="3"/><line x1="10.5" y1="18.5" x2="13.5" y2="18.5"/>', o),
   wallet: (o) => svg('<path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/>', o),
   sparkle: (o) => svg('<circle cx="12" cy="12" r="9"/><polyline points="8.5 12.5 11 15 15.5 9.5"/>', o),
-  // Debt simplification: 3 people as small dots in a triangle. The two legs through
-  // the apex are DASHED and lighter (the roundabout/unnecessary transactions); the base
-  // is a SOLID full-strength line (the one simplified transaction that replaces them).
+  // Debt simplification: 3 people as small ring nodes in a triangle. The two legs
+  // through the apex are DASHED and lighter (the roundabout/unnecessary transactions);
+  // the base is a SOLID full-strength line (the one simplified transaction).
   simplify: (o) =>
-    svg('<path d="M6 17.5 12 6" stroke-dasharray="2 2" stroke-opacity=".4"/><path d="M12 6 18 17.5" stroke-dasharray="2 2" stroke-opacity=".4"/><path d="M6 17.5H18"/><circle cx="12" cy="6" r="1.2" fill="currentColor" stroke="none"/><circle cx="6" cy="17.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="18" cy="17.5" r="1.2" fill="currentColor" stroke="none"/>', o),
+    svg('<path d="M7 16.5 12 7.5" stroke-dasharray="2 2" stroke-opacity=".4"/><path d="M12 7.5 17 16.5" stroke-dasharray="2 2" stroke-opacity=".4"/><path d="M7.2 17H16.8"/><circle cx="12" cy="6.5" r="1.9"/><circle cx="6" cy="17.5" r="1.9"/><circle cx="18" cy="17.5" r="1.9"/>', o),
   login: (o) => svg('<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>', o),
   logout: (o) => svg('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>', o),
   tag: (o) => svg('<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>', o),
