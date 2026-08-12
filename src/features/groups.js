@@ -172,15 +172,16 @@ export function groupDisplayName(g) {
 }
 
 // Structured form: { name, extra } so callers can render a truncatable name span
-// plus a fixed "+N" span (e.g. "Jagannath Ad… +2"). extra is 0 when there are no
-// additional members. For a non-direct group, name = the group's own name.
+// plus a fixed "+N" span (e.g. "Jagannath Ad… +2"). N is the TOTAL count of other
+// members (so a 2-person split shows "B +1"; 3-person shows "B +2"). extra is 0 only
+// for a non-direct group.
 export function directNameParts(g) {
   if (!g) return { name: 'Group', extra: 0 };
   if (!g.direct) return { name: g.name, extra: 0 };
   const uid = state.user?.id;
   const others = (g.members || []).filter((m) => m.id !== uid).map((m) => m.name || 'Member');
   if (!others.length) return { name: 'Direct split', extra: 0 };
-  return { name: others[0], extra: others.length - 1 };
+  return { name: others[0], extra: others.length };
 }
 
 // Look up a registered user by exact mobile number (via the SECURITY DEFINER RPC).
