@@ -270,6 +270,15 @@ function renderSplitPreview() {
     const shares = computeSplits({ amount: amt, members, mode: state.selSplitMode, weights: state.splitWeights, payerId: state.user?.id });
     const byId = Object.fromEntries(shares.map((s) => [s.userId, s.share]));
     el.textContent = memberObjs.map((m) => `${m.name.split(' ')[0]}: ${fmt(byId[m.id] || 0)}`).join('  ·  ');
+    // Flag a mismatch live for amount / percent so it's obvious before saving.
+    const sumW = members.reduce((s, id) => s + (Number(state.splitWeights[id]) || 0), 0);
+    if (state.selSplitMode === 'amount' && Math.abs(sumW - amt) > 0.01) {
+      el.textContent += `  —  ${sumW > amt ? 'over' : 'short'} by ${fmt(Math.abs(amt - sumW))}`;
+      el.style.color = 'var(--neg)';
+    } else if (state.selSplitMode === 'percent' && Math.abs(sumW - 100) > 0.01) {
+      el.textContent += `  —  totals ${sumW}% (needs 100%)`;
+      el.style.color = 'var(--neg)';
+    }
   } catch (e) {
     el.textContent = '';
   }
@@ -728,6 +737,20 @@ export function initAddEdit() {
       const members = activeSplitMembers().map((m) => m.id);
       if (!members.length) {
         toastError('Pick at least one person to split with.');
+        return;
+      }
+      // Validate the split adds up before saving (no silent remainder absorption).
+      const sumW = members.reduce((s, id) => s + (Number(state.splitWeights[id]) || 0), 0);
+      if (state.selSplitMode === 'amount' && Math.abs(sumW - amt) > 0.01) {
+        toastError(`Amounts add up to ${fmt(sumW)}, but the total is ${fmt(amt)}.`);
+        return;
+      }
+      if (state.selSplitMode === 'percent' && Math.abs(sumW - 100) > 0.01) {
+        toastError(`Percentages add up to ${sumW}%, but they must total 100%.`);
+        return;
+      }
+      if (state.selSplitMode === 'shares' && sumW <= 0) {
+        toastError('Enter a share for at least one person.');
         return;
       }
       let shares;
