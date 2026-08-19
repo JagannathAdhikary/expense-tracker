@@ -44,6 +44,31 @@ export function setPayChip(pay) {
   document.querySelectorAll('#ipaychips .pay-chip').forEach((c) => c.classList.toggle('on', c.dataset.pay === pay && !c.classList.contains('add-chip')));
 }
 
+// Snap both horizontal chip strips back to the start when the form (re)opens.
+// The selected chip is already sorted first (renderCatChips/renderPayChips), so
+// scrollLeft=0 reveals it — otherwise the browser can retain a prior scroll offset
+// from the last time the form was used, hiding the selection off-screen.
+function resetChipScroll() {
+  $('ichips').scrollLeft = 0;
+  $('ipaychips').scrollLeft = 0;
+}
+
+// After a save that returns to the home list, arrange for that entry to be scrolled
+// into view and flashed. If the entry is dated outside the month currently on screen
+// (e.g. a back-dated expense), switch state.cur to its month first so it's in the
+// rendered list. The actual scroll/flash is consumed by home.js render() once the
+// row exists in the DOM (which, for shared rows, may be after a background reload).
+function focusHomeOnRecord(dateStr, { recId = null, expId = null }) {
+  const d = new Date(dateStr + 'T00:00:00');
+  if (!isNaN(d) && (d.getMonth() !== state.cur.getMonth() || d.getFullYear() !== state.cur.getFullYear())) {
+    const m = new Date(d);
+    m.setDate(1);
+    state.cur = m;
+  }
+  if (recId != null) state.focusRecId = recId;
+  if (expId != null) state.focusHomeExpId = expId;
+}
+
 // ---- Split-with UI --------------------------------------------------------
 
 // The members participating in the split, as {id,name,avatar} objects:
@@ -326,6 +351,7 @@ export function showAdd() {
   $('form-title').textContent = 'Add expense';
   renderCatChips();
   renderPayChips();
+  resetChipScroll();
   renderGroupChips();
   $('iamt').value = '';
   $('idesc').value = '';
@@ -381,6 +407,7 @@ export function showEdit(id) {
   state.splitAutoId = null;
   renderCatChips();
   renderPayChips();
+  resetChipScroll();
   renderGroupChips();
   $('iamt').value = r.amt;
   $('idesc').value = r.desc || '';
@@ -426,6 +453,7 @@ export function openEditGroup(gid) {
   $('form-title').textContent = 'Edit group expense';
   renderCatChips();
   renderPayChips();
+  resetChipScroll();
   renderGroupChips();
   $('iamt').value = exp.amount;
   $('idesc').value = exp.description || '';
@@ -462,6 +490,7 @@ export function openEditMySplit(splitId) {
   $('idate').closest('.field').style.display = 'none';
   renderCatChips();
   renderPayChips();
+  resetChipScroll();
   $('idesc').value = split.note || exp?.description || '';
   navTo('add');
 }
@@ -801,6 +830,8 @@ export function initAddEdit() {
             shares,
           });
       if (ok) {
+        // The shared expense id to land on: the returned new id, or the one edited.
+        const savedExpId = state.editGroupExpId || (typeof ok === 'string' ? ok : null);
         // Converting an existing personal expense: remove the local record (it
         // now lives in the group). Tombstone it if cloud sync is on.
         if (state.editId) {
@@ -810,29 +841,39 @@ export function initAddEdit() {
           persist();
           toastSuccess('Moved to group');
         }
-        // Return to whichever screen opened the form. When added from a group's
-        // detail page that's the group itself; otherwise home/category.
+        // Return to whichever screen opened the form, restoring its scroll. When added
+        // from a group's detail page that's the group itself; otherwise home/category.
         state.groupPickLocked = false;
+        state.editGroupExpId = null;
         const to = navBack();
+        // Land on the shared row in the home list (switching month if needed). When
+        // returning to the group detail instead, its own focusGroupExpId path handles it.
+        if (to === 'home' && savedExpId) focusHomeOnRecord(date, { expId: savedExpId });
         renderForScreen(to);
       }
       return;
     }
 
+    let savedId = null;
     if (state.editId) {
       const idx = state.recs.findIndex((r) => r.id === state.editId);
       if (idx > -1) {
         state.recs[idx] = { ...state.recs[idx], amt, cat: state.selCat, pay: state.selPay, desc, date, updated: Date.now() };
         pushRecord(state.recs[idx]);
+        savedId = state.recs[idx].id;
       }
     } else {
       const rec = { id: Date.now(), amt, cat: state.selCat, pay: state.selPay, desc, date, updated: Date.now() };
       state.recs.push(rec);
       pushRecord(rec);
+      savedId = rec.id;
     }
     persist();
-    // Return to the screen that opened the form (home / category detail / …).
+    // Return to the screen that opened the form, restoring its scroll position. When
+    // that's home, consumeHomeFocus then nudges to the saved row (block:'nearest', so
+    // no movement if it's already where you were).
     const to = navBack();
+    if (to === 'home' && savedId != null) focusHomeOnRecord(date, { recId: savedId });
     renderForScreen(to);
   }
 }

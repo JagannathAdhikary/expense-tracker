@@ -25,6 +25,7 @@ export const state = {
     cats: [], // category names to include (empty = all)
     groupId: null, // a specific group id to restrict to (null = any)
     pays: [], // payment-method names to include (empty = all)
+    q: '', // free-text search over the current month's list (desc/category/group)
   },
   newCatColor: null, // pending color while adding a category
 
@@ -36,6 +37,8 @@ export const state = {
   settlements: [], // settlements rows for the user's groups (auto-netting + manual settle-ups)
   openGroupId: null, // group currently open in the Groups detail view
   focusGroupExpId: null, // expense to scroll to + flash when the detail view opens
+  focusRecId: null, // personal record to scroll to + flash in the home list after save
+  focusHomeExpId: null, // shared/group expense to scroll to + flash in the home list after save
   // add/edit form group tagging:
   selGroup: null, // group id tagged on the expense being added, or null
   selSplitMode: 'equal', // 'equal' | 'amount' | 'percent'

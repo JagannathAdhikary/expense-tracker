@@ -1,5 +1,5 @@
 // Web Push: subscribe the browser and store the subscription in Supabase so the
-// notify-expense Edge Function can reach group members when the app is closed.
+// notify-group Edge Function can reach group members when the app is closed.
 //
 // Flow: after login we AUTO-ask permission and subscribe on grant ("on by default"
 // as far as browsers allow — a one-time Allow is unavoidable). A menu toggle turns

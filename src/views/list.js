@@ -57,7 +57,7 @@ export function renderDateGroups(rows, container) {
         </div>
       </div>`;
         }
-        return `<div class="txn">
+        return `<div class="txn" data-id="${r.id}">
         <div class="txn-ico" style="background:${cat.c}20">${cat.e}</div>
         <div class="txn-info">
           <div class="txn-desc">${r.desc || cat.n}</div>

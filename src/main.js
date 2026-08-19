@@ -32,12 +32,23 @@ import { persistPrefs } from './storage.js';
 // Deep-link join: capture ?join=CODE from the invite link, then strip it from the
 // URL so a refresh/re-login doesn't re-trigger. Handled after login + cloud load.
 let pendingJoinCode = null;
+// Deep-link open: capture ?group=ID(&exp=ID) from a tapped push notification (or an
+// openWindow when the app was closed), then strip it. Opened after cloud load.
+let pendingOpen = null;
 try {
   const params = new URLSearchParams(window.location.search);
   const code = params.get('join');
   if (code) {
     pendingJoinCode = code.trim().toUpperCase();
     params.delete('join');
+  }
+  const groupId = params.get('group');
+  if (groupId) {
+    pendingOpen = { groupId, expId: params.get('exp') || null };
+    params.delete('group');
+    params.delete('exp');
+  }
+  if (code || groupId) {
     const qs = params.toString();
     const clean = window.location.pathname + (qs ? '?' + qs : '') + window.location.hash;
     window.history.replaceState({}, '', clean);
@@ -91,7 +102,10 @@ onAuthChange((user) => {
   refreshUpiButton();
   updateNotifyButton();
   if (user) {
-    loadCloudData().then(() => maybeJoinFromLink());
+    loadCloudData().then(() => {
+      maybeJoinFromLink();
+      maybeOpenGroupFromLink();
+    });
     subscribeRealtime();
     // Load the user's own profile, then: run the full-screen onboarding journey
     // if it's incomplete (name/phone missing), and refresh the menu button.
@@ -118,6 +132,35 @@ async function maybeJoinFromLink() {
   pendingJoinCode = null; // consume it (only attempt once)
   const grp = await joinGroupByCode(code); // shows its own toast (joined / already in / not found)
   if (grp) showGroupDetail(grp.id);
+}
+
+// If a push notification was tapped (?group=ID&exp=ID, or a runtime message from the
+// service worker), open that group — scrolled to the expense when one was given.
+// Only opens a group the user is actually a member of (cloud data must be loaded).
+function maybeOpenGroupFromLink() {
+  if (!pendingOpen || !state.user) return;
+  const { groupId, expId } = pendingOpen;
+  if (!state.groups.some((g) => g.id === groupId)) return; // not (yet) a member; leave pending
+  pendingOpen = null; // consume it
+  showGroupDetail(groupId, expId || null);
+}
+
+// Service worker relays a tapped notification while the app is already open. If cloud
+// data is loaded, open immediately; otherwise stash it for maybeOpenGroupFromLink to
+// pick up once loadCloudData() resolves.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    if (event.data?.type !== 'open-group') return;
+    try {
+      const u = new URL(event.data.url, window.location.origin);
+      const groupId = u.searchParams.get('group');
+      if (!groupId) return;
+      pendingOpen = { groupId, expId: u.searchParams.get('exp') || null };
+      maybeOpenGroupFromLink();
+    } catch {
+      /* malformed url from SW — ignore */
+    }
+  });
 }
 
 // "Group notifications" menu toggle: shown when signed in + push supported.
