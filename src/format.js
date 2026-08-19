@@ -66,6 +66,16 @@ export function filterActive() {
   return f.scope !== 'all' || f.cats.length > 0 || !!f.groupId || f.pays.length > 0;
 }
 
+// True when a row matches a free-text query. Case-insensitive substring over the
+// visible text: description/note, category, payment, and (for shared rows) the
+// group name in `meta`. Empty/blank query matches everything. Pure — unit-tested.
+export function matchesQuery(r, q) {
+  const needle = String(q || '').trim().toLowerCase();
+  if (!needle) return true;
+  const hay = [r.desc, r.cat, r.pay, r.meta].filter(Boolean).join(' ').toLowerCase();
+  return hay.includes(needle);
+}
+
 // Apply the home filter to a merged rows array (personal + shared). A personal row
 // has no `shared` flag; a group row has `shared:true` and a `groupId`.
 export function applyFilter(rows) {
@@ -76,6 +86,7 @@ export function applyFilter(rows) {
     if (f.groupId && r.groupId !== f.groupId) return false;
     if (f.cats.length && !f.cats.includes(r.cat)) return false;
     if (f.pays.length && !f.pays.includes(r.pay)) return false;
+    if (!matchesQuery(r, f.q)) return false;
     return true;
   });
 }

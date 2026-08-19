@@ -7,6 +7,7 @@ import { cloudEnabled } from '../supabase.js';
 import { catByName } from '../format.js';
 import { $ } from '../dom.js';
 import { icon } from '../icons.js';
+import { thumbMarkup } from '../views/groups.js';
 
 let draft = null; // working copy while the sheet is open
 let applyCb = null; // re-render callback supplied by the opener
@@ -26,9 +27,10 @@ export function filterSummary() {
   return parts.length ? 'Filter: ' + parts.join(' · ') : 'Filter active';
 }
 
-// Reset the filter to "show everything".
+// Reset the filter to "show everything". Preserves the free-text search `q`, which
+// is a separate always-visible affordance (the search box), not part of the sheet.
 export function clearFilter() {
-  state.filter = { scope: 'all', cats: [], groupId: null, pays: [] };
+  state.filter = { scope: 'all', cats: [], groupId: null, pays: [], q: state.filter.q || '' };
 }
 
 function renderSheet() {
@@ -43,7 +45,7 @@ function renderSheet() {
     groupField.style.display = '';
     $('fltGroups').innerHTML =
       `<div class="chip${!draft.groupId ? ' on' : ''}" data-group="">Any group</div>` +
-      groups.map((g) => `<div class="chip${g.id === draft.groupId ? ' on' : ''}" data-group="${g.id}">👥 ${g.name}${g.retired ? ' (retired)' : ''}</div>`).join('');
+      groups.map((g) => `<div class="chip${g.id === draft.groupId ? ' on' : ''}" data-group="${g.id}">${thumbMarkup(g)} ${g.name}${g.retired ? ' (retired)' : ''}</div>`).join('');
   } else {
     groupField.style.display = 'none';
   }
@@ -108,7 +110,7 @@ export function initFilter() {
   };
 
   $('fltApply').onclick = () => {
-    if (draft) state.filter = { scope: draft.scope, cats: [...draft.cats], groupId: draft.groupId, pays: [...draft.pays] };
+    if (draft) state.filter = { scope: draft.scope, cats: [...draft.cats], groupId: draft.groupId, pays: [...draft.pays], q: state.filter.q || '' };
     close();
     if (applyCb) applyCb();
   };

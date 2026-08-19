@@ -31,14 +31,26 @@ self.addEventListener('push', (event) => {
   );
 });
 
-// Tapping a notification -> focus an existing window or open one.
+// Tapping a notification -> focus an existing window (and tell the SPA to open the
+// deep-linked group without a reload), or open a new window at the deep link.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const url = event.notification.data?.url || BASE;
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((cs) => {
       const hit = cs.find((c) => c.url.includes(BASE));
-      return hit ? hit.focus() : self.clients.openWindow(url);
+      if (hit) {
+        // Already-open SPA: message it to route to the group, and (best-effort) nudge
+        // its URL so a reload would also land there. Then bring it to the front.
+        hit.postMessage({ type: 'open-group', url });
+        try {
+          if (typeof hit.navigate === 'function') hit.navigate(url).catch(() => {});
+        } catch {
+          /* navigate() not allowed in this context — the postMessage handles routing */
+        }
+        return hit.focus();
+      }
+      return self.clients.openWindow(url);
     }),
   );
 });

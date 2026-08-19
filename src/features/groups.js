@@ -7,11 +7,38 @@ import { state } from '../state.js';
 import { $ } from '../dom.js';
 import { toastError, toastSuccess, toastInfo } from '../toast.js';
 import { netBetween } from '../split.js';
+import { fmt } from '../format.js';
 
 // Callbacks fired after cloud data (groups/expenses/splits) is (re)loaded.
 const dataListeners = [];
 export const onGroupData = (fn) => dataListeners.push(fn);
 const notifyData = () => dataListeners.forEach((fn) => fn());
+
+// Fire-and-forget Web Push to a group's other members via the notify-group Edge
+// Function. Best-effort: a failure (offline, push not configured, function down)
+// must never block or fail the mutation that triggered it — hence the .catch().
+// `opts` may carry { expId, title, recipientIds } (see the function's header).
+//
+// Direct-split containers (g.direct) are hidden plumbing, not real groups, so their
+// lifecycle events (create/rename/delete) would be meaningless noise — those are
+// suppressed by the callers. Expense/settle events on a direct split DO notify (the
+// other person genuinely needs to know about the money).
+function notifyGroup(type, groupId, body, opts = {}) {
+  if (!cloudEnabled() || !state.user || !groupId || !body) return;
+  const payload = { type, groupId, body };
+  if (opts.expId) payload.expId = opts.expId;
+  if (opts.title) payload.title = opts.title;
+  if (opts.recipientIds) payload.recipientIds = opts.recipientIds;
+  supabase.functions.invoke('notify-group', { body: payload }).catch((e) => console.warn('notify-group invoke failed', e));
+}
+
+// The current user's display name for notification bodies ("You" is never right for
+// the OTHER members reading it).
+const meName = () => state.user?.name || 'Someone';
+// A group's stored name for a body string (falls back gracefully).
+const grpName = (groupId) => state.groups.find((g) => g.id === groupId)?.name || 'a group';
+// Whether a group is a hidden direct-split container (suppress lifecycle pushes).
+const isDirectGroup = (groupId) => !!state.groups.find((g) => g.id === groupId)?.direct;
 
 // Short, human-friendly invite code (no ambiguous chars). Not security-sensitive
 // beyond acting as a shared secret handle.
@@ -137,6 +164,9 @@ export async function createGroup(name, memberIds = [], opts = {}) {
     if (mErr) toastError('Group created, but adding some members failed: ' + mErr.message);
   }
   await loadCloudData();
+  // Tell the added members about the new group (real groups only — direct-split
+  // containers are hidden plumbing). Server resolves recipients from group_members.
+  if (!opts.isDirect) notifyGroup('group_create', grp.id, `${meName()} added you to “${name}”`, { title: name });
   return grp;
 }
 
@@ -254,6 +284,12 @@ export async function addMemberToGroup(groupId, userId) {
     }
   }
   await loadCloudData();
+  // Notify the group that a member was added (skip hidden direct-split containers).
+  if (!isDirectGroup(groupId)) {
+    const added = state.groups.find((g) => g.id === groupId)?.members.find((m) => m.id === userId);
+    const who = added?.name || 'a new member';
+    notifyGroup('member_add', groupId, `${meName()} added ${who} to ${grpName(groupId)}`);
+  }
   return true;
 }
 
@@ -282,6 +318,7 @@ export async function joinGroupByCode(code) {
   }
   toastSuccess(`Joined "${grp.name}".`);
   await loadCloudData();
+  notifyGroup('member_add', grp.id, `${meName()} joined ${grp.name}`, { title: grp.name });
   return grp;
 }
 
@@ -316,14 +353,13 @@ export async function saveGroupExpense({ groupId, amount, description, category,
     return false;
   }
   // Notify the group's other members (best-effort push; never blocks the save).
-  supabase.functions
-    .invoke('notify-expense', { body: { expenseId: exp.id, groupId, payerName: state.user.name || 'Someone', amount } })
-    .catch((e) => console.warn('notify-expense invoke failed', e));
+  notifyGroup('expense_add', groupId, `${meName()} added ${fmt(amount)} in ${grpName(groupId)}` + (description ? ` — ${description}` : ''), { expId: exp.id });
   // Refresh in the background so the form can close immediately; onGroupData
   // re-renders the list once the reload lands. Opposing debts net automatically
   // at read time (see netBetween in split.js) — no auto-settlement row needed.
   loadCloudData();
-  return true;
+  // Return the new expense id so the caller can scroll/flash it in the list.
+  return exp.id;
 }
 
 // Edit a group expense (payer only). Updates the expense row and rebuilds its
@@ -364,6 +400,8 @@ export async function editGroupExpense({ expenseId, amount, description, categor
     toastError('Expense updated but splits failed: ' + sErr.message);
     return false;
   }
+  const gid = existing?.group_id;
+  if (gid) notifyGroup('expense_edit', gid, `${meName()} updated ${fmt(amount)} in ${grpName(gid)}` + (description ? ` — ${description}` : ''), { expId: expenseId });
   loadCloudData(); // background refresh; form closes immediately
   return true;
 }
@@ -402,6 +440,10 @@ export async function deleteGroupExpense(expenseId) {
     toastError('Could not delete: ' + error.message);
     return false;
   }
+  if (existing?.group_id) {
+    const label = existing.description ? ` — ${existing.description}` : '';
+    notifyGroup('expense_delete', existing.group_id, `${meName()} deleted ${fmt(existing.amount)} in ${grpName(existing.group_id)}${label}`);
+  }
   await loadCloudData();
   return true;
 }
@@ -435,7 +477,9 @@ export async function renameGroup(groupId, name) {
     toastError('Could not rename group: ' + error.message);
     return false;
   }
+  const wasDirect = isDirectGroup(groupId);
   await loadCloudData();
+  if (!wasDirect) notifyGroup('group_rename', groupId, `${meName()} renamed the group to “${clean}”`, { title: clean });
   return true;
 }
 
@@ -443,10 +487,19 @@ export async function renameGroup(groupId, name) {
 // and splits via ON DELETE CASCADE.
 export async function deleteGroup(groupId) {
   if (!cloudEnabled() || !state.user) return false;
+  // Capture members + name BEFORE deleting — group_members cascades away, so the
+  // notify-group function can't re-read recipients for this event (see its header).
+  const g = state.groups.find((x) => x.id === groupId);
+  const wasDirect = !!g?.direct;
+  const groupName = g?.name || 'a group';
+  const recipientIds = (g?.members || []).map((m) => m.id).filter((id) => id !== state.user.id);
   const { error } = await supabase.from('groups').delete().eq('id', groupId).eq('created_by', state.user.id);
   if (error) {
     toastError('Could not delete group: ' + error.message);
     return false;
+  }
+  if (!wasDirect && recipientIds.length) {
+    notifyGroup('group_delete', groupId, `${meName()} deleted the group “${groupName}”`, { title: groupName, recipientIds });
   }
   await loadCloudData();
   return true;
@@ -456,6 +509,9 @@ export async function deleteGroup(groupId) {
 // this). Other members and the group stay. The owner should delete/transfer instead.
 export async function leaveGroup(groupId) {
   if (!cloudEnabled() || !state.user) return false;
+  // Notify BEFORE removing self: once we're out of group_members the notify-group
+  // membership check would reject us (403). Skip hidden direct-split containers.
+  if (!isDirectGroup(groupId)) notifyGroup('member_leave', groupId, `${meName()} left ${grpName(groupId)}`);
   const { error } = await supabase.from('group_members').delete().eq('group_id', groupId).eq('user_id', state.user.id);
   if (error) {
     toastError('Could not leave group: ' + error.message);
@@ -533,6 +589,10 @@ export async function markShareDone(splitId, pay = null) {
     toastError('Could not update: ' + error.message);
     return;
   }
+  if (exp?.group_id) {
+    // A settle concerns only the creditor (the expense payer), not the whole group.
+    notifyGroup('settle', exp.group_id, `${meName()} settled ${fmt(split.share_amount)} in ${grpName(exp.group_id)}`, { recipientIds: [exp.payer_id] });
+  }
   await loadCloudData();
 }
 
@@ -583,6 +643,12 @@ export async function settleUpWithMember(groupId, otherId, pay = null) {
     const to_user = net > 0 ? otherId : uid;
     await supabase.from('settlements').insert({ group_id: groupId, from_user, to_user, amount: absAmt, kind: 'manual', created_by: uid });
   }
+  if (myShares.length || theirShares.length || absAmt > 0) {
+    const other = state.groups.find((g) => g.id === groupId)?.members.find((m) => m.id === otherId);
+    const withWho = other?.name ? ` with ${other.name}` : '';
+    // Only the person settled with needs to know.
+    notifyGroup('settle', groupId, `${meName()} settled up${withWho} in ${grpName(groupId)}`, { recipientIds: [otherId] });
+  }
   await loadCloudData();
 }
 
@@ -613,6 +679,10 @@ export async function settleAllMyDebts(groupId, payeeId, amount, pay = null) {
   }
   if (amount > 0 && payeeId) {
     await supabase.from('settlements').insert({ group_id: groupId, from_user: uid, to_user: payeeId, amount, kind: 'simplified', created_by: uid });
+  }
+  if (myPending.length || (amount > 0 && payeeId)) {
+    // Simplified settle re-routes to a single creditor — notify just them.
+    notifyGroup('settle', groupId, `${meName()} settled ${fmt(amount)} in ${grpName(groupId)}`, payeeId ? { recipientIds: [payeeId] } : {});
   }
   await loadCloudData();
 }

@@ -1,7 +1,7 @@
 // Home screen: month summary, the recent transaction list, and the filter bar.
 // (Category breakdown lives on the Analytics page now.)
 
-import { state } from '../state.js';
+import { state, collapsed } from '../state.js';
 import { MN } from '../constants.js';
 import { fmt, filtered, applyFilter, filterActive } from '../format.js';
 import { $ } from '../dom.js';
@@ -63,12 +63,61 @@ export function render() {
 
   const tlist = $('tlist');
   if (!rows.length) {
-    tlist.innerHTML = filterActive()
-      ? '<div class="empty"><span>🔍</span>No transactions match this filter.</div>'
-      : '<div class="empty"><span>🧾</span>No expenses this month.<br>Tap + to add one.</div>';
+    const q = (state.filter.q || '').trim();
+    tlist.innerHTML = q
+      ? `<div class="empty"><span>🔍</span>No matches for “${q}” this month.</div>`
+      : filterActive()
+        ? '<div class="empty"><span>🔍</span>No transactions match this filter.</div>'
+        : '<div class="empty"><span>🧾</span>No expenses this month.<br>Tap + to add one.</div>';
     return;
   }
   renderDateGroups(rows, tlist);
+  consumeHomeFocus();
+}
+
+// After a save, scroll to + flash the just-saved entry (personal or shared). Mirrors
+// the group-detail focus path (groups.js). The focus fields are set by addEdit's
+// focusHomeOnRecord; they're cleared here only once the target row is actually found,
+// so a shared row that arrives via a later background reload still gets consumed.
+function consumeHomeFocus() {
+  const tlist = $('tlist');
+  let target = null;
+  if (state.focusRecId != null) {
+    target = tlist.querySelector(`.txn[data-id="${state.focusRecId}"]`);
+    if (target) state.focusRecId = null;
+  } else if (state.focusHomeExpId != null) {
+    target = tlist.querySelector(`.txn[data-exp-id="${state.focusHomeExpId}"]`);
+    if (target) state.focusHomeExpId = null;
+  }
+  if (!target) return;
+  // Expand its date group if collapsed, else it can't scroll into view.
+  const grp = target.closest('.date-group');
+  if (grp && collapsed.has(grp.dataset.date)) {
+    collapsed.delete(grp.dataset.date);
+    grp.querySelector('.date-entries').classList.remove('collapsed');
+    grp.querySelector('.chevron').classList.add('open');
+  }
+  // rAF so this runs AFTER the render settles. nav restored the scroll position, so
+  // if the row is already visible we leave it be (just flash); otherwise scroll it up
+  // near the top of the viewport — offset below the sticky header so it isn't tucked
+  // behind it — rather than barely into view at the bottom.
+  requestAnimationFrame(() => {
+    if (!isRowFullyVisible(target)) {
+      const header = document.querySelector('#home header');
+      const offset = (header?.offsetHeight || 0) + 12;
+      const y = window.scrollY + target.getBoundingClientRect().top - offset;
+      window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+    }
+    target.classList.add('ge-flash');
+    setTimeout(() => target.classList.remove('ge-flash'), 1600);
+  });
+}
+
+// True when the row is already wholly within the viewport (so we shouldn't scroll —
+// leaving a comfortably-visible entry put, per "otherwise simply just be there").
+function isRowFullyVisible(el) {
+  const r = el.getBoundingClientRect();
+  return r.top >= 0 && r.bottom <= window.innerHeight;
 }
 
 export function showHome() {
@@ -90,6 +139,12 @@ export function initHome() {
   // Filter button opens the filter sheet; onApply re-renders the list.
   $('filterBtn').innerHTML = icon.filter({ size: 18 });
   $('filterBtn').onclick = () => openFilterSheet(render);
+  // Free-text search over the current month's list. Live-filters as you type;
+  // scope is the month already on screen (the list is month-scoped).
+  $('searchInput').addEventListener('input', (e) => {
+    state.filter.q = e.target.value;
+    render();
+  });
   // Clear-filter chip (delegated — the bar is re-rendered each time).
   $('filterBar').addEventListener('click', (e) => {
     if (e.target.closest('#clearFilterBtn')) {
@@ -117,4 +172,28 @@ export function initHome() {
       rerender();
     },
   });
+
+  initBackToTop();
+}
+
+// Floating "back to top" button that appears once the home list is scrolled down.
+// The window is the scroll container (see nav.js), so we watch window.scrollY.
+function initBackToTop() {
+  const btn = $('toTopBtn');
+  if (!btn) return;
+  btn.innerHTML = icon.chevronUp({ size: 22 });
+  btn.hidden = false; // let it participate in layout; visibility is driven by .show
+  btn.onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+  let ticking = false;
+  const update = () => {
+    ticking = false;
+    // Only on home, and only once scrolled a screenful or so down.
+    const show = $('home').classList.contains('active') && window.scrollY > 600;
+    btn.classList.toggle('show', show);
+  };
+  window.addEventListener('scroll', () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(update);
+  }, { passive: true });
 }

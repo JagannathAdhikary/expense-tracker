@@ -135,7 +135,7 @@ function collageMarkup(g) {
 
 // Compact thumbnail (popover tiles): direct split -> avatar collage; else cropped
 // photo or the theme scene.
-function thumbMarkup(g) {
+export function thumbMarkup(g) {
   if (g.direct) return `<span class="gt-ico gt-thumb has-collage">${collageMarkup(g)}</span>`;
   if (g.photo) return `<span class="gt-ico gt-thumb has-photo"><img class="gt-photo" src="${g.photo}" alt="" referrerpolicy="no-referrer"/></span>`;
   return `<span class="gt-ico gt-thumb" style="background:${gradientFor(g)}"></span>`;
