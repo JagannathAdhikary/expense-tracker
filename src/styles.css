@@ -237,6 +237,17 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .split-counts .sc-lbl{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-top:2px}
 .split-counts .sc-settled .sc-num,.split-counts .sc-settled .sc-lbl{color:var(--pos)}
 .split-counts .sc-pending .sc-num,.split-counts .sc-pending .sc-lbl{color:var(--warn)}
+/* The pending stat is a tappable shortcut to its group(s). Reset the button chrome so
+   it sits flush next to the settled column, and hint tappability. */
+.split-counts button.sc-pending{border:none;background:none;padding:0;text-align:left;cursor:pointer;align-items:flex-start;font:inherit}
+.split-counts button.sc-pending:active{opacity:.7}
+/* Dropdown of pending groups, anchored under the Transactions card. */
+#txnCard{position:relative}
+.pending-menu{position:absolute;top:calc(100% + 6px);right:0;left:0;z-index:30;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sm);box-shadow:var(--sh-md);padding:4px;overflow:hidden}
+.pending-menu-row{display:flex;align-items:center;gap:10px;width:100%;border:none;background:none;padding:9px 10px;border-radius:var(--radius-sm);cursor:pointer;text-align:left;font:inherit;color:var(--ink)}
+.pending-menu-row:hover,.pending-menu-row:active{background:var(--bg-2)}
+.pending-menu-row .gt-thumb{width:28px;height:28px;border-radius:8px;flex:0 0 auto}
+.pending-menu-row .pm-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .section-title{font-size:11.5px;font-weight:700;color:var(--ink-mute);text-transform:uppercase;letter-spacing:.7px;margin-bottom:.7rem}
 .cat-bars{display:flex;flex-direction:column;gap:10px;margin-bottom:1.4rem}
 .cat-row{display:flex;align-items:center;gap:10px;cursor:pointer;padding:6px;border-radius:var(--radius-sm);transition:background .15s}

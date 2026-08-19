@@ -252,7 +252,9 @@ function renderGroupList() {
   $('grpTabs').querySelectorAll('.grp-tab').forEach((t) => t.classList.toggle('on', t.dataset.tab === groupTab));
 
   // "Shared splits" section (direct splits with friends), appended below the groups.
-  const sharedBlock = directSplits.length
+  // Only on the Active tab — direct splits aren't retired, so they'd otherwise leak
+  // into the Retired tab (which should show retired groups only).
+  const sharedBlock = groupTab === 'active' && directSplits.length
     ? `<p class="section-title shared-splits-title">Shared splits</p><div class="group-tiles">${directSplits.map(groupTile).join('')}</div>`
     : '';
 

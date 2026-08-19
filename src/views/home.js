@@ -10,13 +10,17 @@ import { renderCategoryView } from './category.js';
 import { showAnalytics } from './analytics.js';
 import { openFilterSheet, filterSummary, clearFilter } from '../features/filter.js';
 import { showEdit, openEditGroup, openEditMySplit } from './addEdit.js';
-import { showGroupDetail, confirmAndSettleShare } from './groups.js';
+import { showGroupDetail, confirmAndSettleShare, thumbMarkup } from './groups.js';
 import { navReset } from '../nav.js';
 import { sharedRowsForMonth, expenseHasPayment } from '../cloudrows.js';
-import { deleteGroupExpense } from '../features/groups.js';
+import { deleteGroupExpense, groupDisplayName } from '../features/groups.js';
 import { icon } from '../icons.js';
 import { toastError } from '../toast.js';
 import { confirmModal } from '../confirm.js';
+
+// Distinct group ids behind the current "pending" count — set each render(), consumed
+// by the pending-stat tap (open the group directly, or a dropdown when there are several).
+let pendingGroupIds = [];
 
 export function render() {
   $('mlbl').textContent = MN[state.cur.getMonth()] + ' ' + state.cur.getFullYear();
@@ -38,6 +42,13 @@ export function render() {
   // of a plain count. Unsettled = a share you owe, or one you paid others haven't.
   const sharedShown = rows.filter((r) => r.shared);
   const unsettled = sharedShown.filter((r) => r.pending || r.badge?.cls === 'shared-pending').length;
+  // Distinct groups behind the pending count, so tapping it can jump to them.
+  pendingGroupIds = [...new Set(
+    sharedShown
+      .filter((r) => r.pending || r.badge?.cls === 'shared-pending')
+      .map((r) => r.groupId)
+      .filter(Boolean),
+  )];
   if (sharedShown.length) {
     $('cnt').style.display = 'none';
     $('splitCounts').style.display = 'flex';
@@ -152,6 +163,17 @@ export function initHome() {
       render();
     }
   });
+  // Pending count is a shortcut to the group(s) with an unsettled share this month:
+  // one group -> open it directly; several -> a small dropdown to pick from.
+  $('pendingStat').addEventListener('click', () => {
+    const ids = pendingGroupIds;
+    if (!ids.length) return;
+    if (ids.length === 1) {
+      showGroupDetail(ids[0]);
+      return;
+    }
+    openPendingMenu(ids);
+  });
   attachListHandler($('tlist'), {
     onEdit: showEdit,
     rerender,
@@ -174,6 +196,46 @@ export function initHome() {
   });
 
   initBackToTop();
+}
+
+// Small dropdown anchored under the Transactions card listing the groups with a pending
+// share this month. Tapping a row opens that group; tapping outside (or a row) dismisses.
+function openPendingMenu(ids) {
+  closePendingMenu();
+  const card = $('txnCard');
+  if (!card) return;
+  const groups = ids
+    .map((id) => state.groups.find((g) => g.id === id))
+    .filter(Boolean);
+  if (groups.length < 2) {
+    if (groups[0]) showGroupDetail(groups[0].id);
+    return;
+  }
+  const menu = document.createElement('div');
+  menu.className = 'pending-menu';
+  menu.id = 'pendingMenu';
+  menu.innerHTML = groups
+    .map((g) => `<button type="button" class="pending-menu-row" data-group="${g.id}">${thumbMarkup(g)}<span class="pm-name">${groupDisplayName(g)}</span></button>`)
+    .join('');
+  card.appendChild(menu);
+  menu.addEventListener('click', (e) => {
+    const row = e.target.closest('.pending-menu-row');
+    if (!row) return;
+    closePendingMenu();
+    showGroupDetail(row.dataset.group);
+  });
+  // Dismiss on the next outside tap. Deferred so the opening click doesn't close it.
+  requestAnimationFrame(() => document.addEventListener('click', onPendingOutside));
+}
+
+function onPendingOutside(e) {
+  if (e.target.closest('#pendingMenu') || e.target.closest('#pendingStat')) return;
+  closePendingMenu();
+}
+
+function closePendingMenu() {
+  document.removeEventListener('click', onPendingOutside);
+  $('pendingMenu')?.remove();
 }
 
 // Floating "back to top" button that appears once the home list is scrolled down.
