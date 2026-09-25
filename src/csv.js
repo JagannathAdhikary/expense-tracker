@@ -39,12 +39,18 @@ export function toCsv(records) {
   return lines.join('\r\n');
 }
 
-// The template CSV: header WITHOUT id (users shouldn't have to invent ids) plus one
-// example row so the expected format is obvious.
+// The template CSV: header WITHOUT id (users shouldn't have to invent ids). The header
+// must stay the exact machine-readable names so import maps the columns; the required vs
+// optional guidance lives in the example rows (and the import dialog's note). First example
+// fills every column; second fills only the two required ones (date, amount) with the
+// optionals left blank, so it's self-evident which columns may be empty.
 export function templateCsv() {
   const headers = CSV_HEADERS.filter((h) => h !== 'id');
-  const example = ['2026-09-25', '250.00', 'Food', 'UPI', 'Lunch with team'];
-  return [headers.join(','), example.join(',')].join('\r\n');
+  const examples = [
+    ['2026-09-25', '250.00', 'Food', 'UPI', 'Lunch with team'],
+    ['2026-09-25', '80', '', '', ''],
+  ];
+  return [headers.join(','), ...examples.map((e) => e.join(','))].join('\r\n');
 }
 
 // Parse CSV text into an array of string-arrays (one per row). Handles quoted fields
@@ -121,12 +127,33 @@ const cell = (cols, hmap, name) => {
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+// Resolve a CSV category/payment cell against the app's known names:
+//   - empty            -> { value: <fallback default> }  (every user has a default)
+//   - matches a known  -> { value: <canonical app name> } (case-insensitive; "food" -> "Food")
+//   - non-empty, no match -> { error }  (don't silently invent it)
+// `known` is the list of app names; `fallback` is the default to use when the cell is blank.
+// When `known` is null (e.g. unit tests calling without app context) matching is skipped:
+// empty stays empty and any value passes through unchanged.
+function resolveName(raw, known, fallback, label) {
+  if (!raw) return { value: known ? fallback : '' };
+  if (!known) return { value: raw };
+  const hit = known.find((n) => n.toLowerCase() === raw.toLowerCase());
+  if (hit) return { value: hit };
+  return { error: `Unknown ${label} "${raw}"` };
+}
+
 // Validate + build one record from a data row. Pure: does not mutate app state and does
 // not assign an id (the caller owns id generation / dedupe). Returns:
 //   { ok: true, record: { amt, cat, pay, desc, date, id? } }
 //   { ok: false, error: 'reason' }
 // `id` is included in the record only when the row carried a non-empty id column.
-export function buildRecordFromRow(cols, hmap) {
+//
+// `opts` supplies the app context so category/payment are matched (not invented):
+//   { cats: [names], pays: [names], defaultCat: name, defaultPay: name }
+// Blank category/payment fall back to defaultCat/defaultPay; a non-empty value must match
+// an existing name (case-insensitive) or the row fails. Omit `opts` to skip matching.
+export function buildRecordFromRow(cols, hmap, opts = {}) {
+  const { cats = null, pays = null, defaultCat = '', defaultPay = null } = opts;
   const rawDate = cell(cols, hmap, 'date');
   const rawAmt = cell(cols, hmap, 'amount');
   const cat = cell(cols, hmap, 'category');
@@ -136,18 +163,29 @@ export function buildRecordFromRow(cols, hmap) {
 
   if (!rawDate) return { ok: false, error: 'Missing date' };
   if (!DATE_RE.test(rawDate)) return { ok: false, error: `Invalid date "${rawDate}" (expected YYYY-MM-DD)` };
+  // new Date() silently rolls invalid days over (2026-09-31 -> Oct 1), so it can't be
+  // trusted alone. Verify the parsed Y/M/D round-trips back to the input to reject days
+  // that don't exist (Sep 31, Feb 30, month 13, ...).
+  const [yy, mm, dd] = rawDate.split('-').map(Number);
   const d = new Date(rawDate + 'T00:00:00');
-  if (isNaN(d.getTime())) return { ok: false, error: `Invalid date "${rawDate}"` };
+  if (isNaN(d.getTime()) || d.getFullYear() !== yy || d.getMonth() + 1 !== mm || d.getDate() !== dd) {
+    return { ok: false, error: `Invalid date "${rawDate}" (not a real calendar date)` };
+  }
 
   if (!rawAmt) return { ok: false, error: 'Missing amount' };
   const amt = Number(rawAmt);
   if (!Number.isFinite(amt)) return { ok: false, error: `Invalid amount "${rawAmt}"` };
   if (amt <= 0) return { ok: false, error: `Amount must be positive (got ${rawAmt})` };
 
+  const catRes = resolveName(cat, cats, defaultCat, 'category');
+  if (catRes.error) return { ok: false, error: catRes.error };
+  const payRes = resolveName(pay, pays, defaultPay, 'payment');
+  if (payRes.error) return { ok: false, error: payRes.error };
+
   const record = {
     amt,
-    cat: cat || '',
-    pay: pay || null,
+    cat: catRes.value || '',
+    pay: payRes.value || null,
     desc: desc || '',
     date: rawDate,
   };

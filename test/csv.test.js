@@ -35,10 +35,12 @@ describe('toCsv / templateCsv', () => {
     expect(rows[1]).toEqual(['5', '2026-09-25', '250', 'Food', 'UPI', 'Lunch, tea']);
   });
 
-  it('template omits the id column and has an example row', () => {
+  it('template omits the id column and has example rows', () => {
     const rows = parseCsv(templateCsv());
     expect(rows[0]).toEqual(['date', 'amount', 'category', 'payment', 'description']);
-    expect(rows.length).toBe(2);
+    expect(rows.length).toBe(3);
+    // Second example fills only the required columns, optionals blank.
+    expect(rows[2]).toEqual(['2026-09-25', '80', '', '', '']);
   });
 
   it('round-trips through parse', () => {
@@ -75,6 +77,12 @@ describe('buildRecordFromRow', () => {
     expect(buildRecordFromRow(row('', '25/09/2026', '10'), hmap)).toMatchObject({ ok: false });
   });
 
+  it('fails on a nonexistent calendar date (Sep 31, Feb 30)', () => {
+    expect(buildRecordFromRow(row('', '2026-09-31', '10'), hmap)).toMatchObject({ ok: false });
+    expect(buildRecordFromRow(row('', '2026-02-30', '10'), hmap)).toMatchObject({ ok: false });
+    expect(buildRecordFromRow(row('', '2026-13-01', '10'), hmap)).toMatchObject({ ok: false });
+  });
+
   it('fails on a missing amount', () => {
     expect(buildRecordFromRow(row('', '2026-09-25', ''), hmap)).toMatchObject({ ok: false });
   });
@@ -93,5 +101,33 @@ describe('buildRecordFromRow', () => {
     const res = buildRecordFromRow(['12.50', '2026-09-25', 'Coffee'], hm);
     expect(res.ok).toBe(true);
     expect(res.record).toMatchObject({ amt: 12.5, date: '2026-09-25', desc: 'Coffee' });
+  });
+
+  describe('category / payment matching against app context', () => {
+    const opts = { cats: ['Food', 'Travel'], pays: ['UPI', 'Cash'], defaultCat: 'Food', defaultPay: 'UPI' };
+
+    it('matches case-insensitively and stores the canonical app name', () => {
+      const res = buildRecordFromRow(row('', '2026-09-25', '10', 'food', 'cash'), hmap, opts);
+      expect(res.ok).toBe(true);
+      expect(res.record).toMatchObject({ cat: 'Food', pay: 'Cash' });
+    });
+
+    it('assigns the default when category / payment are blank', () => {
+      const res = buildRecordFromRow(row('', '2026-09-25', '10', '', ''), hmap, opts);
+      expect(res.ok).toBe(true);
+      expect(res.record).toMatchObject({ cat: 'Food', pay: 'UPI' });
+    });
+
+    it('fails on an unknown category', () => {
+      const res = buildRecordFromRow(row('', '2026-09-25', '10', 'Groceries', 'UPI'), hmap, opts);
+      expect(res.ok).toBe(false);
+      expect(res.error).toMatch(/Groceries/);
+    });
+
+    it('fails on an unknown payment', () => {
+      const res = buildRecordFromRow(row('', '2026-09-25', '10', 'Food', 'Bitcoin'), hmap, opts);
+      expect(res.ok).toBe(false);
+      expect(res.error).toMatch(/Bitcoin/);
+    });
   });
 });
