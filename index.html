@@ -339,9 +339,7 @@
 
     <p class="sheet-section-label">Data</p>
     <div class="sheet-group">
-      <button class="sheet-btn" id="exportBtn"><span class="sb-ico" data-icon="upload"></span> Export data (backup)</button>
-      <button class="sheet-btn" id="importBtn"><span class="sb-ico" data-icon="download"></span> Import data (restore)</button>
-      <input type="file" id="importFile" accept=".json" style="display:none"/>
+      <button class="sheet-btn" id="dataBtn"><span class="sb-ico" data-icon="upload"></span> Import &amp; export expenses (CSV)</button>
     </div>
   </div>
 </div>
@@ -486,6 +484,62 @@
       <div class="cat-manage-list" id="breakdownList"></div>
     </div>
     <div id="expDetailAction"></div>
+  </div>
+</div>
+
+<!-- IMPORT EXPENSES (CSV) MODAL -->
+<div class="modal" id="importModal">
+  <div class="modal-box">
+    <h3>Import &amp; export</h3>
+    <div class="data-tabs" id="dataTabs" role="tablist">
+      <button class="data-tab on" data-tab="import" role="tab">Import</button>
+      <button class="data-tab" data-tab="export" role="tab">Export</button>
+    </div>
+
+    <!-- IMPORT TAB -->
+    <div id="tabImport">
+      <!-- STEP 1: pick a file -->
+      <div id="importPick">
+        <p class="modal-note">Upload a CSV of expenses. <strong>date</strong> (YYYY-MM-DD) and <strong>amount</strong> (positive number) are required. <strong>category</strong> and <strong>payment</strong> must match ones you already use (leave blank to use your defaults); <strong>description</strong> is optional. Need the format? <button type="button" class="link-btn" id="importTemplateLink">Download the template</button>.</p>
+        <label class="file-drop" id="importFileLabel">
+          <span class="sb-ico" data-icon="download"></span>
+          <span id="importFileName">Choose a CSV file…</span>
+          <input type="file" id="importFile" accept=".csv" hidden/>
+        </label>
+        <div class="modal-actions">
+          <button id="importCancel">Cancel</button>
+          <button class="primary" id="importSubmit" disabled>Import</button>
+        </div>
+      </div>
+      <!-- STEP 2: results (shown after import) -->
+      <div id="importResult" style="display:none">
+        <div class="import-summary" id="importSummary"></div>
+        <div class="modal-actions">
+          <button id="importDone">Done</button>
+          <button class="primary" id="importReportBtn">Download report</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- EXPORT TAB -->
+    <div id="tabExport" style="display:none">
+      <p class="modal-note">Download your expenses as a CSV. Pick a range.</p>
+      <div class="export-ranges" id="exportRange">
+        <button class="range-opt on" data-range="month">This month</button>
+        <button class="range-opt" data-range="year">This year</button>
+        <button class="range-opt" data-range="all">All time</button>
+        <button class="range-opt" data-range="custom">Custom range</button>
+      </div>
+      <div id="exportCustom" class="export-custom" style="display:none">
+        <label class="field-inline"><span>From</span><input type="date" id="exportFrom"/></label>
+        <label class="field-inline"><span>To</span><input type="date" id="exportTo"/></label>
+      </div>
+      <p class="export-count" id="exportCount"></p>
+      <div class="modal-actions">
+        <button id="exportCancel">Cancel</button>
+        <button class="primary" id="exportSubmit">Export CSV</button>
+      </div>
+    </div>
   </div>
 </div>
 
