@@ -570,7 +570,11 @@ function renderGroupDetail() {
   } else {
     $('groupRetiredBanner').innerHTML = '';
   }
-  $('groupAddBtn').closest('.fab').style.display = g.retired ? 'none' : '';
+  // The add-expense FAB shows only on the Expenses pane of an active group. Hide it
+  // on a retired group AND whenever the Chat pane is showing — this render can re-run
+  // on a background data sync (e.g. after the app is resumed) while chat is open, so
+  // it must respect the current tab or the FAB reappears floating over the chat.
+  $('groupAddBtn').closest('.fab').style.display = g.retired || gdTab === 'chat' ? 'none' : '';
 
   // Pending-action nudge: if you haven't added a UPI ID, group members can't pay
   // you back in one tap. Tapping the banner opens your profile.
@@ -713,24 +717,24 @@ function renderGroupDetail() {
   // (when chat) re-renders messages; on an expense-driven reload it just refreshes
   // the badge and keeps the current pane.
   renderChatUnread();
-  if (gdTab === 'chat') renderGroupChat(g);
-  else {
+  if (gdTab === 'chat') {
+    // Keep the panes + flush-bottom class consistent on a background re-render.
+    $('gdPaneExpenses').hidden = true;
+    $('gdPaneChat').hidden = false;
+    $('groups').classList.add('chat-active');
+    renderGroupChat(g);
+  } else {
     $('gdPaneExpenses').hidden = false;
     $('gdPaneChat').hidden = true;
+    $('groups').classList.remove('chat-active');
   }
 }
 
-// Short time label for a chat message ("14:32" today, "Yesterday 14:32", else a
-// friendly date + time). Cheap and locale-aware enough for a chat timeline.
+// Per-message stamp: just the clock time ("14:32"). No date/"Yesterday" — the
+// bubble carries only the time; day context lives in the timeline flow, not each token.
 function chatTime(iso) {
-  const d = new Date(iso);
-  const t = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const day = friendlyDate(isoOf(d));
-  const today = friendlyDate(isoOf(new Date()));
-  return day === today ? t : `${day} ${t}`;
+  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
-// Local YYYY-MM-DD (mirrors format.isoDay, kept local to avoid a new import churn).
-const isoOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 // A centered "New messages" divider inserted before the first message the viewer
 // hasn't seen yet, so opening a chat lands them on where they left off.
@@ -787,7 +791,7 @@ function renderGroupChat(g, unread = 0) {
   const msgs = state.groupMessages[g.id] || [];
   box.innerHTML = '';
   if (!msgs.length) {
-    box.innerHTML = '<div class="empty"><span>💬</span>No messages yet. Say hello!</div>';
+    box.innerHTML = `<div class="empty chat-empty"><span class="chat-empty-ico">${icon.chat({ size: 30 })}</span>No messages yet. Say hello!</div>`;
     return;
   }
   const frag = document.createDocumentFragment();
@@ -862,7 +866,8 @@ function renderChatUnread() {
 
 // Show one pane of the group-detail screen ('expenses' | 'chat') and light its tab.
 // The add-expense FAB belongs to the Expenses pane only. Switching to Chat lazily
-// loads messages, joins presence, clears unread, and focuses the input.
+// loads messages, joins presence, and clears unread. We deliberately do NOT focus
+// the input on open — that would pop the keyboard unbidden; the user taps to type.
 async function applyGdTab(name) {
   gdTab = name;
   document.querySelectorAll('#gdTabs .gd-tab').forEach((b) => b.classList.toggle('on', b.dataset.tab === name));
@@ -888,7 +893,6 @@ async function applyGdTab(name) {
   await prefetchChat(g.id); // shares the once-guard + in-flight promise from open
   if (state.openGroupId === g.id && gdTab === 'chat') {
     renderGroupChat(g, unread);
-    if (!g.retired) $('chatInput').focus();
   }
 }
 
@@ -1162,6 +1166,7 @@ export function initGroupsView() {
   $('groupsBackBtn').onclick = () => {
     if (state.openGroupId) leaveChatPresence(state.openGroupId);
     state.openGroupId = null;
+    $('groups').classList.remove('chat-active'); // leave chat layout behind
     const to = navBack();
     renderForScreen(to);
   };
