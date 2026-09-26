@@ -2,18 +2,21 @@
 //
 // Unlike notify-group (which is JWT-gated and fans out to a single group's members),
 // this sends one announcement to EVERY row in push_subscriptions. That power must never
-// be client-callable, so this function is PRIVILEGED: it requires the caller to present
-// the project's SERVICE_ROLE key as the bearer token. Deploy it with verify_jwt=false
-// (otherwise the platform would reject the service-role token as a non-user JWT):
+// be client-callable, so this function is PRIVILEGED: the caller must present a shared
+// secret you control as the bearer token. Set it once, then deploy with verify_jwt=false
+// (otherwise the platform would reject a non-user JWT):
 //
+//   supabase secrets set BROADCAST_SECRET=<long random string, e.g. `openssl rand -hex 32`>
 //   supabase functions deploy notify-broadcast --no-verify-jwt
 //
 // Trigger it manually, only when you want to announce something — e.g.:
 //
 //   curl -i -X POST "$SUPABASE_URL/functions/v1/notify-broadcast" \
-//     -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+//     -H "Authorization: Bearer $BROADCAST_SECRET" \
 //     -H "Content-Type: application/json" \
 //     -d '{"title":"Expense Tracker","body":"New: group chat + CSV import. Open to see what'"'"'s new.","url":"/expense-tracker/?whatsnew=1"}'
+//
+// (If BROADCAST_SECRET is unset, the gate falls back to the auto-injected service_role key.)
 //
 // Users who turned notifications off have had their subscription row deleted
 // (see disablePush in src/features/push.js), so they receive nothing — opt-out is honored.
@@ -38,6 +41,12 @@ if (VAPID_PUBLIC && VAPID_PRIVATE) webpush.setVapidDetails(VAPID_SUBJECT, VAPID_
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+// Explicit shared secret for the privileged gate. Set it yourself with
+//   supabase secrets set BROADCAST_SECRET=<a long random string>
+// and present the same value as the bearer token when calling. This avoids depending on
+// the auto-injected SUPABASE_SERVICE_ROLE_KEY matching the legacy service_role JWT — on
+// projects migrated to the new publishable/secret key system those can differ.
+const BROADCAST_SECRET = Deno.env.get('BROADCAST_SECRET') ?? '';
 const BASE = '/expense-tracker/';
 
 Deno.serve(async (req) => {
@@ -45,11 +54,13 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'method not allowed' }, 405);
   if (!VAPID_PUBLIC || !VAPID_PRIVATE) return json({ error: 'push not configured' }, 500);
 
-  // Privileged gate: only a caller holding the service_role key may broadcast. This is
-  // a constant-length-ish compare on the bearer token; there is no user-JWT path here.
+  // Privileged gate: the caller must present the shared BROADCAST_SECRET as the bearer
+  // token. Falls back to the service_role key if BROADCAST_SECRET is unset, so existing
+  // deployments keep working. Never client-callable — no user-JWT path here.
   const authHeader = req.headers.get('Authorization') ?? '';
   const token = authHeader.replace('Bearer ', '').trim();
-  if (!SERVICE_ROLE || token !== SERVICE_ROLE) return json({ error: 'forbidden' }, 403);
+  const expected = BROADCAST_SECRET || SERVICE_ROLE;
+  if (!expected || token !== expected) return json({ error: 'forbidden' }, 403);
 
   let payload: { title?: string; body?: string; url?: string };
   try {

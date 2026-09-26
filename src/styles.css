@@ -373,7 +373,6 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .pay-chip.add-chip{color:var(--accent);border-style:dashed;font-weight:600}
 .pay-chip.pay-custom.on{background:#eef1f6;color:var(--accent);border-color:var(--accent)}
 .pay-badge.pay-custom{background:#eef1f6;color:var(--accent)}
-.default-star{color:#d4a017;font-size:12px;margin-left:4px}
 .save-btn{width:100%;padding:16px;background:var(--grad-accent);color:#fff;border:none;border-radius:var(--radius);font-size:16px;font-weight:700;cursor:pointer;box-shadow:var(--sh-accent);transition:transform .12s}
 .save-btn:active{transform:scale(.99)}
 .overlay{display:none;position:fixed;inset:0;background:rgba(18,26,45,.5);backdrop-filter:blur(2px);z-index:20;align-items:flex-end}
@@ -429,6 +428,26 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .modal-actions button.danger-btn{background:linear-gradient(135deg,#d0463a 0%,#a5271b 100%);color:#fff;border-color:transparent;box-shadow:0 3px 10px rgba(192,57,43,.28)}
 .modal-actions button:disabled{opacity:.5;cursor:not-allowed;box-shadow:none}
 .modal-actions button:disabled:hover{border-color:var(--line)}
+/* --- Modernized profile editor (#profileModal) — roomier, clearer sections --- */
+.profile-modal{max-width:400px;padding:1.5rem 1.5rem 1.35rem}
+.profile-modal .pm-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:1.15rem}
+.profile-modal .pm-head-ico{flex:0 0 auto;width:42px;height:42px;border-radius:13px;background:var(--grad-accent);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:var(--sh-accent)}
+.profile-modal .pm-head-ico svg{display:block}
+.profile-modal .pm-head-text{flex:1;min-width:0}
+.profile-modal .pm-head h3{margin:2px 0 0;font-size:17px}
+.profile-modal .pm-head .modal-note{margin:5px 0 0}
+/* Give each field a touch more vertical rhythm than the shared 12px. */
+.profile-modal .field{margin-bottom:16px}
+.profile-modal .pm-upi-field{margin-bottom:6px;padding-top:14px;border-top:1px solid var(--line)}
+.profile-modal .pm-optional{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-mute);background:var(--bg-2);border-radius:var(--radius-pill);padding:2px 8px;margin-left:4px;vertical-align:middle}
+.profile-modal .pm-hint{font-size:12px;color:var(--ink-mute);line-height:1.4;margin:-2px 0 10px}
+.profile-modal .upi-list{gap:8px;margin-bottom:10px}
+.profile-modal .upi-list:empty{margin-bottom:0}
+.profile-modal .upi-row{padding:10px 12px;gap:10px}
+.profile-modal .upi-empty{padding:2px 0 6px}
+.profile-modal .upi-add-row input{padding:11px 13px;font-size:15px}
+.profile-modal .upi-add-btn{padding:0 18px;border-radius:var(--radius-sm)}
+.profile-modal .modal-actions{margin-top:1.2rem}
 /* CSV import modal */
 .link-btn{background:none;border:0;padding:0;font:inherit;color:var(--accent,#1e3a5f);font-weight:600;cursor:pointer;text-decoration:underline}
 .file-drop{display:flex;align-items:center;gap:10px;padding:14px;border:1.5px dashed var(--line);border-radius:var(--radius-sm);cursor:pointer;color:var(--ink-soft);transition:border-color .15s,background .15s}
@@ -460,12 +479,30 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .swatch:hover{transform:scale(1.1)}
 .swatch.on{border-color:var(--ink)}
 /* Category-manage list */
-.cat-manage-list{display:flex;flex-direction:column;gap:8px;margin-bottom:.5rem}
-.cat-manage-row{display:flex;align-items:center;gap:12px;padding:11px 13px;background:var(--bg-2);border-radius:var(--radius-sm)}
-.cat-manage-row .cm-ico{width:36px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
-.cat-manage-row .cm-name{flex:1;font-size:14px;font-weight:600}
-.cat-manage-row .cm-count{font-size:11px;color:var(--ink-mute);margin-right:4px}
-.cat-manage-row .cm-del{background:none;border:none;color:#c0392b;font-size:20px;cursor:pointer;padding:4px}
+/* Fixed-height scroll area so adding/removing items or switching panes never
+   resizes the sheet. Sized to show ~4.5 rows; the rest scroll. */
+.cat-manage-list{display:flex;flex-direction:column;gap:8px;margin-bottom:.5rem;height:280px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:2px}
+.cat-manage-row{display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--surface);border:1.5px solid var(--line);border-radius:var(--radius-sm);transition:border-color .15s;flex:0 0 auto}
+.cat-manage-row.is-default{border-color:var(--pos)}
+.cat-manage-row .cm-ico{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.cat-manage-row .cm-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.cat-manage-row .cm-name{font-size:14px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cat-manage-row .cm-count{font-size:11px;color:var(--ink-mute)}
+/* Tap-to-set-default pill: hollow when not default, solid green when it is. */
+.cm-default{flex:0 0 auto;border:1.5px solid var(--line);background:none;color:var(--ink-soft);font-size:11px;font-weight:700;border-radius:var(--radius-pill);padding:5px 11px;cursor:pointer;transition:all .15s;white-space:nowrap}
+.cm-default:active{transform:scale(.95)}
+.cm-default.on{background:var(--pos);border-color:var(--pos);color:#fff;cursor:default}
+/* Modern trash button (SVG icon), muted until hovered/pressed. */
+.cat-manage-row .cm-del{display:flex;align-items:center;justify-content:center;width:34px;height:34px;background:none;border:none;border-radius:var(--radius-sm);color:var(--ink-mute);cursor:pointer;flex:0 0 auto;transition:background .15s,color .15s}
+.cat-manage-row .cm-del svg{width:18px;height:18px;display:block}
+.cat-manage-row .cm-del:hover{background:#fdecea;color:#c0392b}
+.cat-manage-row .cm-del:active{transform:scale(.92)}
+/* Preferences hub: segmented Categories | Payment methods switch. */
+.pref-seg{display:flex;gap:4px;background:var(--bg-2);border-radius:var(--radius-pill);padding:4px;margin-bottom:14px}
+.pref-seg button{flex:1;border:none;background:none;padding:9px 8px;border-radius:var(--radius-pill);font-size:13.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;transition:background .18s,color .18s}
+.pref-seg button.on{background:var(--surface);color:var(--accent);box-shadow:var(--sh-sm)}
+.pref-add{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px;margin-top:4px;border:1.5px dashed var(--line);background:none;border-radius:var(--radius-sm);color:var(--accent);font-size:14px;font-weight:600;cursor:pointer}
+.pref-add:active{opacity:.6}
 
 /* Shared (group) rows — visually distinct from personal txns */
 .shared-txn{position:relative;background:linear-gradient(135deg,#f4f8fd 0%,#eef3fb 100%);border:1px solid #dbe6f4;padding-left:calc(1rem + 4px)}
@@ -476,12 +513,17 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .pay-badge.shared-neutral{background:#eef1f6;color:var(--accent)}
 .icon-btn.settle{color:var(--pos);font-weight:700}
 .icon-btn.settle:hover{color:#0e6655}
-#groupList{margin-bottom:14px}
 /* Active / Retired tabs above the group list */
-.grp-tabs{display:flex;gap:6px;margin-bottom:12px}
-.grp-tab{flex:0 0 auto;padding:7px 16px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink-soft);font-size:13px;font-weight:600;border-radius:var(--radius-pill);cursor:pointer;transition:all .15s}
-.grp-tab:hover{border-color:#c9d1de}
-.grp-tab.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.grp-tabs{display:flex;gap:4px;border-bottom:1.5px solid var(--line);margin-bottom:12px}
+.grp-tab{flex:0 0 auto;padding:9px 16px;border:0;background:none;color:var(--ink-soft);font-size:14px;font-weight:600;cursor:pointer;border-bottom:2.5px solid transparent;margin-bottom:-1.5px;transition:color .15s,border-color .15s}
+.grp-tab:hover{color:var(--ink)}
+.grp-tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+/* Two-pane track: Active and Retired sit side by side; the track slides to reveal one.
+   Swipe (see initGroupsView in views/groups.js) or a tab click toggles .show-retired. */
+.grp-panes{overflow:hidden}
+.grp-track{display:flex;width:200%;transform:translateX(0);transition:transform .28s cubic-bezier(.22,.61,.36,1)}
+.grp-panes.show-retired .grp-track{transform:translateX(-50%)}
+.grp-pane{width:50%;flex:0 0 50%}
 /* Compact group tiles: a single horizontally-scrollable row */
 .group-tiles{display:flex;gap:14px;margin-top:4px;overflow-x:auto;padding:2px 2px 8px;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
 .group-tiles::-webkit-scrollbar{height:5px}
@@ -732,6 +774,21 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .toast-error{background:linear-gradient(135deg,#c0392b 0%,#96271b 100%)}
 .toast-info{background:linear-gradient(135deg,#2e3a4e 0%,#222a38 100%)}
 
+/* Spinner — reusable busy indicator. Inherits currentColor; sizes via font-size or width/height. */
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;box-sizing:border-box}
+
+/* Notify toggle busy state: swap the pill knob for a spinner while (un)subscribing. */
+.sheet-btn-toggle[aria-busy="true"]{opacity:.75}
+.sheet-btn-toggle[aria-busy="true"] .switch::after{opacity:0}
+.switch .switch-spin{display:none;position:absolute;top:50%;left:50%;width:14px;height:14px;margin:-7px 0 0 -7px;border:2px solid #fff;border-right-color:transparent;border-radius:50%;animation:spin .6s linear infinite;box-sizing:border-box}
+.sheet-btn-toggle[aria-busy="true"] .switch .switch-spin{display:block}
+
+/* Auto-login banner: slim top strip shown while restoring a saved session on app open. */
+.auth-restoring{position:fixed;top:0;left:0;right:0;z-index:1100;display:flex;align-items:center;justify-content:center;gap:9px;padding:calc(8px + env(safe-area-inset-top)) 12px 8px;background:var(--grad-accent);color:#fff;font-size:13px;font-weight:600;box-shadow:var(--sh-md);transform:translateY(-100%);transition:transform .25s ease}
+.auth-restoring.show{transform:none}
+.auth-restoring .spinner{width:15px;height:15px;border-width:2px}
+
 /* ---- Header actions (right side) ---- */
 .header-actions{display:flex;align-items:center;gap:8px}
 .hdr-btn{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 14px;border:1px solid var(--line);background:var(--surface);color:var(--accent);border-radius:var(--radius-pill);font-size:13px;font-weight:600;cursor:pointer;box-shadow:var(--sh-sm);transition:background .15s,border-color .15s,transform .1s}
@@ -881,9 +938,9 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .sync-text{flex:1;min-width:0}
 .sync-title{font-size:14px;font-weight:600;color:var(--ink)}
 .sync-toggle input{position:absolute;opacity:0;width:0;height:0}
-.sync-toggle .switch{position:relative;width:44px;height:26px;background:#cdd3dd;border-radius:var(--radius-pill);flex-shrink:0;transition:background .2s}
+.sync-toggle .switch{position:relative;width:44px;height:26px;background:var(--line);border-radius:var(--radius-pill);flex-shrink:0;transition:background .2s}
 .sync-toggle .switch::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;background:#fff;border-radius:50%;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.25)}
-.sync-toggle input:checked + .switch{background:var(--accent)}
+.sync-toggle input:checked + .switch{background:var(--pos)}
 .sync-toggle input:checked + .switch::after{transform:translateX(18px)}
 
 /* locked (uneditable) form controls when a group payment is already made */
@@ -912,26 +969,34 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
   /* Grow to fill the pane (pushing the compose bar down); scroll when overflowing. */
   flex:1 1 auto;min-height:0;-webkit-overflow-scrolling:touch}
 .chat-scroll .empty{margin:auto}
-.chat-row{display:flex;align-items:flex-end;gap:8px;max-width:80%}
+/* "Showing recent messages" hint at the top when the backfill is capped. */
+.chat-start{align-self:center;margin:2px 0 8px;font-size:11px;color:var(--ink-mute);letter-spacing:.02em}
+/* Centered day-divider chip between calendar days. */
+.chat-day{align-self:center;margin:12px 0 6px;font-size:11px;font-weight:600;color:var(--ink-soft);
+  background:var(--bg-2);border:1px solid var(--line);padding:3px 12px;border-radius:var(--radius-pill)}
+.chat-row{display:flex;align-items:flex-end;gap:8px;max-width:82%}
 .chat-row.theirs{align-self:flex-start}
 .chat-row.mine{align-self:flex-end;flex-direction:row-reverse}
 .chat-row.with-meta{margin-top:9px}
+/* New live messages animate in (subtle rise + fade). */
+.chat-row.chat-enter{opacity:0;transform:translateY(6px)}
+.chat-row{transition:opacity .18s ease,transform .18s ease}
 .chat-av.member-avatar{width:26px;height:26px;font-size:11px;flex:0 0 auto}
 .chat-col{display:flex;flex-direction:column;gap:2px;min-width:0}
 .chat-sender{font-size:11.5px;font-weight:600;color:var(--ink-soft);margin-left:12px}
 /* Bubble: text + a small trailing time on one flow. flex-wrap lets the time tuck
    into the bottom-right of the last line, or drop below on a long final word. */
 .chat-bubble{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:flex-end;gap:2px 8px;
-  background:var(--bg-2);color:var(--ink);border-radius:15px;padding:7px 11px;
-  font-size:14.5px;line-height:1.35;word-break:break-word}
+  background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:16px;padding:7px 12px;
+  font-size:14.5px;line-height:1.35;word-break:break-word;box-shadow:var(--sh-sm)}
 .chat-text{white-space:pre-wrap;flex:1 1 auto;min-width:0}
-.chat-row.mine .chat-bubble{background:var(--accent);color:#fff;border-bottom-right-radius:5px}
+.chat-row.mine .chat-bubble{background:var(--grad-accent);color:#fff;border:none;border-bottom-right-radius:5px;box-shadow:var(--sh-accent)}
 .chat-row.theirs .chat-bubble{border-bottom-left-radius:5px}
 .chat-time{flex:0 0 auto;font-size:10px;opacity:.55;line-height:1;padding-bottom:1px;white-space:nowrap}
-.chat-row.mine .chat-time{color:#fff;opacity:.7}
+.chat-row.mine .chat-time{color:#fff;opacity:.75}
 .chat-compose{position:sticky;bottom:0;display:flex;gap:8px;align-items:center;padding:10px 0 calc(env(safe-area-inset-bottom,0px) + 10px);background:linear-gradient(to top,var(--bg) 72%,transparent)}
-.chat-compose input{flex:1;min-width:0;padding:11px 15px;font-size:15px;border:1.5px solid var(--line);border-radius:var(--radius-pill);background:var(--surface);color:var(--ink)}
-.chat-compose input:focus{outline:none;border-color:var(--accent)}
-.chat-send{flex:0 0 auto;width:42px;height:42px;border:none;background:var(--accent);color:#fff;border-radius:50%;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .1s,opacity .15s}
+.chat-compose input{flex:1;min-width:0;padding:11px 16px;font-size:15px;border:1.5px solid var(--line);border-radius:var(--radius-pill);background:var(--surface);color:var(--ink);transition:border-color .15s,box-shadow .15s}
+.chat-compose input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,58,95,.12)}
+.chat-send{flex:0 0 auto;width:42px;height:42px;border:none;background:var(--grad-accent);color:#fff;border-radius:50%;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;box-shadow:var(--sh-accent);transition:transform .1s,opacity .15s}
 .chat-send svg{margin-left:-2px}
 .chat-send:active{transform:scale(.94);opacity:.9}

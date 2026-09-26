@@ -137,7 +137,7 @@ function collageMarkup(g) {
 // photo or the theme scene.
 export function thumbMarkup(g) {
   if (g.direct) return `<span class="gt-ico gt-thumb has-collage">${collageMarkup(g)}</span>`;
-  if (g.photo) return `<span class="gt-ico gt-thumb has-photo"><img class="gt-photo" src="${g.photo}" alt="" referrerpolicy="no-referrer"/></span>`;
+  if (g.photo) return `<span class="gt-ico gt-thumb has-photo"><img class="gt-photo" src="${g.photo}" alt="" referrerpolicy="no-referrer" decoding="async"/></span>`;
   return `<span class="gt-ico gt-thumb" style="background:${gradientFor(g)}"></span>`;
 }
 
@@ -162,7 +162,7 @@ function memberAvatar(group, userId, extraClass = '') {
   const m = group.members.find((x) => x.id === userId);
   const name = m ? m.name : 'Member';
   const cls = `member-avatar${extraClass ? ' ' + extraClass : ''}`;
-  if (m && m.avatar) return `<span class="${cls}"><img src="${m.avatar}" alt="" referrerpolicy="no-referrer"/></span>`;
+  if (m && m.avatar) return `<span class="${cls}"><img src="${m.avatar}" alt="" referrerpolicy="no-referrer" decoding="async"/></span>`;
   return `<span class="${cls}" style="background:${avatarColor(userId)}">${(name || '?').charAt(0).toUpperCase()}</span>`;
 }
 
@@ -240,9 +240,11 @@ let gdTab = 'expenses';
 // Groups whose messages we've already lazy-loaded (so re-opening the chat tab
 // doesn't refetch on every switch; realtime keeps them fresh after the first load).
 const messagesLoaded = new Set();
+// In-flight prefetch promise per group, so a group open + an immediate Chat-tab tap
+// share one fetch instead of racing into two.
+const chatLoading = new Map();
 
 function renderGroupList() {
-  const wrap = $('groupList');
   // Direct-split containers are not real groups — they're listed separately below.
   const realGroups = state.groups.filter((g) => !g.direct);
   const active = realGroups.filter((g) => !g.retired);
@@ -255,23 +257,46 @@ function renderGroupList() {
   const retiredTab = $('grpTabs').querySelector('[data-tab="retired"]');
   retiredTab.style.display = retired.length ? '' : 'none';
   if (groupTab === 'retired' && !retired.length) groupTab = 'active';
-  $('grpTabs').querySelectorAll('.grp-tab').forEach((t) => t.classList.toggle('on', t.dataset.tab === groupTab));
+  syncGroupTab();
 
-  // "Shared splits" section (direct splits with friends), appended below the groups.
-  // Only on the Active tab — direct splits aren't retired, so they'd otherwise leak
-  // into the Retired tab (which should show retired groups only).
-  const sharedBlock = groupTab === 'active' && directSplits.length
-    ? `<p class="section-title shared-splits-title">Shared splits</p><div class="group-tiles">${directSplits.map(groupTile).join('')}</div>`
-    : '';
-
+  // Empty state: no real groups and no shared splits — show it in the active pane, clear retired.
   if (realGroups.length === 0 && !directSplits.length) {
-    wrap.innerHTML = '<div class="empty"><span>👥</span>No groups yet.<br>Create one, or split an expense with friends.</div>';
+    $('grpPaneActive').innerHTML = '<div class="empty"><span>👥</span>No groups yet.<br>Create one, or split an expense with friends.</div>';
+    $('grpPaneRetired').innerHTML = '';
     return;
   }
 
-  const shown = groupTab === 'retired' ? retired : active;
-  const groupsBlock = shown.length ? `<div class="group-tiles">${shown.map(groupTile).join('')}</div>` : (groupTab === 'retired' ? '<div class="empty"><span>👥</span>No groups here.</div>' : '');
-  wrap.innerHTML = groupsBlock + sharedBlock;
+  // Active pane: active groups + the "Shared splits" section (direct splits with friends).
+  // Shared splits live on Active only — they aren't retired, so they'd otherwise leak into
+  // the Retired pane (which should show retired groups only).
+  const activeTiles = active.length ? `<div class="group-tiles">${active.map(groupTile).join('')}</div>` : '';
+  const sharedBlock = directSplits.length
+    ? `<p class="section-title shared-splits-title">Shared splits</p><div class="group-tiles">${directSplits.map(groupTile).join('')}</div>`
+    : '';
+  $('grpPaneActive').innerHTML = activeTiles + sharedBlock;
+
+  // Retired pane: retired groups only.
+  $('grpPaneRetired').innerHTML = retired.length
+    ? `<div class="group-tiles">${retired.map(groupTile).join('')}</div>`
+    : '<div class="empty"><span>👥</span>No groups here.</div>';
+}
+
+// Paint the current tab selection: tab .on/aria state + slide the pane track.
+function syncGroupTab() {
+  $('grpTabs').querySelectorAll('.grp-tab').forEach((t) => {
+    const on = t.dataset.tab === groupTab;
+    t.classList.toggle('on', on);
+    t.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  $('grpPanes').classList.toggle('show-retired', groupTab === 'retired');
+}
+
+// Switch tabs (from a click or a swipe). No-ops toward Retired when none exist.
+function setGroupTab(tab) {
+  if (tab === groupTab) return;
+  if (tab === 'retired' && !state.groups.some((g) => !g.direct && g.retired)) return;
+  groupTab = tab;
+  syncGroupTab();
 }
 
 // Name markup that keeps a trailing "+N" visible while the name itself truncates in
@@ -707,6 +732,19 @@ function chatTime(iso) {
 // Local YYYY-MM-DD (mirrors format.isoDay, kept local to avoid a new import churn).
 const isoOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
+// A centered day-divider chip ("Today" / "Yesterday" / friendly date) inserted into
+// the timeline when the calendar day changes between messages.
+function chatDayDivider(iso) {
+  const wrap = document.createElement('div');
+  wrap.className = 'chat-day';
+  const chip = document.createElement('span');
+  const day = friendlyDate(isoOf(new Date(iso)));
+  chip.textContent = day;
+  wrap.appendChild(chip);
+  wrap.dataset.day = isoOf(new Date(iso));
+  return wrap;
+}
+
 // Build one chat bubble as a DOM node (textContent-safe for user input). Consecutive
 // messages from the same sender omit the repeated name/avatar for a cleaner thread.
 function chatBubble(g, msg, showMeta) {
@@ -743,7 +781,8 @@ function chatBubble(g, msg, showMeta) {
 }
 
 // Render the whole chat message list for the open group into #chatMessages, then
-// scroll to the bottom. Groups consecutive-by-sender (only the first shows meta).
+// scroll to the bottom. Groups consecutive-by-sender (only the first shows meta),
+// and inserts a day-divider whenever the calendar day changes.
 function renderGroupChat(g) {
   const box = $('chatMessages');
   const msgs = state.groupMessages[g.id] || [];
@@ -752,30 +791,55 @@ function renderGroupChat(g) {
     box.innerHTML = '<div class="empty"><span>💬</span>No messages yet. Say hello!</div>';
     return;
   }
-  let prevSender = null;
   const frag = document.createDocumentFragment();
+  // We cap the backfill at MESSAGE_PAGE (50); once we hit that many, older history
+  // exists beyond what's shown — a subtle top hint keeps that honest.
+  if (msgs.length >= 50) {
+    const hint = document.createElement('div');
+    hint.className = 'chat-start';
+    hint.textContent = 'Showing recent messages';
+    frag.appendChild(hint);
+  }
+  let prevSender = null;
+  let prevDay = null;
   for (const m of msgs) {
+    const day = isoOf(new Date(m.created_at));
+    if (day !== prevDay) {
+      frag.appendChild(chatDayDivider(m.created_at));
+      prevSender = null; // force meta after a day break
+    }
     frag.appendChild(chatBubble(g, m, m.sender_id !== prevSender));
     prevSender = m.sender_id;
+    prevDay = day;
   }
   box.appendChild(frag);
   box.scrollTop = box.scrollHeight;
 }
 
 // Append a single newly-arrived message to the open chat (live), keeping the
-// sender-grouping and autoscroll — used by the realtime handler when this chat
-// is the visible pane.
+// sender-grouping, day-dividers and autoscroll — used by the realtime handler when
+// this chat is the visible pane. New bubbles animate in.
 function appendChatMessage(g, msg) {
   const box = $('chatMessages');
   const empty = box.querySelector('.empty');
   if (empty) box.innerHTML = '';
-  const last = box.lastElementChild;
-  const prevSender = last?.dataset?.sender || null;
+  // Insert a day-divider if this message crosses into a new calendar day.
+  const day = isoOf(new Date(msg.created_at));
+  const lastDay = box.querySelector('.chat-day:last-of-type')?.dataset?.day;
+  const rows = box.querySelectorAll('.chat-row');
+  const seenDay = rows.length ? lastDay : null;
+  let prevSender = box.lastElementChild?.dataset?.sender || null;
+  if (rows.length && day !== seenDay) {
+    box.appendChild(chatDayDivider(msg.created_at));
+    prevSender = null;
+  }
   const showMeta = msg.sender_id !== prevSender;
   const node = chatBubble(g, msg, showMeta);
   node.dataset.sender = msg.sender_id;
+  node.classList.add('chat-enter');
   const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
   box.appendChild(node);
+  requestAnimationFrame(() => node.classList.remove('chat-enter'));
   if (nearBottom) box.scrollTop = box.scrollHeight;
 }
 
@@ -813,10 +877,7 @@ async function applyGdTab(name) {
   state.chatUnread[g.id] = 0;
   renderChatUnread();
   joinChatPresence(g.id);
-  if (!messagesLoaded.has(g.id)) {
-    await loadMessages(g.id);
-    messagesLoaded.add(g.id);
-  }
+  await prefetchChat(g.id); // shares the once-guard + in-flight promise from open
   if (state.openGroupId === g.id && gdTab === 'chat') {
     renderGroupChat(g);
     $('chatInput').focus();
@@ -859,8 +920,34 @@ export function showGroupDetail(id, focusExpId = null, openChat = false) {
   closeGroupsPopover();
   navTo('groups');
   renderGroupDetail();
+  // Warm the chat on open: fetch the last page of messages in the background so
+  // switching to the Chat tab shows them instantly. applyGdTab's once-guard picks
+  // this up (marks loaded), and re-renders if the user is already on the tab.
+  prefetchChat(id);
   if (openChat) applyGdTab('chat');
   else applyGdTab('expenses');
+}
+
+// Background prefetch of a group's messages on open (once per group). Kept separate
+// from applyGdTab so a plain open doesn't block on the network; the tab switch reuses
+// the cached result via the shared `messagesLoaded` guard. Dedupes concurrent callers
+// (group open + an immediate Chat-tab tap) onto one in-flight fetch.
+function prefetchChat(id) {
+  if (messagesLoaded.has(id)) return Promise.resolve();
+  if (chatLoading.has(id)) return chatLoading.get(id);
+  const p = loadMessages(id)
+    .then(() => {
+      messagesLoaded.add(id);
+      // If the user already flipped to Chat for this group while the fetch was in
+      // flight, paint what we just loaded.
+      if (state.openGroupId === id && gdTab === 'chat') {
+        const g = state.groups.find((x) => x.id === id);
+        if (g) renderGroupChat(g);
+      }
+    })
+    .finally(() => chatLoading.delete(id));
+  chatLoading.set(id, p);
+  return p;
 }
 
 // Re-render whatever group view is currently visible (called on cloud data reload).
@@ -1156,18 +1243,39 @@ export function initGroupsView() {
     if (e.target === $('groupsOverlay')) closeGroupsPopover();
   };
 
-  $('groupList').addEventListener('click', (e) => {
+  $('grpPanes').addEventListener('click', (e) => {
     const tile = e.target.closest('.group-tile');
     if (tile) showGroupDetail(tile.dataset.group);
   });
 
-  // Tab switch between Active and Retired groups.
+  // Tab switch between Active and Retired groups (click or swipe). Panes are already
+  // rendered on both sides, so switching only slides the track — no re-render needed.
   $('grpTabs').addEventListener('click', (e) => {
     const tab = e.target.closest('.grp-tab');
-    if (!tab) return;
-    groupTab = tab.dataset.tab;
-    renderGroupList();
+    if (tab) setGroupTab(tab.dataset.tab);
   });
+
+  // Horizontal swipe on the list slides between Active/Retired. Mirrors the date-stepper
+  // gesture (initDateStepper): touchend delta with a 40px threshold, and clearly more
+  // horizontal than vertical so vertical scroll / tile scroll aren't hijacked.
+  {
+    let sx = null;
+    let sy = null;
+    const panes = $('grpPanes');
+    panes.addEventListener('touchstart', (e) => {
+      sx = e.touches[0].clientX;
+      sy = e.touches[0].clientY;
+    }, { passive: true });
+    panes.addEventListener('touchend', (e) => {
+      if (sx == null) return;
+      const dx = e.changedTouches[0].clientX - sx;
+      const dy = e.changedTouches[0].clientY - sy;
+      sx = sy = null;
+      if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        setGroupTab(dx < 0 ? 'retired' : 'active'); // swipe left -> retired, right -> active
+      }
+    }, { passive: true });
+  }
 
   // --- Group detail: Expenses / Chat tabs ---
   $('chatSend').innerHTML = icon.send({ size: 20 });

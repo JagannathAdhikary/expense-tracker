@@ -196,6 +196,35 @@ export function initHome() {
   });
 
   initBackToTop();
+  initMonthSwipe();
+}
+
+// Horizontal swipe anywhere on the home screen changes the viewed month, mirroring
+// the ‹ / › arrows. Swipe right -> previous month (past), left -> next month —
+// same convention as the date stepper. Mutates state.cur then dispatches
+// 'month-change' so the central listener re-renders home/category/analytics.
+function initMonthSwipe() {
+  const home = $('home');
+  if (!home) return;
+  let startX = null;
+  let startY = null;
+  home.addEventListener('touchstart', (e) => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+  home.addEventListener('touchend', (e) => {
+    if (startX == null) return;
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    startX = startY = null;
+    // Past the threshold, and clearly more horizontal than vertical (so it never
+    // fights vertical scrolling of the transaction list).
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      const delta = dx > 0 ? -1 : 1;
+      state.cur = new Date(state.cur.getFullYear(), state.cur.getMonth() + delta, 1);
+      document.dispatchEvent(new CustomEvent('month-change'));
+    }
+  }, { passive: true });
 }
 
 // Small dropdown anchored under the Transactions card listing the groups with a pending

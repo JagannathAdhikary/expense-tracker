@@ -24,6 +24,9 @@
 </head>
 <body>
 
+<!-- Auto-login indicator: shown while restoring a saved session on app open -->
+<div class="auth-restoring" id="authRestoring" role="status" aria-live="polite"><span class="spinner"></span> Signing you back in…</div>
+
 <!-- HOME -->
 <div id="home" class="screen active">
   <header>
@@ -252,11 +255,16 @@
     </div>
     <p id="groupsAuthGate" class="auth-note" style="display:none"></p>
     <div id="groupsContent" style="display:none">
-      <div class="grp-tabs" id="grpTabs">
-        <button class="grp-tab on" data-tab="active">Active</button>
-        <button class="grp-tab" data-tab="retired" style="display:none">Retired</button>
+      <div class="grp-tabs" id="grpTabs" role="tablist">
+        <button class="grp-tab on" data-tab="active" role="tab" aria-selected="true">Active</button>
+        <button class="grp-tab" data-tab="retired" role="tab" aria-selected="false" style="display:none">Retired</button>
       </div>
-      <div id="groupList" style="margin-bottom:14px"></div>
+      <div class="grp-panes" id="grpPanes" style="margin-bottom:14px">
+        <div class="grp-track" id="grpTrack">
+          <div class="grp-pane" id="grpPaneActive" role="tabpanel"></div>
+          <div class="grp-pane" id="grpPaneRetired" role="tabpanel"></div>
+        </div>
+      </div>
       <button class="hdr-btn primary grp-create-full" id="grpCreateBtn">+ Create group</button>
     </div>
   </div>
@@ -340,14 +348,12 @@
 
     <p class="sheet-section-label">Customize</p>
     <div class="sheet-group">
-      <button class="sheet-btn" id="defaultsBtn"><span class="sb-ico" data-icon="star"></span> Set defaults</button>
-      <button class="sheet-btn" id="manageCatsBtn"><span class="sb-ico" data-icon="tag"></span> Manage categories</button>
-      <button class="sheet-btn" id="managePaysBtn"><span class="sb-ico" data-icon="card"></span> Manage payment methods</button>
+      <button class="sheet-btn" id="prefsBtn"><span class="sb-ico" data-icon="sliders"></span> Preferences</button>
     </div>
 
     <p class="sheet-section-label" id="notifSectionLabel" style="display:none">Notifications</p>
     <div class="sheet-group" id="notifSection" style="display:none">
-      <button class="sheet-btn sheet-btn-toggle" id="notifyBtn" style="display:none"><span class="sb-ico" data-icon="bell"></span> <span id="notifyBtnLabel">Group notifications</span><span class="switch" id="notifySwitch" aria-hidden="true"></span></button>
+      <button class="sheet-btn sheet-btn-toggle" id="notifyBtn" style="display:none"><span class="sb-ico" data-icon="bell"></span> <span id="notifyBtnLabel">Group notifications</span><span class="switch" id="notifySwitch" aria-hidden="true"><span class="switch-spin"></span></span></button>
     </div>
 
     <p class="sheet-section-label">Data</p>
@@ -391,13 +397,25 @@
   </div>
 </div>
 
-<!-- MANAGE CATEGORIES SHEET -->
-<div class="overlay" id="catOverlay">
+<!-- PREFERENCES SHEET (categories / payment methods: set default, add, remove) -->
+<div class="overlay" id="prefsOverlay">
   <div class="sheet">
-    <h3>Manage categories</h3>
-    <div class="cat-manage-list" id="catManageList"></div>
-    <button class="sheet-btn" id="addCatBtn" style="color:#1E3A5F;font-weight:500"><span>➕</span> Add new category</button>
-    <button class="sheet-btn" id="closeCatSheet"><span>✕</span> Close</button>
+    <div class="sheet-head">
+      <h3>Preferences</h3>
+      <button class="sheet-close" id="closePrefsSheet" aria-label="Close"></button>
+    </div>
+    <div class="pref-seg" id="prefSeg" role="tablist">
+      <button data-seg="cat" class="on" role="tab" aria-selected="true">Categories</button>
+      <button data-seg="pay" role="tab" aria-selected="false">Payment methods</button>
+    </div>
+    <div id="prefCatPane">
+      <div class="cat-manage-list" id="catManageList"></div>
+      <button class="pref-add" id="addCatBtn"><span>➕</span> Add category</button>
+    </div>
+    <div id="prefPayPane" style="display:none">
+      <div class="cat-manage-list" id="payManageList"></div>
+      <button class="pref-add" id="addPayBtn"><span>➕</span> Add payment method</button>
+    </div>
   </div>
 </div>
 
@@ -424,16 +442,6 @@
   </div>
 </div>
 
-<!-- MANAGE PAYMENT METHODS SHEET -->
-<div class="overlay" id="payOverlay">
-  <div class="sheet">
-    <h3>Manage payment methods</h3>
-    <div class="cat-manage-list" id="payManageList"></div>
-    <button class="sheet-btn" id="addPayBtn" style="color:#1E3A5F;font-weight:500"><span>➕</span> Add new payment method</button>
-    <button class="sheet-btn" id="closePaySheet"><span>✕</span> Close</button>
-  </div>
-</div>
-
 <!-- ADD PAYMENT MODAL -->
 <div class="modal" id="payModal">
   <div class="modal-box">
@@ -449,25 +457,6 @@
     <div class="modal-actions">
       <button id="pCancel">Cancel</button>
       <button class="primary" id="pSave">Save</button>
-    </div>
-  </div>
-</div>
-
-<!-- DEFAULTS MODAL -->
-<div class="modal" id="defModal">
-  <div class="modal-box">
-    <h3>Set defaults</h3>
-    <div class="field">
-      <label>Default category</label>
-      <div class="chips" id="defCatChips"></div>
-    </div>
-    <div class="field">
-      <label>Default payment method</label>
-      <div class="pay-chips" id="defPayChips"></div>
-    </div>
-    <div class="modal-actions">
-      <button id="defCancel">Cancel</button>
-      <button class="primary" id="defSave">Save</button>
     </div>
   </div>
 </div>
@@ -615,9 +604,14 @@
 </div>
 
 <div class="modal" id="profileModal">
-  <div class="modal-box">
-    <h3 id="profileModalTitle">Complete your profile</h3>
-    <p class="modal-note" id="profileModalNote">Tell us a bit about you so friends can find and pay you in groups.</p>
+  <div class="modal-box profile-modal">
+    <div class="pm-head">
+      <span class="sb-ico pm-head-ico" data-icon="user"></span>
+      <div class="pm-head-text">
+        <h3 id="profileModalTitle">Complete your profile</h3>
+        <p class="modal-note" id="profileModalNote">Tell us a bit about you so friends can find and pay you in groups.</p>
+      </div>
+    </div>
     <div class="pending-banner" id="profilePendingBanner" style="display:none"></div>
     <div class="field">
       <label>Name</label>
@@ -629,11 +623,12 @@
       <input type="tel" id="profPhone" placeholder="e.g. +91 98765 43210" autocomplete="tel" inputmode="tel"/>
       <div class="field-err" id="profPhoneErr" style="display:none"></div>
     </div>
-    <div class="field">
-      <label>UPI IDs <span style="font-size:11px;opacity:.5">(optional)</span></label>
+    <div class="field pm-upi-field">
+      <label>UPI IDs <span class="pm-optional">optional</span></label>
+      <p class="pm-hint">So group members can pay you back. Tap the circle to mark your primary.</p>
       <div id="profUpiList" class="upi-list"></div>
       <div class="upi-add-row">
-        <input type="text" id="profUpi" placeholder="Add a UPI ID — e.g. rahul@okaxis" autocapitalize="off" autocorrect="off" spellcheck="false"/>
+        <input type="text" id="profUpi" placeholder="e.g. rahul@okaxis" autocapitalize="off" autocorrect="off" spellcheck="false"/>
         <button type="button" class="upi-add-btn" id="profUpiAdd">Add</button>
       </div>
       <div class="field-err" id="profUpiErr" style="display:none"></div>

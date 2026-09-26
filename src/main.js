@@ -15,7 +15,7 @@ import { initAddEdit, renderGroupChips } from './views/addEdit.js';
 import { initHeader, renderHomeActions } from './views/header.js';
 import { initCategories } from './features/categories.js';
 import { initPayments } from './features/payments.js';
-import { initDefaults } from './features/defaults.js';
+import { initPreferences } from './features/preferences.js';
 import { initBackup } from './features/backup.js';
 import { initFilter } from './features/filter.js';
 import { initProfile, loadMyProfile, refreshUpiButton } from './features/profile.js';
@@ -92,7 +92,7 @@ initAnalytics();
 initAddEdit();
 initCategories();
 initPayments();
-initDefaults();
+initPreferences();
 initBackup();
 initFilter();
 initProfile();
@@ -208,11 +208,16 @@ const notifyBtn = $('notifyBtn');
 if (notifyBtn) {
   notifyBtn.onclick = async () => {
     if (notifyBtn.disabled) return;
+    // Guard against double-taps AND show a spinner in the switch while the
+    // subscribe/unsubscribe round-trip (permission prompt + push service +
+    // Supabase write) is in flight.
     notifyBtn.disabled = true;
+    notifyBtn.setAttribute('aria-busy', 'true');
     try {
       if (await isSubscribed()) await disablePush();
       else await enablePush(state.user);
     } finally {
+      notifyBtn.removeAttribute('aria-busy');
       // Keep the menu open so the switch visibly flips in place.
       await updateNotifyButton();
     }
