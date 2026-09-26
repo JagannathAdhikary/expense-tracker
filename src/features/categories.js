@@ -1,4 +1,5 @@
-// Manage-categories sheet and the add-category modal.
+// Category management inside the Preferences sheet: list rows with a set-default
+// pill + remove, and the add-category modal.
 
 import { state } from '../state.js';
 import { PALETTE } from '../constants.js';
@@ -7,9 +8,31 @@ import { $ } from '../dom.js';
 import { render } from '../views/home.js';
 import { renderCatChips } from '../views/addEdit.js';
 import { toastError } from '../toast.js';
+import { confirmModal } from '../confirm.js';
 
-function renderCatManage() {
+// Modern outline trash icon (shared by category & payment rows via a matching const there).
+const TRASH_SVG =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
+
+// Guarantee a valid default category: if none is set (new user) or the saved one
+// no longer exists (was deleted), fall back to the top-most category. Persists
+// only when it actually changes. Returns the resolved default name (or null if
+// there are no categories at all).
+export function ensureDefaultCat() {
+  const has = state.PREFS.defaultCat && state.CATS.some((c) => c.n === state.PREFS.defaultCat);
+  if (!has) {
+    const top = state.CATS[0] ? state.CATS[0].n : null;
+    if (state.PREFS.defaultCat !== top) {
+      state.PREFS.defaultCat = top;
+      persistPrefs();
+    }
+  }
+  return state.PREFS.defaultCat;
+}
+
+export function renderCatManage() {
   const list = $('catManageList');
+  ensureDefaultCat();
   const counts = {};
   state.recs.forEach((r) => {
     counts[r.cat] = (counts[r.cat] || 0) + 1;
@@ -18,13 +41,24 @@ function renderCatManage() {
     state.CATS.map((c) => {
       const n = counts[c.n] || 0;
       const isDefault = state.PREFS.defaultCat === c.n;
-      return `<div class="cat-manage-row">
+      return `<div class="cat-manage-row${isDefault ? ' is-default' : ''}">
       <div class="cm-ico" style="background:${c.c}20">${c.e}</div>
-      <div class="cm-name">${c.n}${isDefault ? ' <span class="default-star" title="Default">★</span>' : ''}</div>
-      <span class="cm-count">${n} ${n === 1 ? 'entry' : 'entries'}</span>
-      <button class="cm-del" data-cat="${c.n}" title="Remove">🗑</button>
+      <div class="cm-main">
+        <span class="cm-name">${c.n}</span>
+        <span class="cm-count">${n} ${n === 1 ? 'entry' : 'entries'}</span>
+      </div>
+      <button class="cm-default${isDefault ? ' on' : ''}" data-def="${c.n}">${isDefault ? '★ Default' : 'Set default'}</button>
+      <button class="cm-del" data-cat="${c.n}" title="Remove" aria-label="Remove ${c.n}">${TRASH_SVG}</button>
     </div>`;
     }).join('') || '<div style="color:#888;font-size:13px;padding:8px 0">No categories yet.</div>';
+}
+
+// Set (or keep) the default category and persist. Shared by the row pill.
+export function setDefaultCat(name) {
+  if (state.PREFS.defaultCat === name) return;
+  state.PREFS.defaultCat = name;
+  persistPrefs();
+  renderCatManage();
 }
 
 function openCatModalSwatches() {
@@ -42,29 +76,23 @@ export function openCatModal() {
 }
 
 export function initCategories() {
-  $('manageCatsBtn').onclick = () => {
-    renderCatManage();
-    $('catOverlay').classList.add('open');
-  };
-  $('closeCatSheet').onclick = () => $('catOverlay').classList.remove('open');
-  $('catOverlay').onclick = (e) => {
-    if (e.target === $('catOverlay')) $('catOverlay').classList.remove('open');
-  };
-
-  $('catManageList').addEventListener('click', (e) => {
+  $('catManageList').addEventListener('click', async (e) => {
+    const def = e.target.closest('.cm-default');
+    if (def) {
+      setDefaultCat(def.dataset.def);
+      return;
+    }
     const btn = e.target.closest('.cm-del');
     if (!btn) return;
     const name = btn.dataset.cat;
     const count = state.recs.filter((r) => r.cat === name).length;
     let msg = `Remove category "${name}" from the picker?`;
-    if (count) msg += `\n\n${count} existing ${count === 1 ? 'entry' : 'entries'} still labelled "${name}" will be kept — they'll show as "${name}" but the option won't appear when adding new expenses.`;
-    if (!confirm(msg)) return;
+    if (count) msg += ` ${count} existing ${count === 1 ? 'entry' : 'entries'} labelled "${name}" will be kept — the option just won't appear when adding new expenses.`;
+    if (!(await confirmModal(msg, { title: 'Remove category', confirmLabel: 'Remove', danger: true }))) return;
     state.CATS = state.CATS.filter((c) => c.n !== name);
-    if (state.PREFS.defaultCat === name) {
-      state.PREFS.defaultCat = null;
-      persistPrefs();
-    }
     persistCats();
+    // If we removed the default, renderCatManage()'s ensureDefaultCat() promotes
+    // the new top-most category and persists it.
     renderCatManage();
     render();
     if (state.filterCat === name) state.filterCat = null;
@@ -102,8 +130,8 @@ export function initCategories() {
       state.selCat = name;
       renderCatChips();
     }
-    // If manage sheet is open, refresh it.
-    if ($('catOverlay').classList.contains('open')) renderCatManage();
+    // If Preferences sheet is open, refresh the list.
+    if ($('prefsOverlay').classList.contains('open')) renderCatManage();
     render();
   };
 }

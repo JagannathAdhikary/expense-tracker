@@ -22,3 +22,18 @@ export function downscaleImage(file, max = 640) {
     img.src = url;
   });
 }
+
+// Warm the browser cache for a set of remote image URLs so they're already fetched/decoded
+// by the time views insert them (covers, tiles, avatars otherwise pop in late). Best-effort
+// and fire-and-forget: dedupes, skips falsy/data: URLs, and swallows failures (a stale or
+// offline URL just falls back to the normal lazy fetch when the markup renders).
+const preloaded = new Set();
+export function preloadImages(urls) {
+  for (const url of urls) {
+    if (!url || url.startsWith('data:') || preloaded.has(url)) continue;
+    preloaded.add(url);
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = url;
+  }
+}

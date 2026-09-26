@@ -8,6 +8,7 @@ import { $ } from '../dom.js';
 import { toastError, toastSuccess, toastInfo } from '../toast.js';
 import { netBetween } from '../split.js';
 import { fmt } from '../format.js';
+import { preloadImages } from '../imgutil.js';
 
 // Callbacks fired after cloud data (groups/expenses/splits) is (re)loaded.
 const dataListeners = [];
@@ -126,6 +127,10 @@ export async function loadCloudData() {
   }
 
   notifyData();
+
+  // Warm remote group photos + member avatars so covers/tiles/avatars appear immediately
+  // instead of popping in late (best-effort; themes are inline data-URIs and need no warm-up).
+  preloadImages(state.groups.flatMap((g) => [g.photo, ...g.members.map((m) => m.avatar)]));
 }
 
 // ---------------------------------------------------------------------------
@@ -147,20 +152,24 @@ export const onMessage = (fn) => messageListeners.push(fn);
 const presenceChannels = {};
 const presentByGroup = {};
 
-// Load a group's messages once (idempotent-ish: always refetches, cheap select).
-// Ordered oldest-first so the chat renders top-to-bottom.
+// Load a group's most recent messages (capped) for a fast open. We fetch the
+// NEWEST `MESSAGE_PAGE` rows (descending + limit) then reverse to oldest-first,
+// since the chat renders top-to-bottom and scrolls to the bottom. New messages
+// arrive live via the realtime INSERT handler, so this only bounds the backfill.
+const MESSAGE_PAGE = 50;
 export async function loadMessages(groupId) {
   if (!cloudEnabled() || !state.user || !groupId) return [];
   const { data, error } = await supabase
     .from('group_messages')
     .select('*')
     .eq('group_id', groupId)
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: false })
+    .limit(MESSAGE_PAGE);
   if (error) {
     console.warn('load messages failed', error);
     return state.groupMessages[groupId] || [];
   }
-  state.groupMessages[groupId] = data || [];
+  state.groupMessages[groupId] = (data || []).reverse();
   return state.groupMessages[groupId];
 }
 

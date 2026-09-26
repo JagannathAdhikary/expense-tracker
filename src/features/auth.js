@@ -66,20 +66,46 @@ function renderAuthUI() {
   }
 }
 
+// True when Supabase has a persisted session in localStorage (key looks like
+// `sb-<ref>-auth-token`). Lets us show the "signing you back in…" hint only when
+// there's genuinely a session to restore, not for first-time / logged-out users.
+function hasStoredSession() {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('sb-') && k.endsWith('-auth-token') && localStorage.getItem(k)) return true;
+    }
+  } catch {
+    /* localStorage blocked — assume none */
+  }
+  return false;
+}
+
+function showRestoring(on) {
+  const el = $('authRestoring');
+  if (el) el.classList.toggle('show', on);
+}
+
 export function initAuth() {
   renderAuthUI(); // initial paint (logged-out / not-configured)
   if (!cloudEnabled()) return;
 
-  // Restore any existing session and react to future changes.
+  // Restore any existing session and react to future changes. Show a brief
+  // top-strip indicator while getSession() resolves the stored token, so the
+  // app doesn't look logged-out during the wait on a cold open.
+  const restoring = hasStoredSession();
+  if (restoring) showRestoring(true);
   supabase.auth.getSession().then(({ data }) => {
     setUser(data.session);
     renderAuthUI();
     notify();
+    if (restoring) showRestoring(false);
   });
 
   supabase.auth.onAuthStateChange((_event, session) => {
     setUser(session);
     renderAuthUI();
     notify();
+    showRestoring(false);
   });
 }
