@@ -129,6 +129,99 @@ export async function loadCloudData() {
 }
 
 // ---------------------------------------------------------------------------
+// Group chat (text messages) + presence.
+//
+// Messages are lazy-loaded per group (not part of the heavy loadCloudData path)
+// and updated live via a granular realtime INSERT handler — no full reload, so
+// chat stays snappy. Presence tracks who is currently VIEWING a group's chat, so
+// a sent message pushes only to members who are NOT looking (offline-for-chat).
+// ---------------------------------------------------------------------------
+
+// Callbacks fired when a new chat message arrives (realtime INSERT). The view
+// uses this to append a bubble / bump the unread badge.
+const messageListeners = [];
+export const onMessage = (fn) => messageListeners.push(fn);
+
+// Presence channels keyed by group id, plus the current member-id set present in
+// each. Joined when a group's chat opens, left when it closes.
+const presenceChannels = {};
+const presentByGroup = {};
+
+// Load a group's messages once (idempotent-ish: always refetches, cheap select).
+// Ordered oldest-first so the chat renders top-to-bottom.
+export async function loadMessages(groupId) {
+  if (!cloudEnabled() || !state.user || !groupId) return [];
+  const { data, error } = await supabase
+    .from('group_messages')
+    .select('*')
+    .eq('group_id', groupId)
+    .order('created_at', { ascending: true });
+  if (error) {
+    console.warn('load messages failed', error);
+    return state.groupMessages[groupId] || [];
+  }
+  state.groupMessages[groupId] = data || [];
+  return state.groupMessages[groupId];
+}
+
+// Post a message to a group, then push to members not currently viewing the chat.
+// The realtime INSERT handler renders it (for us and everyone). Returns true on success.
+export async function sendMessage(groupId, rawBody) {
+  if (!cloudEnabled() || !state.user || !groupId) return false;
+  const body = (rawBody || '').trim().slice(0, 2000);
+  if (!body) return false;
+  const { error } = await supabase.from('group_messages').insert({ group_id: groupId, sender_id: state.user.id, body });
+  if (error) {
+    toastError('Could not send message: ' + error.message);
+    return false;
+  }
+  // Notify only members who aren't currently in this chat (offline for chat).
+  // presentByGroup holds the ids known to be viewing; everyone else gets a push.
+  const present = presentByGroup[groupId] || new Set();
+  const offline = (state.groups.find((g) => g.id === groupId)?.members || [])
+    .map((m) => m.id)
+    .filter((id) => id !== state.user.id && !present.has(id));
+  if (offline.length) {
+    notifyGroup('chat_message', groupId, `${meName()}: ${body}`, { recipientIds: offline, chat: true });
+  }
+  return true;
+}
+
+// Join a group's chat presence channel: track ourselves as present and keep the
+// live set of present member ids in memory (used to compute offline push targets).
+export function joinChatPresence(groupId) {
+  if (!cloudEnabled() || !state.user || !groupId || presenceChannels[groupId]) return;
+  const uid = state.user.id;
+  presentByGroup[groupId] = new Set([uid]);
+  const ch = supabase.channel('chat-presence-' + groupId, { config: { presence: { key: uid } } });
+  const sync = () => {
+    const st = ch.presenceState();
+    presentByGroup[groupId] = new Set(Object.keys(st));
+  };
+  ch.on('presence', { event: 'sync' }, sync)
+    .on('presence', { event: 'join' }, sync)
+    .on('presence', { event: 'leave' }, sync)
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') ch.track({ at: Date.now() });
+    });
+  presenceChannels[groupId] = ch;
+}
+
+// Leave a group's chat presence channel (untrack + remove).
+export function leaveChatPresence(groupId) {
+  const ch = presenceChannels[groupId];
+  if (!ch) return;
+  try {
+    ch.untrack();
+  } catch {
+    /* channel may already be closing */
+  }
+  supabase.removeChannel(ch);
+  delete presenceChannels[groupId];
+  delete presentByGroup[groupId];
+}
+
+// ---------------------------------------------------------------------------
 // Mutations
 // ---------------------------------------------------------------------------
 
@@ -694,6 +787,18 @@ export async function settleAllMyDebts(groupId, payeeId, amount, pay = null) {
 let rtChannel = null;
 let reloadTimer = null;
 
+// A new chat message landed. Append it to that group's cached list (dedup by id,
+// since our own insert also echoes back) and notify listeners so the view can
+// append a bubble live or bump the unread badge. Granular — never a full reload.
+function onMessageInsert(payload) {
+  const msg = payload.new;
+  if (!msg || !msg.group_id) return;
+  const list = (state.groupMessages[msg.group_id] ||= []);
+  if (list.some((m) => m.id === msg.id)) return; // already have it
+  list.push(msg);
+  messageListeners.forEach((fn) => fn(msg));
+}
+
 export function subscribeRealtime() {
   if (!cloudEnabled() || !state.user || rtChannel) return;
   const scheduleReload = () => {
@@ -707,6 +812,7 @@ export function subscribeRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'settlements' }, scheduleReload)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'groups' }, scheduleReload)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members' }, scheduleReload)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages' }, onMessageInsert)
     .subscribe();
 }
 

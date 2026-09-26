@@ -58,6 +58,7 @@ const KNOWN_TYPES = new Set([
   'group_create',
   'group_rename',
   'group_delete',
+  'chat_message',
 ]);
 
 Deno.serve(async (req) => {
@@ -78,13 +79,14 @@ Deno.serve(async (req) => {
     body?: string;
     expId?: string;
     recipientIds?: string[];
+    chat?: boolean;
   };
   try {
     payload = await req.json();
   } catch {
     return json({ error: 'bad request' }, 400);
   }
-  const { type, groupId, title, body, expId, recipientIds } = payload;
+  const { type, groupId, title, body, expId, recipientIds, chat } = payload;
   if (!type || !KNOWN_TYPES.has(type)) return json({ error: 'unknown type' }, 400);
   if (!groupId || !body) return json({ error: 'missing groupId/body' }, 400);
 
@@ -120,7 +122,7 @@ Deno.serve(async (req) => {
 
   // Deep link: open the app on this group (and expense, when relevant). The SW turns
   // this into focus+navigate for an open app, or openWindow for a closed one.
-  const url = '/expense-tracker/?group=' + encodeURIComponent(groupId) + (expId ? '&exp=' + encodeURIComponent(expId) : '');
+  const url = '/expense-tracker/?group=' + encodeURIComponent(groupId) + (expId ? '&exp=' + encodeURIComponent(expId) : '') + (chat ? '&chat=1' : '');
 
   let sent = 0;
   const stale: string[] = [];

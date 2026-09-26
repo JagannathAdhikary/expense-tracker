@@ -7,7 +7,7 @@ import { cloudEnabled } from '../supabase.js';
 import { fmt } from '../format.js';
 import { friendlyDate, payBadge } from '../format.js';
 import { $ } from '../dom.js';
-import { loadCloudData, markShareDone, deleteGroupExpense, settleUpWithMember, settleAllMyDebts, deleteGroup, setGroupRetired, setGroupSimplify, myFriends, addMemberToGroup, findUserByPhone, leaveGroup, groupDisplayName, directNameParts } from '../features/groups.js';
+import { loadCloudData, markShareDone, deleteGroupExpense, settleUpWithMember, settleAllMyDebts, deleteGroup, setGroupRetired, setGroupSimplify, myFriends, addMemberToGroup, findUserByPhone, leaveGroup, groupDisplayName, directNameParts, loadMessages, sendMessage, joinChatPresence, leaveChatPresence, onMessage } from '../features/groups.js';
 import { openEditGroup, showAddForGroup } from './addEdit.js';
 import { expenseHasPayment, owedByUserInGroup, owedToUserInGroup, totalShareInGroup } from '../cloudrows.js';
 import { toastError, toastSuccess } from '../toast.js';
@@ -234,6 +234,12 @@ function dateTimeLabel(spentOn, createdAt) {
 
 // Which group tab is showing in the popover: 'active' | 'retired'.
 let groupTab = 'active';
+
+// Which pane of the group DETAIL screen is showing: 'expenses' | 'chat'.
+let gdTab = 'expenses';
+// Groups whose messages we've already lazy-loaded (so re-opening the chat tab
+// doesn't refetch on every switch; realtime keeps them fresh after the first load).
+const messagesLoaded = new Set();
 
 function renderGroupList() {
   const wrap = $('groupList');
@@ -677,6 +683,141 @@ function renderGroupDetail() {
       setTimeout(() => target.classList.remove('ge-flash'), 1600);
     }
   }
+
+  // Reflect the chat state on the tab strip. applyGdTab shows the right pane and
+  // (when chat) re-renders messages; on an expense-driven reload it just refreshes
+  // the badge and keeps the current pane.
+  renderChatUnread();
+  if (gdTab === 'chat') renderGroupChat(g);
+  else {
+    $('gdPaneExpenses').hidden = false;
+    $('gdPaneChat').hidden = true;
+  }
+}
+
+// Short time label for a chat message ("14:32" today, "Yesterday 14:32", else a
+// friendly date + time). Cheap and locale-aware enough for a chat timeline.
+function chatTime(iso) {
+  const d = new Date(iso);
+  const t = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const day = friendlyDate(isoOf(d));
+  const today = friendlyDate(isoOf(new Date()));
+  return day === today ? t : `${day} ${t}`;
+}
+// Local YYYY-MM-DD (mirrors format.isoDay, kept local to avoid a new import churn).
+const isoOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+// Build one chat bubble as a DOM node (textContent-safe for user input). Consecutive
+// messages from the same sender omit the repeated name/avatar for a cleaner thread.
+function chatBubble(g, msg, showMeta) {
+  const mine = msg.sender_id === state.user?.id;
+  const wrap = document.createElement('div');
+  wrap.className = `chat-row ${mine ? 'mine' : 'theirs'}${showMeta ? ' with-meta' : ''}`;
+  wrap.dataset.sender = msg.sender_id;
+  if (showMeta && !mine) {
+    const av = document.createElement('span');
+    av.innerHTML = memberAvatar(g, msg.sender_id, 'chat-av');
+    wrap.appendChild(av.firstElementChild);
+  }
+  const col = document.createElement('div');
+  col.className = 'chat-col';
+  if (showMeta && !mine) {
+    const nm = document.createElement('span');
+    nm.className = 'chat-sender';
+    nm.textContent = memberName(g, msg.sender_id);
+    col.appendChild(nm);
+  }
+  const bubble = document.createElement('div');
+  bubble.className = 'chat-bubble';
+  const txt = document.createElement('span');
+  txt.className = 'chat-text';
+  txt.textContent = msg.body;
+  const time = document.createElement('span');
+  time.className = 'chat-time';
+  time.textContent = chatTime(msg.created_at);
+  bubble.appendChild(txt);
+  bubble.appendChild(time);
+  col.appendChild(bubble);
+  wrap.appendChild(col);
+  return wrap;
+}
+
+// Render the whole chat message list for the open group into #chatMessages, then
+// scroll to the bottom. Groups consecutive-by-sender (only the first shows meta).
+function renderGroupChat(g) {
+  const box = $('chatMessages');
+  const msgs = state.groupMessages[g.id] || [];
+  box.innerHTML = '';
+  if (!msgs.length) {
+    box.innerHTML = '<div class="empty"><span>💬</span>No messages yet. Say hello!</div>';
+    return;
+  }
+  let prevSender = null;
+  const frag = document.createDocumentFragment();
+  for (const m of msgs) {
+    frag.appendChild(chatBubble(g, m, m.sender_id !== prevSender));
+    prevSender = m.sender_id;
+  }
+  box.appendChild(frag);
+  box.scrollTop = box.scrollHeight;
+}
+
+// Append a single newly-arrived message to the open chat (live), keeping the
+// sender-grouping and autoscroll — used by the realtime handler when this chat
+// is the visible pane.
+function appendChatMessage(g, msg) {
+  const box = $('chatMessages');
+  const empty = box.querySelector('.empty');
+  if (empty) box.innerHTML = '';
+  const last = box.lastElementChild;
+  const prevSender = last?.dataset?.sender || null;
+  const showMeta = msg.sender_id !== prevSender;
+  const node = chatBubble(g, msg, showMeta);
+  node.dataset.sender = msg.sender_id;
+  const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+  box.appendChild(node);
+  if (nearBottom) box.scrollTop = box.scrollHeight;
+}
+
+// Reflect the chat unread count on the Chat tab badge.
+function renderChatUnread() {
+  const badge = $('chatUnread');
+  const n = state.chatUnread[state.openGroupId] || 0;
+  if (n > 0) {
+    badge.textContent = n > 99 ? '99+' : String(n);
+    badge.hidden = false;
+  } else {
+    badge.hidden = true;
+  }
+}
+
+// Show one pane of the group-detail screen ('expenses' | 'chat') and light its tab.
+// The add-expense FAB belongs to the Expenses pane only. Switching to Chat lazily
+// loads messages, joins presence, clears unread, and focuses the input.
+async function applyGdTab(name) {
+  gdTab = name;
+  document.querySelectorAll('#gdTabs .gd-tab').forEach((b) => b.classList.toggle('on', b.dataset.tab === name));
+  const chat = name === 'chat';
+  $('gdPaneExpenses').hidden = chat;
+  $('gdPaneChat').hidden = !chat;
+  const g = state.groups.find((x) => x.id === state.openGroupId);
+  // FAB only on Expenses (and never on a retired group, handled in renderGroupDetail).
+  const fab = $('groupAddBtn').closest('.fab');
+  if (fab) fab.style.display = chat || (g && g.retired) ? 'none' : '';
+  if (!chat || !g) return;
+
+  // Entering chat: clear unread, join presence, load (once) + render.
+  state.chatUnread[g.id] = 0;
+  renderChatUnread();
+  joinChatPresence(g.id);
+  if (!messagesLoaded.has(g.id)) {
+    await loadMessages(g.id);
+    messagesLoaded.add(g.id);
+  }
+  if (state.openGroupId === g.id && gdTab === 'chat') {
+    renderGroupChat(g);
+    $('chatInput').focus();
+  }
 }
 
 // Open the Groups popover (list + create/join). Group detail remains a full page.
@@ -705,12 +846,18 @@ function closeGroupsPopover() {
 
 // Open a group's full detail page (from the popover, or a group txn row).
 // `focusExpId` (optional): scroll to and flash that expense once rendered.
-export function showGroupDetail(id, focusExpId = null) {
+// `openChat` (optional): open straight to the Chat tab (used by the deep link).
+export function showGroupDetail(id, focusExpId = null, openChat = false) {
+  // Leaving any previously-open group's chat: drop its presence.
+  if (state.openGroupId && state.openGroupId !== id) leaveChatPresence(state.openGroupId);
   state.openGroupId = id;
   state.focusGroupExpId = focusExpId;
+  gdTab = 'expenses'; // default; applyGdTab flips to chat below when requested
   closeGroupsPopover();
   navTo('groups');
   renderGroupDetail();
+  if (openChat) applyGdTab('chat');
+  else applyGdTab('expenses');
 }
 
 // Re-render whatever group view is currently visible (called on cloud data reload).
@@ -920,6 +1067,7 @@ function memberResultRow(f) {
 export function initGroupsView() {
   // Group detail back -> previous screen (home, category, …).
   $('groupsBackBtn').onclick = () => {
+    if (state.openGroupId) leaveChatPresence(state.openGroupId);
     state.openGroupId = null;
     const to = navBack();
     renderForScreen(to);
@@ -1016,6 +1164,37 @@ export function initGroupsView() {
     if (!tab) return;
     groupTab = tab.dataset.tab;
     renderGroupList();
+  });
+
+  // --- Group detail: Expenses / Chat tabs ---
+  $('chatSend').innerHTML = icon.send({ size: 20 });
+  $('gdTabs').addEventListener('click', (e) => {
+    const tab = e.target.closest('.gd-tab');
+    if (tab) applyGdTab(tab.dataset.tab);
+  });
+
+  // Compose: send on submit (Enter or the Send button), then clear + refocus.
+  $('chatCompose').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = $('chatInput');
+    const body = input.value;
+    if (!body.trim() || !state.openGroupId) return;
+    input.value = '';
+    input.focus();
+    const ok = await sendMessage(state.openGroupId, body);
+    if (!ok) input.value = body; // restore so the user can retry
+  });
+
+  // Live incoming messages (from the shared realtime channel). If it's for the
+  // group + chat pane currently open, append a bubble; otherwise bump its unread.
+  onMessage((msg) => {
+    if (msg.group_id === state.openGroupId && gdTab === 'chat') {
+      const g = state.groups.find((x) => x.id === msg.group_id);
+      if (g) appendChatMessage(g, msg);
+    } else if (msg.sender_id !== state.user?.id) {
+      state.chatUnread[msg.group_id] = (state.chatUnread[msg.group_id] || 0) + 1;
+      if (msg.group_id === state.openGroupId) renderChatUnread();
+    }
   });
 
   // --- Add-member picker ---
