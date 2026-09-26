@@ -1,11 +1,15 @@
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import pkg from './package.json' with { type: 'json' };
 
 // Hosted under a sub-path on the static host; must match manifest scope/start_url.
 const BASE = '/expense-tracker/';
 
 export default defineConfig({
   base: BASE,
+  // Expose the package version to the app so it can detect updates and show a
+  // one-time "What's new" tutorial (see src/version.js / src/features/whatsnew.js).
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   plugins: [
     VitePWA({
       registerType: 'autoUpdate',

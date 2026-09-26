@@ -28,6 +28,7 @@ import { initGroupsView, refreshGroupsView, showGroupDetail } from './views/grou
 import { renderSyncUI, onLoginSync, onSynced } from './features/sync.js';
 import { showCoachmark } from './coachmark.js';
 import { persistPrefs } from './storage.js';
+import { initWhatsNew, maybeShowWhatsNew, openWhatsNew } from './features/whatsnew.js';
 
 // Deep-link join: capture ?join=CODE from the invite link, then strip it from the
 // URL so a refresh/re-login doesn't re-trigger. Handled after login + cloud load.
@@ -35,6 +36,8 @@ let pendingJoinCode = null;
 // Deep-link open: capture ?group=ID(&exp=ID) from a tapped push notification (or an
 // openWindow when the app was closed), then strip it. Opened after cloud load.
 let pendingOpen = null;
+// Deep-link: a tapped "what's new" broadcast push opens the tutorial carousel.
+let pendingWhatsNew = false;
 try {
   const params = new URLSearchParams(window.location.search);
   const code = params.get('join');
@@ -49,7 +52,11 @@ try {
     params.delete('exp');
     params.delete('chat');
   }
-  if (code || groupId) {
+  if (params.get('whatsnew') === '1') {
+    pendingWhatsNew = true;
+    params.delete('whatsnew');
+  }
+  if (code || groupId || pendingWhatsNew) {
     const qs = params.toString();
     const clean = window.location.pathname + (qs ? '?' + qs : '') + window.location.hash;
     window.history.replaceState({}, '', clean);
@@ -94,6 +101,7 @@ initAuth();
 initGroupsFeature();
 initGroupsView();
 initNewGroup();
+initWhatsNew();
 
 // React to sign in / out: load or clear cloud data, (un)subscribe to realtime,
 // update the header actions, and run personal-expense sync.
@@ -154,6 +162,10 @@ if ('serviceWorker' in navigator) {
     if (event.data?.type !== 'open-group') return;
     try {
       const u = new URL(event.data.url, window.location.origin);
+      if (u.searchParams.get('whatsnew') === '1') {
+        openWhatsNew();
+        return;
+      }
       const groupId = u.searchParams.get('group');
       if (!groupId) return;
       pendingOpen = { groupId, expId: u.searchParams.get('exp') || null, chat: u.searchParams.get('chat') === '1' };
@@ -241,6 +253,15 @@ onGroupData(() => {
 });
 
 render();
+
+// A tapped "what's new" push always opens the tutorial (bypass the version gate);
+// otherwise show it once if the app version changed since the user last saw it.
+if (pendingWhatsNew) {
+  pendingWhatsNew = false;
+  openWhatsNew();
+} else {
+  maybeShowWhatsNew();
+}
 
 // vite-plugin-pwa: keep the app up to date automatically.
 registerSW({ immediate: true });

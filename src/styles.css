@@ -807,6 +807,57 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .ob-next:active{transform:scale(.97)}
 /* Lone Next (Welcome / Done): no auto-margin so justify-center truly centers it. */
 .ob-next--lone{margin-left:0}
+
+/* ---- What's-new tutorial (centered modal carousel, shown once after an update) ---- */
+/* --wn-hue is set per-step from JS so the badge, glow and dots retint as you page through. */
+.wn-box{--wn-hue:var(--accent);text-align:center;overflow:hidden;position:relative;padding-top:1.5rem}
+/* Header: a small "✨ What's new" eyebrow sitting above a soft radial glow that bleeds
+   down behind the icon, tinted to the current step's hue. */
+.wn-header{position:relative}
+.wn-glow{position:absolute;top:-2.4rem;left:50%;transform:translateX(-50%);width:220px;height:170px;
+  pointer-events:none;background:radial-gradient(closest-side,color-mix(in srgb,var(--wn-hue) 34%,transparent),transparent 72%);
+  filter:blur(6px);transition:background .4s ease}
+.wn-eyebrow{position:relative;display:inline-flex;align-items:center;gap:5px;
+  font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--wn-hue);transition:color .4s ease}
+.wn-eyebrow-ico{display:inline-flex;align-items:center;justify-content:center}
+.wn-eyebrow-ico svg{display:block}
+.wn-steps{position:relative;margin-top:.6rem}
+.wn-step[hidden]{display:none}
+/* Directional slide-in so paging feels like a carousel, not a flicker. */
+.wn-in-right{animation:wn-slide-r .28s cubic-bezier(.22,.61,.36,1)}
+.wn-in-left{animation:wn-slide-l .28s cubic-bezier(.22,.61,.36,1)}
+@keyframes wn-slide-r{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
+@keyframes wn-slide-l{from{opacity:0;transform:translateX(-24px)}to{opacity:1;transform:none}}
+.wn-ico{width:72px;height:72px;margin:0 auto 1.1rem;border-radius:22px;display:flex;align-items:center;justify-content:center;
+  color:#fff;background:linear-gradient(150deg,color-mix(in srgb,var(--wn-hue) 88%,#fff),var(--wn-hue));
+  box-shadow:0 12px 28px color-mix(in srgb,var(--wn-hue) 34%,transparent);transition:background .4s ease,box-shadow .4s ease}
+.wn-ico svg{display:block;stroke-width:2}
+.wn-title{font-size:21px;font-weight:800;letter-spacing:-.3px;color:var(--ink);margin-bottom:.5rem}
+.wn-note{font-size:14.5px;color:var(--ink-soft);line-height:1.55;max-width:300px;margin:0 auto}
+/* Direction line: set apart from the explanation — accent color, monospace font, and a
+   soft accent-tinted pill so it reads as "where to tap". Retints with the step hue. */
+.wn-cta{margin:1.1rem auto 0;max-width:300px;padding:9px 13px;border-radius:var(--radius-sm);
+  background:color-mix(in srgb,var(--wn-hue) 9%,transparent);color:var(--wn-hue);
+  border:1px solid color-mix(in srgb,var(--wn-hue) 22%,transparent);
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;
+  font-weight:600;line-height:1.45;letter-spacing:-.1px;transition:color .4s ease,background .4s ease,border-color .4s ease}
+/* Dot pager replaces the old progress bar — one pip per step; the active one stretches. */
+.wn-dots{display:flex;justify-content:center;gap:7px;margin:1.4rem 0 .2rem}
+.wn-dot{width:7px;height:7px;padding:0;border:none;border-radius:99px;cursor:pointer;
+  background:rgba(0,0,0,.14);transition:width .3s ease,background .3s ease}
+.wn-dot.on{width:22px;background:var(--wn-hue)}
+.wn-actions{align-items:center;margin-top:.4rem}
+.wn-skip{background:none;border:none;color:var(--ink-mute);font-weight:600;cursor:pointer;padding:12px 8px}
+/* Next: a filled pill in the step hue with a trailing chevron. */
+.wn-next{margin-left:auto;display:inline-flex;align-items:center;gap:6px;
+  padding:11px 20px;border:none;border-radius:var(--radius-pill);cursor:pointer;
+  color:#fff;font-weight:700;font-size:14px;letter-spacing:-.1px;
+  background:linear-gradient(150deg,color-mix(in srgb,var(--wn-hue) 88%,#fff),var(--wn-hue));
+  box-shadow:0 8px 18px color-mix(in srgb,var(--wn-hue) 30%,transparent);
+  transition:transform .12s ease,box-shadow .4s ease,background .4s ease}
+.wn-next:active{transform:scale(.97)}
+.wn-next::after{content:"›";font-size:17px;line-height:1;font-weight:400;margin-top:-1px}
 .sheet-group .sheet-btn{border-bottom:1px solid var(--line)}
 .sheet-group .sheet-btn:last-child{border-bottom:none}
 .sb-ico{display:inline-flex;align-items:center;justify-content:center;width:22px;color:var(--accent)}
@@ -849,11 +900,17 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .gd-unread[hidden]{display:none}
 
 /* --- Group chat --- */
-#gdPaneChat{display:flex;flex-direction:column}
+/* On the chat tab, drop the screen's FAB-clearance bottom padding so the compose bar
+   reaches the true viewport bottom. */
+#groups.chat-active{padding-bottom:0}
+/* Fill the viewport from wherever the pane starts down to the bottom, so the compose
+   bar sits at the bottom of the screen even when there are only a few messages. The
+   scroll area flexes to take the slack; the compose bar is sticky within it. */
+#gdPaneChat{display:flex;flex-direction:column;min-height:calc(100vh - 190px)}
 #gdPaneChat[hidden],#gdPaneExpenses[hidden]{display:none}
 .chat-scroll{display:flex;flex-direction:column;gap:2px;overflow-y:auto;padding:4px 0 12px;
-  /* Fill from below the tabs to just above the sticky compose bar. */
-  min-height:220px;max-height:calc(100vh - 300px);-webkit-overflow-scrolling:touch}
+  /* Grow to fill the pane (pushing the compose bar down); scroll when overflowing. */
+  flex:1 1 auto;min-height:0;-webkit-overflow-scrolling:touch}
 .chat-scroll .empty{margin:auto}
 .chat-row{display:flex;align-items:flex-end;gap:8px;max-width:80%}
 .chat-row.theirs{align-self:flex-start}
