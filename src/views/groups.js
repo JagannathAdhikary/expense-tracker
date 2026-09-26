@@ -800,6 +800,9 @@ async function applyGdTab(name) {
   const chat = name === 'chat';
   $('gdPaneExpenses').hidden = chat;
   $('gdPaneChat').hidden = !chat;
+  // Drop the screen's FAB-clearance bottom padding on chat so the compose bar can sit
+  // flush at the bottom of the viewport (see #groups.chat-active in styles.css).
+  $('groups').classList.toggle('chat-active', chat);
   const g = state.groups.find((x) => x.id === state.openGroupId);
   // FAB only on Expenses (and never on a retired group, handled in renderGroupDetail).
   const fab = $('groupAddBtn').closest('.fab');

@@ -13,7 +13,7 @@ export const state = {
   recs: [],
   CATS: [],
   PAYS: [],
-  PREFS: { defaultCat: null, defaultPay: null, cloudSync: false },
+  PREFS: { defaultCat: null, defaultPay: null, cloudSync: false, lastSeenVersion: null },
   selCat: null,
   selPay: null,
   editId: null,
