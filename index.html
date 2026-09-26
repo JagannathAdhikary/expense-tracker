@@ -219,13 +219,26 @@
         </div>
       </div>
     </div>
-    <div id="groupRetiredBanner"></div>
-    <div id="groupPendingBanner"></div>
-    <div id="groupTotal"></div>
-    <div id="groupOwe"></div>
-    <div id="groupOwedTo"></div>
-    <p class="section-title" style="margin-top:14px">Expenses</p>
-    <div id="groupExpenseList"></div>
+    <div class="gd-tabs" id="gdTabs" role="tablist">
+      <button class="gd-tab on" data-tab="expenses" role="tab">Expenses</button>
+      <button class="gd-tab" data-tab="chat" role="tab">Chat <span class="gd-unread" id="chatUnread" hidden></span></button>
+    </div>
+    <div id="gdPaneExpenses">
+      <div id="groupRetiredBanner"></div>
+      <div id="groupPendingBanner"></div>
+      <div id="groupTotal"></div>
+      <div id="groupOwe"></div>
+      <div id="groupOwedTo"></div>
+      <p class="section-title" style="margin-top:14px">Expenses</p>
+      <div id="groupExpenseList"></div>
+    </div>
+    <div id="gdPaneChat" hidden>
+      <div class="chat-scroll" id="chatMessages"></div>
+      <form class="chat-compose" id="chatCompose" autocomplete="off">
+        <input id="chatInput" type="text" placeholder="Message…" maxlength="2000" aria-label="Message" />
+        <button type="submit" id="chatSend" class="chat-send" aria-label="Send"></button>
+      </form>
+    </div>
   </div>
   <div class="fab"><button id="groupAddBtn" aria-label="Add expense to this group">+</button></div>
 </div>

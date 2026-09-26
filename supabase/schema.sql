@@ -73,6 +73,16 @@ create table if not exists public.group_expenses (
 -- For projects created before payment method was added:
 alter table public.group_expenses add column if not exists pay text;
 
+-- Group chat: one text message per row. Immutable in v1 (no edit/delete policy).
+create table if not exists public.group_messages (
+  id         uuid primary key default gen_random_uuid(),
+  group_id   uuid not null references public.groups(id) on delete cascade,
+  sender_id  uuid not null references public.profiles(id) on delete cascade,
+  body       text not null check (char_length(body) between 1 and 2000),
+  created_at timestamptz not null default now()
+);
+create index if not exists group_messages_group_created on public.group_messages(group_id, created_at);
+
 create table if not exists public.expense_splits (
   id           uuid primary key default gen_random_uuid(),
   expense_id   uuid not null references public.group_expenses(id) on delete cascade,
@@ -188,6 +198,7 @@ alter table public.group_members  enable row level security;
 alter table public.group_expenses enable row level security;
 alter table public.expense_splits enable row level security;
 alter table public.settlements    enable row level security;
+alter table public.group_messages enable row level security;
 
 -- profiles ------------------------------------------------------------------
 drop policy if exists profiles_select on public.profiles;
@@ -272,6 +283,17 @@ drop policy if exists expenses_delete on public.group_expenses;
 create policy expenses_delete on public.group_expenses
   for delete using (payer_id = auth.uid());
 
+-- group_messages ------------------------------------------------------------
+-- Any member of the group may read the chat; only a member posting as themselves
+-- may write. Immutable in v1 — no update/delete policy (so nobody can edit/remove).
+drop policy if exists messages_select on public.group_messages;
+create policy messages_select on public.group_messages
+  for select using (public.is_group_member(group_id));
+
+drop policy if exists messages_insert on public.group_messages;
+create policy messages_insert on public.group_messages
+  for insert with check (sender_id = auth.uid() and public.is_group_member(group_id));
+
 -- expense_splits ------------------------------------------------------------
 drop policy if exists splits_select on public.expense_splits;
 create policy splits_select on public.expense_splits
@@ -336,7 +358,7 @@ create policy settlements_delete on public.settlements
 do $$
 declare t text;
 begin
-  foreach t in array array['group_expenses','expense_splits','settlements','groups','group_members'] loop
+  foreach t in array array['group_expenses','expense_splits','settlements','groups','group_members','group_messages'] loop
     if not exists (
       select 1 from pg_publication_tables
       where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t

@@ -33,6 +33,8 @@ export const state = {
   user: null, // signed-in user {id,email,name,avatar} or null (local-only)
   groups: [], // groups the user belongs to: {id,name,invite_code,members:[{id,name,avatar}]}
   groupExpenses: [], // group_expenses rows visible to the user
+  groupMessages: {}, // group chat: { [groupId]: [{id, sender_id, body, created_at}] } (lazy-loaded per group)
+  chatUnread: {}, // { [groupId]: count } of messages arrived while that chat wasn't open
   mySplits: [], // expense_splits rows involving the user (for borrowed rows + settle)
   settlements: [], // settlements rows for the user's groups (auto-netting + manual settle-ups)
   openGroupId: null, // group currently open in the Groups detail view

@@ -44,9 +44,10 @@ try {
   }
   const groupId = params.get('group');
   if (groupId) {
-    pendingOpen = { groupId, expId: params.get('exp') || null };
+    pendingOpen = { groupId, expId: params.get('exp') || null, chat: params.get('chat') === '1' };
     params.delete('group');
     params.delete('exp');
+    params.delete('chat');
   }
   if (code || groupId) {
     const qs = params.toString();
@@ -139,10 +140,10 @@ async function maybeJoinFromLink() {
 // Only opens a group the user is actually a member of (cloud data must be loaded).
 function maybeOpenGroupFromLink() {
   if (!pendingOpen || !state.user) return;
-  const { groupId, expId } = pendingOpen;
+  const { groupId, expId, chat } = pendingOpen;
   if (!state.groups.some((g) => g.id === groupId)) return; // not (yet) a member; leave pending
   pendingOpen = null; // consume it
-  showGroupDetail(groupId, expId || null);
+  showGroupDetail(groupId, expId || null, !!chat);
 }
 
 // Service worker relays a tapped notification while the app is already open. If cloud
@@ -155,7 +156,7 @@ if ('serviceWorker' in navigator) {
       const u = new URL(event.data.url, window.location.origin);
       const groupId = u.searchParams.get('group');
       if (!groupId) return;
-      pendingOpen = { groupId, expId: u.searchParams.get('exp') || null };
+      pendingOpen = { groupId, expId: u.searchParams.get('exp') || null, chat: u.searchParams.get('chat') === '1' };
       maybeOpenGroupFromLink();
     } catch {
       /* malformed url from SW — ignore */
