@@ -1003,17 +1003,25 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 
 /* --- Group chat --- */
 /* On the chat tab, drop the screen's FAB-clearance bottom padding so the compose bar
-   reaches the true viewport bottom. */
+   reaches the true viewport bottom. The full cover hero (name + members) stays exactly
+   as it is on the Expenses tab — chat keeps the normal group header. */
 #groups.chat-active{padding-bottom:0}
 /* Fill the viewport from wherever the pane starts down to the bottom, so the compose
    bar sits at the bottom of the screen even when there are only a few messages. The
    scroll area flexes to take the slack; the compose bar is sticky within it. */
-#gdPaneChat{display:flex;flex-direction:column;min-height:calc(100vh - 190px)}
+#gdPaneChat{display:flex;flex-direction:column;min-height:calc(100vh - 320px)}
 #gdPaneChat[hidden],#gdPaneExpenses[hidden]{display:none}
 .chat-scroll{display:flex;flex-direction:column;gap:2px;overflow-y:auto;padding:4px 0 12px;
   /* Grow to fill the pane (pushing the compose bar down); scroll when overflowing. */
   flex:1 1 auto;min-height:0;-webkit-overflow-scrolling:touch}
 .chat-scroll .empty{margin:auto}
+/* Chat empty state: a soft accent circle around the stroked chat icon, centered
+   ABOVE the text. `display:flex` (not inline-flex) makes the circle a block so the
+   caption wraps onto its own line below it instead of sitting beside it. */
+.chat-empty .chat-empty-ico{display:flex;align-items:center;justify-content:center;
+  width:64px;height:64px;margin:0 auto .8rem;border-radius:50%;
+  background:var(--bg-2);color:var(--accent);font-size:0}
+.chat-empty .chat-empty-ico svg{display:block}
 /* "Showing recent messages" hint at the top when the backfill is capped. */
 .chat-start{align-self:center;margin:2px 0 8px;font-size:11px;color:var(--ink-mute);letter-spacing:.02em}
 /* Centered "New messages" divider before the first unseen message. */
