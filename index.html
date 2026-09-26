@@ -84,11 +84,20 @@
     <h1>Analytics</h1>
     <span style="width:40px"></span>
   </header>
-  <p class="section-title" id="anPeriod" style="text-align:center"></p>
 
-  <!-- Hero total + month-over-month delta -->
+  <!-- Period toggle: rescopes every chart below. -->
+  <div class="an-period-seg" id="anPeriodSeg" role="tablist" aria-label="Time range">
+    <button data-period="month" class="on" role="tab" aria-selected="true">Month</button>
+    <button data-period="3" role="tab" aria-selected="false">3M</button>
+    <button data-period="6" role="tab" aria-selected="false">6M</button>
+    <button data-period="12" role="tab" aria-selected="false">12M</button>
+    <button data-period="all" role="tab" aria-selected="false">All</button>
+  </div>
+  <p class="section-title an-range" id="anPeriod" style="text-align:center"></p>
+
+  <!-- Hero total + period-over-period delta -->
   <div class="an-hero">
-    <div class="an-hero-lbl">Total spent</div>
+    <div class="an-hero-lbl" id="anHeroLbl">Total spent</div>
     <div class="an-hero-val" id="anTot">₹0</div>
     <div class="an-delta" id="anDelta"></div>
   </div>
@@ -96,19 +105,31 @@
   <!-- KPI stat tiles -->
   <div class="an-kpis" id="anKpis"></div>
 
+  <!-- Spending over time: monthly trend line (multi-month) or day-of-month strip (single month) -->
+  <p class="section-title" id="anTimeTitle">Daily spend</p>
+  <div class="an-timechart" id="anTimeChart"></div>
+
   <!-- Category breakdown: donut + bars -->
   <p class="section-title">By category</p>
-  <div id="anCatEmpty" class="empty" style="display:none"><span>📊</span>No spending to analyze this month.</div>
+  <div id="anCatEmpty" class="empty" style="display:none"><span>📊</span>No spending to analyze in this range.</div>
   <div class="an-donut-wrap" id="anDonutWrap">
     <div class="an-donut" id="anDonut"></div>
     <div class="an-legend" id="anLegend"></div>
   </div>
   <div class="cat-bars" id="anBars"></div>
 
-  <!-- Daily spend trend -->
-  <p class="section-title">Daily spend</p>
-  <div class="an-trend" id="anTrend"></div>
+  <!-- Payment-method split -->
+  <p class="section-title" id="anPayTitle">By payment method</p>
+  <div class="an-pay" id="anPay"></div>
+
+  <!-- Weekday spending pattern (emphasis: peak highlighted) -->
+  <p class="section-title">Spending by weekday</p>
+  <div class="an-weekday" id="anWeekday"></div>
+
+  <!-- Shared floating tooltip for hover/focus on charts -->
+  <div class="an-tip" id="anTip" role="status" aria-live="polite" hidden></div>
 </div>
+
 
 <!-- GROUP SETTINGS (full-screen actions) -->
 <div id="groupSettings" class="screen">

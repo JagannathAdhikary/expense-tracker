@@ -258,6 +258,14 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .cat-row .camt{width:80px;text-align:right;font-size:13px;font-weight:600}
 
 /* ---- Analytics page ---- */
+#analytics{position:relative} /* anchor for the floating tooltip */
+
+/* Period toggle — segmented control that rescopes every chart */
+.an-period-seg{display:flex;gap:4px;background:var(--surface);border-radius:var(--radius-pill);padding:4px;box-shadow:var(--sh-sm);margin-bottom:10px}
+.an-period-seg button{flex:1;border:none;background:none;font:inherit;font-size:12px;font-weight:600;color:var(--ink-soft);padding:7px 4px;border-radius:var(--radius-pill);cursor:pointer;transition:background .15s,color .15s}
+.an-period-seg button.on{background:var(--accent);color:#fff}
+.an-range{margin-bottom:14px}
+
 .an-hero{background:var(--grad-accent);border-radius:var(--radius);padding:1.3rem 1.2rem;box-shadow:var(--sh-accent);margin-bottom:14px;text-align:center;color:#fff}
 .an-hero-lbl{font-size:12px;color:rgba(255,255,255,.78);font-weight:500}
 .an-hero-val{font-size:34px;font-weight:800;letter-spacing:-.6px;margin-top:4px}
@@ -269,8 +277,24 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .an-kpi{background:var(--surface);border-radius:var(--radius-sm);padding:.75rem .85rem;box-shadow:var(--sh-sm)}
 .an-kpi-lbl{font-size:11px;color:var(--ink-mute);font-weight:500}
 .an-kpi-val{font-size:17px;font-weight:700;color:var(--accent);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Spending-over-time chart (monthly line or day-of-month strip) */
+.an-timechart{background:var(--surface);border-radius:var(--radius-sm);padding:.9rem .8rem 1rem;box-shadow:var(--sh-sm);margin-bottom:1.5rem}
+.an-timechart svg{display:block;overflow:visible}
+.an-axis-lbl{font-size:9px;fill:var(--ink-mute)}
+.an-line-stroke{stroke:var(--accent);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.an-line-area{fill:var(--accent);opacity:.10}
+.an-line-dot{fill:var(--accent)}
+.an-cross-line{stroke:var(--accent);stroke-width:1;opacity:.35}
+.an-bar{fill:#c7d4e6}         /* muted day bars */
+.an-bar-peak{fill:var(--accent)} /* emphasis: the peak day */
+
 .an-donut-wrap{display:flex;align-items:center;gap:16px;margin-bottom:1.2rem;flex-wrap:wrap}
 .an-donut{flex:0 0 auto}
+.an-donut svg{cursor:default}
+.an-donut path{transition:opacity .15s}
+.an-donut svg:hover path{opacity:.55}
+.an-donut svg:hover path:hover{opacity:1}
 .an-donut-total{font-size:19px;font-weight:800;fill:var(--ink)}
 .an-donut-sub{font-size:9px;fill:var(--ink-mute);text-transform:uppercase;letter-spacing:.5px}
 .an-legend{flex:1;min-width:150px;display:flex;flex-direction:column;gap:6px}
@@ -278,9 +302,30 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .an-leg-dot{width:10px;height:10px;border-radius:3px;flex:0 0 auto}
 .an-leg-name{flex:1;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .an-leg-pct{font-weight:700;font-variant-numeric:tabular-nums}
-.an-trend{--an-trend-bar:#9ec5f4;background:var(--surface);border-radius:var(--radius-sm);padding:.9rem .8rem 1.1rem;box-shadow:var(--sh-sm);margin-bottom:1.4rem}
-.an-trend svg{display:block}
-.an-trend-lbl{font-size:9px;fill:var(--ink-mute)}
+
+/* Payment-method split — horizontal stacked bar + labelled legend */
+.an-pay{margin-bottom:1.5rem}
+.an-pay-bar{display:flex;height:14px;border-radius:var(--radius-pill);overflow:hidden;gap:2px;background:var(--surface)}
+.an-pay-seg{height:100%;min-width:3px;cursor:default;transition:filter .15s}
+.an-pay-seg:hover{filter:brightness(1.08)}
+.an-pay-legend{display:flex;flex-direction:column;gap:6px;margin-top:12px}
+.an-pay-leg{display:flex;align-items:center;gap:8px;font-size:13px}
+.an-pay-name{flex:1;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.an-pay-amt{font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink)}
+.an-pay-pct{width:42px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink-mute)}
+
+/* Weekday pattern — emphasis bars (peak in accent, rest muted) */
+.an-weekday{display:flex;flex-direction:column;gap:9px;margin-bottom:1.5rem}
+.an-wd-row{display:flex;align-items:center;gap:10px}
+.an-wd-lbl{width:34px;font-size:12px;font-weight:600;color:var(--ink-soft)}
+.an-wd-track{flex:1;background:var(--line);border-radius:var(--radius-pill);height:8px;overflow:hidden}
+.an-wd-fill{height:100%;border-radius:var(--radius-pill);background:#c7d4e6;transition:width .4s ease}
+.an-wd-fill.is-peak{background:var(--accent)}
+.an-wd-amt{width:64px;text-align:right;font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums}
+
+/* Floating tooltip — enhances charts; every value is also on axis/legend */
+.an-tip{position:absolute;z-index:20;pointer-events:none;background:var(--ink);color:#fff;font-size:12px;line-height:1.35;padding:6px 9px;border-radius:8px;box-shadow:var(--sh-md);white-space:nowrap;font-variant-numeric:tabular-nums}
+.an-tip b{font-weight:700}
 
 /* Date group */
 .date-group{margin-bottom:10px}
@@ -971,9 +1016,10 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .chat-scroll .empty{margin:auto}
 /* "Showing recent messages" hint at the top when the backfill is capped. */
 .chat-start{align-self:center;margin:2px 0 8px;font-size:11px;color:var(--ink-mute);letter-spacing:.02em}
-/* Centered day-divider chip between calendar days. */
-.chat-day{align-self:center;margin:12px 0 6px;font-size:11px;font-weight:600;color:var(--ink-soft);
-  background:var(--bg-2);border:1px solid var(--line);padding:3px 12px;border-radius:var(--radius-pill)}
+/* Centered "New messages" divider before the first unseen message. */
+.chat-unread-div{align-self:stretch;display:flex;align-items:center;gap:10px;margin:14px 2px 8px;
+  font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--accent)}
+.chat-unread-div::before,.chat-unread-div::after{content:"";flex:1;height:1px;background:var(--line)}
 .chat-row{display:flex;align-items:flex-end;gap:8px;max-width:82%}
 .chat-row.theirs{align-self:flex-start}
 .chat-row.mine{align-self:flex-end;flex-direction:row-reverse}
@@ -1000,3 +1046,9 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .chat-send{flex:0 0 auto;width:42px;height:42px;border:none;background:var(--grad-accent);color:#fff;border-radius:50%;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;box-shadow:var(--sh-accent);transition:transform .1s,opacity .15s}
 .chat-send svg{margin-left:-2px}
 .chat-send:active{transform:scale(.94);opacity:.9}
+/* Retired group: compose bar is read-only. Dim it and neutralize the send button. */
+.chat-compose.is-readonly{opacity:.85}
+.chat-compose.is-readonly input{background:var(--bg-2);color:var(--ink-mute);cursor:not-allowed}
+.chat-compose.is-readonly input::placeholder{color:var(--ink-mute)}
+.chat-compose.is-readonly .chat-send{background:var(--line);color:var(--ink-mute);box-shadow:none;cursor:not-allowed}
+.chat-compose.is-readonly .chat-send:active{transform:none}

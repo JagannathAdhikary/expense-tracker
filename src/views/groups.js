@@ -732,16 +732,14 @@ function chatTime(iso) {
 // Local YYYY-MM-DD (mirrors format.isoDay, kept local to avoid a new import churn).
 const isoOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-// A centered day-divider chip ("Today" / "Yesterday" / friendly date) inserted into
-// the timeline when the calendar day changes between messages.
-function chatDayDivider(iso) {
+// A centered "New messages" divider inserted before the first message the viewer
+// hasn't seen yet, so opening a chat lands them on where they left off.
+function chatUnreadDivider() {
   const wrap = document.createElement('div');
-  wrap.className = 'chat-day';
+  wrap.className = 'chat-unread-div';
   const chip = document.createElement('span');
-  const day = friendlyDate(isoOf(new Date(iso)));
-  chip.textContent = day;
+  chip.textContent = 'New messages';
   wrap.appendChild(chip);
-  wrap.dataset.day = isoOf(new Date(iso));
   return wrap;
 }
 
@@ -780,10 +778,11 @@ function chatBubble(g, msg, showMeta) {
   return wrap;
 }
 
-// Render the whole chat message list for the open group into #chatMessages, then
-// scroll to the bottom. Groups consecutive-by-sender (only the first shows meta),
-// and inserts a day-divider whenever the calendar day changes.
-function renderGroupChat(g) {
+// Render the whole chat message list for the open group into #chatMessages. Groups
+// consecutive-by-sender (only the first shows meta). `unread` is how many trailing
+// messages the viewer hasn't seen: when > 0 we mark that boundary and scroll to it;
+// otherwise we scroll all the way to the bottom.
+function renderGroupChat(g, unread = 0) {
   const box = $('chatMessages');
   const msgs = state.groupMessages[g.id] || [];
   box.innerHTML = '';
@@ -800,39 +799,33 @@ function renderGroupChat(g) {
     hint.textContent = 'Showing recent messages';
     frag.appendChild(hint);
   }
+  // The first unseen message is the Nth-from-last, where N = unread count.
+  const firstUnseen = unread > 0 ? Math.max(0, msgs.length - unread) : -1;
   let prevSender = null;
-  let prevDay = null;
-  for (const m of msgs) {
-    const day = isoOf(new Date(m.created_at));
-    if (day !== prevDay) {
-      frag.appendChild(chatDayDivider(m.created_at));
-      prevSender = null; // force meta after a day break
+  let unreadMark = null;
+  msgs.forEach((m, i) => {
+    if (i === firstUnseen) {
+      unreadMark = chatUnreadDivider();
+      frag.appendChild(unreadMark);
+      prevSender = null; // force meta after the divider
     }
     frag.appendChild(chatBubble(g, m, m.sender_id !== prevSender));
     prevSender = m.sender_id;
-    prevDay = day;
-  }
+  });
   box.appendChild(frag);
-  box.scrollTop = box.scrollHeight;
+  // Land on the first unseen message if there is one, else at the very bottom.
+  if (unreadMark) box.scrollTop = unreadMark.offsetTop - 8;
+  else box.scrollTop = box.scrollHeight;
 }
 
 // Append a single newly-arrived message to the open chat (live), keeping the
-// sender-grouping, day-dividers and autoscroll — used by the realtime handler when
-// this chat is the visible pane. New bubbles animate in.
+// sender-grouping and autoscroll — used by the realtime handler when this chat is
+// the visible pane. New bubbles animate in.
 function appendChatMessage(g, msg) {
   const box = $('chatMessages');
   const empty = box.querySelector('.empty');
   if (empty) box.innerHTML = '';
-  // Insert a day-divider if this message crosses into a new calendar day.
-  const day = isoOf(new Date(msg.created_at));
-  const lastDay = box.querySelector('.chat-day:last-of-type')?.dataset?.day;
-  const rows = box.querySelectorAll('.chat-row');
-  const seenDay = rows.length ? lastDay : null;
-  let prevSender = box.lastElementChild?.dataset?.sender || null;
-  if (rows.length && day !== seenDay) {
-    box.appendChild(chatDayDivider(msg.created_at));
-    prevSender = null;
-  }
+  const prevSender = box.querySelector('.chat-row:last-of-type')?.dataset?.sender || null;
   const showMeta = msg.sender_id !== prevSender;
   const node = chatBubble(g, msg, showMeta);
   node.dataset.sender = msg.sender_id;
@@ -841,6 +834,18 @@ function appendChatMessage(g, msg) {
   box.appendChild(node);
   requestAnimationFrame(() => node.classList.remove('chat-enter'));
   if (nearBottom) box.scrollTop = box.scrollHeight;
+}
+
+// Enable or disable the chat compose bar. A retired group is read-only: the input +
+// send are disabled and a small note replaces the placeholder cue. Restoring re-enables.
+function setChatComposeEnabled(on) {
+  const form = $('chatCompose');
+  const input = $('chatInput');
+  const send = $('chatSend');
+  form.classList.toggle('is-readonly', !on);
+  input.disabled = !on;
+  send.disabled = !on;
+  input.placeholder = on ? 'Message…' : 'This group is retired — chat is read-only';
 }
 
 // Reflect the chat unread count on the Chat tab badge.
@@ -873,14 +878,17 @@ async function applyGdTab(name) {
   if (fab) fab.style.display = chat || (g && g.retired) ? 'none' : '';
   if (!chat || !g) return;
 
-  // Entering chat: clear unread, join presence, load (once) + render.
+  // Entering chat: remember how many are unseen, then clear the badge.
+  const unread = state.chatUnread[g.id] || 0;
   state.chatUnread[g.id] = 0;
   renderChatUnread();
+  // A retired group is read-only: history stays readable, but no new messages.
+  setChatComposeEnabled(!g.retired);
   joinChatPresence(g.id);
   await prefetchChat(g.id); // shares the once-guard + in-flight promise from open
   if (state.openGroupId === g.id && gdTab === 'chat') {
-    renderGroupChat(g);
-    $('chatInput').focus();
+    renderGroupChat(g, unread);
+    if (!g.retired) $('chatInput').focus();
   }
 }
 
@@ -931,19 +939,14 @@ export function showGroupDetail(id, focusExpId = null, openChat = false) {
 // Background prefetch of a group's messages on open (once per group). Kept separate
 // from applyGdTab so a plain open doesn't block on the network; the tab switch reuses
 // the cached result via the shared `messagesLoaded` guard. Dedupes concurrent callers
-// (group open + an immediate Chat-tab tap) onto one in-flight fetch.
+// (group open + an immediate Chat-tab tap) onto one in-flight fetch. The awaiting
+// caller (applyGdTab) does the paint — with the unread position — once this resolves.
 function prefetchChat(id) {
   if (messagesLoaded.has(id)) return Promise.resolve();
   if (chatLoading.has(id)) return chatLoading.get(id);
   const p = loadMessages(id)
     .then(() => {
       messagesLoaded.add(id);
-      // If the user already flipped to Chat for this group while the fetch was in
-      // flight, paint what we just loaded.
-      if (state.openGroupId === id && gdTab === 'chat') {
-        const g = state.groups.find((x) => x.id === id);
-        if (g) renderGroupChat(g);
-      }
     })
     .finally(() => chatLoading.delete(id));
   chatLoading.set(id, p);
@@ -1290,6 +1293,9 @@ export function initGroupsView() {
     const input = $('chatInput');
     const body = input.value;
     if (!body.trim() || !state.openGroupId) return;
+    // Retired groups are read-only — never send (the bar is disabled, but guard anyway).
+    const g = state.groups.find((x) => x.id === state.openGroupId);
+    if (g?.retired) return;
     input.value = '';
     input.focus();
     const ok = await sendMessage(state.openGroupId, body);
