@@ -1002,17 +1002,20 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .gd-unread[hidden]{display:none}
 
 /* --- Group chat --- */
-/* On the chat tab, drop the screen's FAB-clearance bottom padding so the compose bar
-   reaches the true viewport bottom. The full cover hero (name + members) stays exactly
-   as it is on the Expenses tab — chat keeps the normal group header. */
-#groups.chat-active{padding-bottom:0}
-/* Fill the viewport from wherever the pane starts down to the bottom, so the compose
-   bar sits at the bottom of the screen even when there are only a few messages. The
-   scroll area flexes to take the slack; the compose bar is sticky within it. */
-#gdPaneChat{display:flex;flex-direction:column;min-height:calc(100vh - 320px)}
+/* On the chat tab, drop the screen's FAB-clearance bottom padding so the message
+   list can reach the true viewport bottom. The full cover hero (name + members)
+   stays exactly as it is on the Expenses tab — chat keeps the normal group header.
+   The screen itself stops scrolling; the message list is the only scroll area. */
+#groups.chat-active{padding-bottom:0;overflow:hidden}
+/* The pane fills from where it starts down to the bottom of the visual viewport.
+   The message list scrolls internally; the compose bar is pinned at the bottom and
+   never scrolls with the messages. --kb is the on-screen keyboard height (0 when
+   closed), set from visualViewport so the compose bar rides just above the keyboard. */
+#gdPaneChat{display:flex;flex-direction:column;
+  height:calc(100vh - var(--gd-chat-top,300px) - var(--kb,0px));min-height:0}
 #gdPaneChat[hidden],#gdPaneExpenses[hidden]{display:none}
 .chat-scroll{display:flex;flex-direction:column;gap:2px;overflow-y:auto;padding:4px 0 12px;
-  /* Grow to fill the pane (pushing the compose bar down); scroll when overflowing. */
+  /* Grow to fill the pane (pushing the compose bar to the bottom); scroll when overflowing. */
   flex:1 1 auto;min-height:0;-webkit-overflow-scrolling:touch}
 .chat-scroll .empty{margin:auto}
 /* Chat empty state: a soft accent circle around the stroked chat icon, centered
@@ -1030,6 +1033,15 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .chat-unread-div::before,.chat-unread-div::after{content:"";flex:1;height:1px;background:var(--line)}
 .chat-row{display:flex;align-items:flex-end;gap:8px;max-width:82%}
 .chat-row.theirs{align-self:flex-start}
+/* First bubble of a run (beside the avatar): top-align the avatar with the bubble's
+   top edge and close the row gap so the corner tail meets the avatar. The sender
+   name sits above in the column, so nudge the avatar down past it to the bubble top. */
+.chat-row.theirs.with-meta{gap:6px;align-items:flex-start}
+.chat-row.theirs.with-meta .chat-av{margin-top:19px}
+/* Consecutive messages from the same sender omit the avatar. Reserve the avatar
+   gutter (26px avatar + 8px gap) so those bubbles line up under the first one
+   instead of sliding left into the empty gutter. */
+.chat-row.theirs:not(.with-meta){padding-left:34px}
 .chat-row.mine{align-self:flex-end;flex-direction:row-reverse}
 .chat-row.with-meta{margin-top:9px}
 /* New live messages animate in (subtle rise + fade). */
@@ -1040,15 +1052,26 @@ header h1{font-size:19px;font-weight:700;letter-spacing:-.2px}
 .chat-sender{font-size:11.5px;font-weight:600;color:var(--ink-soft);margin-left:12px}
 /* Bubble: text + a small trailing time on one flow. flex-wrap lets the time tuck
    into the bottom-right of the last line, or drop below on a long final word. */
-.chat-bubble{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:flex-end;gap:2px 8px;
+.chat-bubble{position:relative;display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:flex-end;gap:2px 8px;
   background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:16px;padding:7px 12px;
   font-size:14.5px;line-height:1.35;word-break:break-word;box-shadow:var(--sh-sm)}
 .chat-text{white-space:pre-wrap;flex:1 1 auto;min-width:0}
-.chat-row.mine .chat-bubble{background:var(--grad-accent);color:#fff;border:none;border-bottom-right-radius:5px;box-shadow:var(--sh-accent)}
-.chat-row.theirs .chat-bubble{border-bottom-left-radius:5px}
+.chat-row.mine .chat-bubble{background:var(--grad-accent);color:#fff;border:none;box-shadow:var(--sh-accent)}
+/* Speech-bubble tail on the FIRST bubble of a run (the one beside the avatar):
+   square the avatar-facing TOP corner and fill it with a small triangle so the
+   corner comes to a point aimed at the avatar (Telegram/WhatsApp style). The other
+   three corners stay rounded; consecutive bubbles have no tail. */
+.chat-row.theirs.with-meta .chat-bubble{border-top-left-radius:0}
+.chat-row.mine.with-meta .chat-bubble{border-top-right-radius:0}
+.chat-row.with-meta .chat-bubble::before{content:"";position:absolute;top:0;
+  width:0;height:0;border-style:solid}
+.chat-row.theirs.with-meta .chat-bubble::before{left:-7px;
+  border-width:0 8px 10px 0;border-color:transparent var(--surface) transparent transparent}
+.chat-row.mine.with-meta .chat-bubble::before{right:-7px;
+  border-width:0 0 10px 8px;border-color:transparent transparent transparent #264a76}
 .chat-time{flex:0 0 auto;font-size:10px;opacity:.55;line-height:1;padding-bottom:1px;white-space:nowrap}
 .chat-row.mine .chat-time{color:#fff;opacity:.75}
-.chat-compose{position:sticky;bottom:0;display:flex;gap:8px;align-items:center;padding:10px 0 calc(env(safe-area-inset-bottom,0px) + 10px);background:linear-gradient(to top,var(--bg) 72%,transparent)}
+.chat-compose{flex:0 0 auto;display:flex;gap:8px;align-items:center;padding:10px 0 calc(env(safe-area-inset-bottom,0px) + 10px);background:linear-gradient(to top,var(--bg) 72%,transparent)}
 .chat-compose input{flex:1;min-width:0;padding:11px 16px;font-size:15px;border:1.5px solid var(--line);border-radius:var(--radius-pill);background:var(--surface);color:var(--ink);transition:border-color .15s,box-shadow .15s}
 .chat-compose input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,58,95,.12)}
 .chat-send{flex:0 0 auto;width:42px;height:42px;border:none;background:var(--grad-accent);color:#fff;border-radius:50%;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;box-shadow:var(--sh-accent);transition:transform .1s,opacity .15s}

@@ -864,6 +864,38 @@ function renderChatUnread() {
   }
 }
 
+// Size the chat pane so the message list scrolls internally and the compose bar
+// stays pinned at the bottom (above the keyboard) — the page itself doesn't scroll
+// in chat. --gd-chat-top is the distance from the viewport top to where the pane
+// begins (hero + tabs); --kb is the on-screen keyboard height from visualViewport.
+function syncChatLayout() {
+  if (!$('groups').classList.contains('chat-active')) return;
+  const pane = $('gdPaneChat');
+  const top = pane.getBoundingClientRect().top; // pane's top in the viewport
+  const root = document.documentElement;
+  root.style.setProperty('--gd-chat-top', `${Math.max(0, Math.round(top))}px`);
+  const vv = window.visualViewport;
+  const kb = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0;
+  root.style.setProperty('--kb', `${Math.round(kb)}px`);
+  // Keep the newest message visible when the keyboard opens/closes.
+  const box = $('chatMessages');
+  if (box) box.scrollTop = box.scrollHeight;
+}
+let vvBound = false;
+function bindChatViewport(on) {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  if (on && !vvBound) {
+    vv.addEventListener('resize', syncChatLayout);
+    vv.addEventListener('scroll', syncChatLayout);
+    vvBound = true;
+  } else if (!on && vvBound) {
+    vv.removeEventListener('resize', syncChatLayout);
+    vv.removeEventListener('scroll', syncChatLayout);
+    vvBound = false;
+  }
+}
+
 // Show one pane of the group-detail screen ('expenses' | 'chat') and light its tab.
 // The add-expense FAB belongs to the Expenses pane only. Switching to Chat lazily
 // loads messages, joins presence, and clears unread. We deliberately do NOT focus
@@ -877,11 +909,18 @@ async function applyGdTab(name) {
   // Drop the screen's FAB-clearance bottom padding on chat so the compose bar can sit
   // flush at the bottom of the viewport (see #groups.chat-active in styles.css).
   $('groups').classList.toggle('chat-active', chat);
+  if (chat) {
+    // The page doesn't scroll in chat; reset it to the top so the hero + tabs are
+    // fully shown and the pane's top offset (--gd-chat-top) is measured stable.
+    window.scrollTo(0, 0);
+    updateGroupTopbar();
+  }
   const g = state.groups.find((x) => x.id === state.openGroupId);
   // FAB only on Expenses (and never on a retired group, handled in renderGroupDetail).
   const fab = $('groupAddBtn').closest('.fab');
   if (fab) fab.style.display = chat || (g && g.retired) ? 'none' : '';
-  if (!chat || !g) return;
+  if (!chat) { bindChatViewport(false); return; }
+  if (!g) return;
 
   // Entering chat: remember how many are unseen, then clear the badge.
   const unread = state.chatUnread[g.id] || 0;
@@ -890,9 +929,11 @@ async function applyGdTab(name) {
   // A retired group is read-only: history stays readable, but no new messages.
   setChatComposeEnabled(!g.retired);
   joinChatPresence(g.id);
+  bindChatViewport(true);
   await prefetchChat(g.id); // shares the once-guard + in-flight promise from open
   if (state.openGroupId === g.id && gdTab === 'chat') {
     renderGroupChat(g, unread);
+    syncChatLayout();
   }
 }
 
@@ -1166,6 +1207,7 @@ export function initGroupsView() {
   $('groupsBackBtn').onclick = () => {
     if (state.openGroupId) leaveChatPresence(state.openGroupId);
     state.openGroupId = null;
+    bindChatViewport(false);
     $('groups').classList.remove('chat-active'); // leave chat layout behind
     const to = navBack();
     renderForScreen(to);
